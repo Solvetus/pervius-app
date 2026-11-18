@@ -1,0 +1,37 @@
+.TH PERVIUS-PROOF 1 "2026-11-18" "Pervius" "User Commands"
+.SH NAME
+pervius\-proof \- live NetworkManager/OpenVPN connection test
+.SH SYNOPSIS
+.B pervius\-proof
+.BI \-\-location " CITY"
+.RB [ \-\-proto " udp|tcp]"
+.RB [ \-\-refresh ]
+.RB [ \-\-timeout
+.IR SECONDS ]
+.RB [ \-\-delete\-profile ]
+.SH DESCRIPTION
+Creates or updates the Pervius-managed NetworkManager profile for the chosen
+location and brings up a real VPN connection, then waits for Enter to
+disconnect. It changes NetworkManager settings; run it only when you intend
+to. Close the desktop application first.
+.PP
+The username and password are prompted for locally. A password is never
+accepted as an argument, environment variable or file, and is never printed.
+.SH OPTIONS
+.TP
+.BI \-\-location " CITY"
+City or COUNTRY/City to connect to.
+.TP
+.BR \-\-proto " udp|tcp"
+Transport (default udp).
+.TP
+.B \-\-refresh
+Download a fresh catalogue first.
+.TP
+.BI \-\-timeout " SECONDS"
+Connection timeout (default 90).
+.TP
+.B \-\-delete\-profile
+Offer to delete the managed profile afterwards.
+.SH SEE ALSO
+.BR pervius (1)

@@ -1,0 +1,37 @@
+.TH PERVIUS-KILLSWITCH 1 "2026-11-18" "Pervius" "User Commands"
+.SH NAME
+pervius\-killswitch \- control the Pervius VPN kill switch
+.SH SYNOPSIS
+.B pervius\-killswitch
+.RB { status | arm " [" \-\-allow\-lan "] | " disarm | diagnose }
+.SH DESCRIPTION
+Talks to the
+.B pervius\-killswitchd
+system service over D-Bus. Arming and disarming are authorized by polkit.
+While armed, the service installs the nftables table
+.B inet pervius_ks
+that allows only loopback, the tunnel interface, DHCP, IPv6 neighbour
+discovery and the VPN server addresses of the Pervius-managed profile, and
+drops all other traffic.
+.SH COMMANDS
+.TP
+.B status
+Show the service state.
+.TP
+.BR arm " [" \-\-allow\-lan ]
+Install the rules for the managed profile.
+.B \-\-allow\-lan
+also allows RFC 1918 and ULA local-network ranges.
+.TP
+.B disarm
+Remove the rules. Use this to recover network access if the kill switch was
+left armed.
+.TP
+.B diagnose
+Read-only checks of nftables, the service and platform details.
+.SH RECOVERY
+If the service itself is broken, remove the table as root:
+.B nft delete table inet pervius_ks
+.SH SEE ALSO
+.BR pervius (1),
+.BR nft (8)

@@ -31,13 +31,18 @@ chmod 0755 "$STAGE"
 
 "$ROOT/packaging/stage.sh" "$STAGE" "$PYTHONDIR"
 
+# Debian ships compressed manual pages.
+find "$STAGE/usr/share/man" -type f -name '*.[0-9]' -exec gzip -9n {} +
+
 DOC="$STAGE/usr/share/doc/$PACKAGE"
 install -d -m 0755 "$DOC"
 install -m 0644 README.md "$DOC/README.md"
 install -m 0644 docs/ARCHITECTURE.md "$DOC/ARCHITECTURE.md"
+install -m 0644 NOTICE "$DOC/NOTICE"
 install -m 0644 "$HERE/copyright" "$DOC/copyright"
-gzip -9n -c "$HERE/changelog" >"$DOC/changelog.Debian.gz"
-chmod 0644 "$DOC/changelog.Debian.gz"
+MAINTAINER=$(sed -n 's/^Maintainer: //p' "$HERE/control.in")
+python3 "$HERE/gen-changelog.py" "$PACKAGE" "$MAINTAINER" | gzip -9n >"$DOC/changelog.gz"
+chmod 0644 "$DOC/changelog.gz"
 
 if find "$STAGE" -name __pycache__ -o -name '*.py[co]' | grep -q .; then
     echo "error: Python bytecode in the staged tree" >&2

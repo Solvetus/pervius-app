@@ -1,0 +1,32 @@
+.TH PERVIUS 1 "2026-11-18" "Pervius" "User Commands"
+.SH NAME
+pervius \- unofficial Linux client for FastVPN
+.SH SYNOPSIS
+.B pervius
+.SH DESCRIPTION
+.B pervius
+starts the Pervius desktop application, a GTK 4/libadwaita client for an
+existing FastVPN (OpenVPN) subscription. It validates the provider's public
+server catalogue and imports the selected profile through NetworkManager and
+its OpenVPN plugin. Passwords are supplied by a NetworkManager secret agent and
+are never written into the profile.
+.PP
+Run it as your desktop user, never as root. NetworkManager performs the
+privileged network operations. The optional kill switch is controlled through
+.BR pervius\-killswitch (1).
+.SH FILES
+.TP
+.I ~/.local/share/pervius/
+Settings, favorites, cached catalogue, CA file and ownership manifest. No
+passwords.
+.SH SEE ALSO
+.BR pervius\-killswitch (1),
+.BR pervius\-inspect (1),
+.BR pervius\-proof (1),
+.BR nmcli (1)
+.SH NOTES
+Pervius is an independent open-source project by Solvetus Labs. It is not
+affiliated with, endorsed by, or sponsored by Namecheap, Inc. FastVPN is a
+trademark of Namecheap, Inc.
+.PP
+https://github.com/Solvetus/pervius-app

@@ -13,6 +13,7 @@ data/                    shared assets installed by every package
   com.solvetus.Pervius.desktop
   com.solvetus.Pervius.metainfo.xml
   icons/hicolor/scalable/apps/
+  man/man1/              manual pages for the four commands
   dbus/                  system bus policy and activation file for the kill-switch service
   polkit/                polkit action
   systemd/               pervius-killswitchd.service
@@ -20,9 +21,9 @@ packaging/
   layout.tsv             THE list of install paths (shared)
   stage.sh               stages layout.tsv into a build root (shared)
   debian/                Debian/Ubuntu only: build.sh, control.in, maintainer scripts,
-                         copyright, lintian-overrides, gen-changelog.py
+                         copyright, lintianrc, gen-changelog.py
   rpm/                   Fedora (planned): README.md only
-scripts/                 release helpers (changelog extraction)
+scripts/changelog.py     reads CHANGELOG.md (release notes, Debian changelog)
 ```
 
 ## Rules
@@ -52,13 +53,14 @@ scripts/                 release helpers (changelog extraction)
 ```sh
 packaging/debian/build.sh              # → dist/pervius_<version>_all.deb
 DIST_DIR=/tmp/out packaging/debian/build.sh
-lintian --fail-on error dist/pervius_*_all.deb
+lintian --cfg packaging/debian/lintianrc --fail-on error dist/pervius_*_all.deb
 ```
 
 `build.sh` stages the shared tree, adds `/usr/share/doc/pervius` (README,
 copyright and a Debian changelog generated from `CHANGELOG.md` by
-`gen-changelog.py`), the lintian overrides, the control file from
-`control.in`, and the maintainer scripts, then runs `dpkg-deb`.
+`gen-changelog.py`), compresses the manual pages, writes the control file
+from `control.in`, adds the maintainer scripts, and runs `dpkg-deb`. The
+package needs no lintian overrides; `lintianrc` holds the lintian settings.
 
 Debian-specific behaviour, all under `packaging/debian/`:
 

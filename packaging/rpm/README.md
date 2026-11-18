@@ -27,6 +27,7 @@ packaging/stage.sh %{buildroot} %{python3_sitelib}
 | `data/dbus/com.solvetus.Pervius.KillSwitch1.conf` | `/usr/share/dbus-1/system.d/` |
 | `data/dbus/com.solvetus.Pervius.KillSwitch1.service` | `/usr/share/dbus-1/system-services/` |
 | `data/polkit/com.solvetus.pervius.killswitch.policy` | `/usr/share/polkit-1/actions/` |
+| `data/man/man1/pervius*.1` | `/usr/share/man/man1/` (`%{_mandir}/man1`, compressed by brp) |
 
 Use `%license LICENSE NOTICE` and `%doc README.md CHANGELOG.md docs/ARCHITECTURE.md`.
 Let `%py_byte_compile` / brp scripts compile the package as usual.

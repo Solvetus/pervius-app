@@ -1,0 +1,6 @@
+# Lintian configuration for the Pervius Debian package.
+# Used as: lintian --cfg packaging/debian/lintianrc --fail-on error dist/pervius_*_all.deb
+# CI fails on errors; warnings are reported but do not fail the build.
+# The package currently needs no overrides.
+display-info = yes
+pedantic = yes

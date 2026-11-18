@@ -1,0 +1,20 @@
+.TH PERVIUS-INSPECT 1 "2026-11-18" "Pervius" "User Commands"
+.SH NAME
+pervius\-inspect \- validate and summarize a VPN server catalogue
+.SH SYNOPSIS
+.B pervius\-inspect
+.RB { \-\-zip
+.IR FILE " | "
+.B \-\-url
+.IR URL }
+.SH DESCRIPTION
+Validates a server catalogue ZIP with the same strict rules as the desktop
+application and prints a JSON summary. It does not touch NetworkManager.
+.TP
+.BI \-\-zip " FILE"
+Read a local ZIP file.
+.TP
+.BI \-\-url " URL"
+Download the ZIP over HTTPS.
+.SH SEE ALSO
+.BR pervius (1)
