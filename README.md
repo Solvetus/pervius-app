@@ -14,7 +14,11 @@ your own FastVPN account.
 
 ## Screenshots
 
-_Screenshots will be added here._
+<p align="center">
+  <img src="docs/screenshots/connected.png" width="32%" alt="Connected to Lisbon, with the IP addresses hidden and the traffic, protocol and connected time below">
+  <img src="docs/screenshots/locations.png" width="32%" alt="The location chooser with search, flags and favorites">
+  <img src="docs/screenshots/killswitch.png" width="32%" alt="Connection and security settings, including the kill switch and Allow local network">
+</p>
 
 ## Features
 
@@ -55,7 +59,7 @@ _Screenshots will be added here._
 
 | Distribution | Status |
 | --- | --- |
-| Ubuntu | `.deb` package. **Tested only on Ubuntu 26.10, aarch64.** Other releases may work but are untested. |
+| Ubuntu | `.deb` package. **Tested on Ubuntu 26.10, aarch64.** Other releases may work but are untested. |
 | Debian | Same `.deb`; untested. |
 | Fedora | Planned (RPM). See [`packaging/rpm/README.md`](packaging/rpm/README.md). |
 
@@ -64,17 +68,20 @@ nftables, polkit, systemd and the GTK 4/libadwaita GObject bindings.
 
 ## Install
 
-Packages are published on [GitHub Releases](https://github.com/Solvetus/pervius-app/releases).
-Download the `.deb` and `SHA256SUMS` from the same release, verify the
-checksum, then install:
+The latest release is
+[v0.3.2](https://github.com/Solvetus/pervius-app/releases/tag/v0.3.2). Download
+the `.deb` and `SHA256SUMS` from the same release, verify the checksum, then
+install. With the GitHub CLI:
 
 ```sh
-sha256sum --check --ignore-missing SHA256SUMS
+gh release download v0.3.2 --repo Solvetus/pervius-app
+sha256sum --check SHA256SUMS
 sudo apt install ./pervius_0.3.2_all.deb
 ```
 
-`sha256sum` must print `pervius_0.3.2_all.deb: OK`. Do not install a package
-whose checksum does not match. The packages are not signed yet.
+Without it, download both files from the release page and run the last two
+commands. `sha256sum` must print `pervius_0.3.2_all.deb: OK`; do not install a
+package whose checksum does not match. The packages are not signed yet.
 
 Start **Pervius** from the application menu or run `pervius`. Do not run it
 with `sudo`.
@@ -86,20 +93,6 @@ pins the tunnel to the interface `pervius0`; an armed 0.2.0 kill switch that
 is restored by the new service blocks the old tunnel until you reconnect. The
 managed profile is re-imported automatically on the next connection (new
 tunnel name, DNS through the tunnel).
-
-### Upgrading from the 0.1.x test builds
-
-**Turn the kill switch off in the old app before upgrading.** `apt` removes
-the old package first, and the old package's removal script deletes its own
-firewall table, so an armed kill switch would be turned off without asking.
-`sudo dpkg -i pervius_0.3.2_all.deb` instead refuses to install while the old
-kill switch is armed and prints the command to disarm it.
-
-On the first start, Pervius moves your settings, favorites and cached server
-list to `~/.local/share/pervius`, moves a saved password to its own keyring
-entry (deleting the old one), and renames the existing NetworkManager profile
-to **Pervius (managed)**. The old data directory is left in place and can be
-deleted once Pervius works.
 
 ## First use
 
@@ -222,9 +215,8 @@ removes it.
 - `~/.config/autostart/com.solvetus.Pervius.desktop` — only while Start at
   login is on.
 
-`sudo apt remove pervius` removes the app, the kill-switch service, the IPv6
-guard hook and both firewall tables. The
-NetworkManager profile **Pervius (managed)**, the data directory and the
+`sudo apt remove pervius` removes the app, the kill-switch service, the leak
+guard hook and both firewall tables. The NetworkManager profile **Pervius (managed)**, the data directory and the
 keyring entry stay until you remove them.
 
 ## Command-line tools
@@ -242,6 +234,19 @@ keyring entry stay until you remove them.
 - [Architecture, kill-switch design and threat model](docs/ARCHITECTURE.md)
 - [Packaging and adding a distribution](docs/PACKAGING.md)
 - [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Changelog](CHANGELOG.md)
+
+## Security
+
+Please report vulnerabilities privately, not in public issues: use GitHub's
+[private vulnerability reporting](https://github.com/Solvetus/pervius-app/security/advisories/new)
+or email **security@solvetus.com**. See [SECURITY.md](SECURITY.md).
+
+## Trademarks
+
+Pervius is an independent open-source project by Solvetus Labs. It is not
+affiliated with, endorsed by, or sponsored by Namecheap, Inc. FastVPN and
+Namecheap are trademarks of Namecheap, Inc., used here only to name the service
+Pervius works with.
 
 ## License
 
