@@ -18,7 +18,13 @@ T = TypeVar("T")
 
 
 class KillSwitchError(RuntimeError):
-    pass
+    """A failed call.  ``code`` is the short D-Bus error name, for example
+    "PermissionDenied", "NotAvailable", "NotArmed", "ResolveFailed" or "Failed";
+    the GUI maps it to a translated message."""
+
+    def __init__(self, message: str, code: str = "Failed"):
+        super().__init__(message)
+        self.code = code
 
 
 class KillSwitchClient:
@@ -49,7 +55,16 @@ class KillSwitchClient:
                 None,
             )
         except GLib.Error as exc:
-            raise KillSwitchError(exc.message) from exc
+            remote = Gio.DBusError.get_remote_error(exc) or ""
+            if remote.startswith(INTERFACE + "."):
+                code = remote[len(INTERFACE) + 1 :]
+            elif remote.startswith("org.freedesktop.DBus.Error.ServiceUnknown"):
+                code = "NotAvailable"
+            else:
+                code = "Failed"
+            if Gio.DBusError.is_remote_error(exc):
+                Gio.DBusError.strip_remote_error(exc)
+            raise KillSwitchError(exc.message, code) from exc
         try:
             return dict(reply.unpack()[0])
         except (IndexError, TypeError, ValueError) as exc:
@@ -58,10 +73,24 @@ class KillSwitchClient:
     def status(self) -> dict:
         return self._call("GetStatus", GLib.Variant("()", ()))
 
-    def arm(self, allow_lan: bool) -> dict:
+    def arm(self, allow_lan: bool, interfaces: list[str] | tuple[str, ...] = ()) -> dict:
+        """Arm; the reply's "resolved" holds the endpoints for pinning."""
         return self._call(
             "Arm",
-            GLib.Variant("(sb)", (MANAGED_UUID, bool(allow_lan))),
+            GLib.Variant("(sbas)", (MANAGED_UUID, bool(allow_lan), list(interfaces))),
+        )
+
+    def configure(self, allow_lan: bool, interfaces: list[str] | tuple[str, ...] = ()) -> dict:
+        return self._call(
+            "Configure",
+            GLib.Variant("(bas)", (bool(allow_lan), list(interfaces))),
+        )
+
+    def update_endpoints(self, replace: bool) -> dict:
+        """Re-resolve the profile's servers and swap the endpoint set atomically."""
+        return self._call(
+            "UpdateEndpoints",
+            GLib.Variant("(sb)", (MANAGED_UUID, bool(replace))),
         )
 
     def disarm(self) -> dict:

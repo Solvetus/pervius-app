@@ -3,25 +3,56 @@
 pervius\-killswitch \- control the Pervius VPN kill switch
 .SH SYNOPSIS
 .B pervius\-killswitch
-.RB { status | arm " [" \-\-allow\-lan "] | " disarm | diagnose }
+.B status
+.br
+.B pervius\-killswitch
+.BR arm " [" \-\-allow\-lan "] [" \-\-allow\-interface
+.IR IFACE " ...]"
+.br
+.B pervius\-killswitch
+.BR configure " [" \-\-allow\-lan "] [" \-\-allow\-interface
+.IR IFACE " ...]"
+.br
+.B pervius\-killswitch
+.BR update\-endpoints " [" \-\-merge ]
+.br
+.B pervius\-killswitch
+.BR disarm " | " diagnose
 .SH DESCRIPTION
 Talks to the
 .B pervius\-killswitchd
-system service over D-Bus. Arming and disarming are authorized by polkit.
+system service over D-Bus. Every change is authorized by polkit.
 While armed, the service installs the nftables table
 .B inet pervius_ks
-that allows only loopback, the tunnel interface, DHCP, IPv6 neighbour
-discovery and the VPN server addresses of the Pervius-managed profile, and
-drops all other traffic.
+that allows only loopback, the Pervius tunnel interface
+.B pervius0
+and any interfaces you always allow, DHCP, IPv6 neighbour discovery and the
+VPN server addresses of the Pervius-managed profile, and drops all other
+traffic.
 .SH COMMANDS
 .TP
 .B status
 Show the service state.
 .TP
-.BR arm " [" \-\-allow\-lan ]
+.BR arm " [" \-\-allow\-lan "] [" \-\-allow\-interface " IFACE]"
 Install the rules for the managed profile.
 .B \-\-allow\-lan
-also allows RFC 1918 and ULA local-network ranges.
+also allows RFC 1918 and ULA local-network ranges;
+.B \-\-allow\-interface
+(repeatable) always allows an interface such as
+.BR wt0 .
+.TP
+.BR configure " [" \-\-allow\-lan "] [" \-\-allow\-interface " IFACE]"
+Change LAN access and the allowed interfaces while armed, in one atomic
+update.
+.TP
+.BR update\-endpoints " [" \-\-merge ]
+Resolve the managed profile's VPN server names again and replace the allowed
+server addresses in one atomic update
+.RB ( \-\-merge
+keeps the current addresses as well). While the tunnel is down, the service
+resolves through a DNS window of at most five seconds that admits only its
+own queries.
 .TP
 .B disarm
 Remove the rules. Use this to recover network access if the kill switch was

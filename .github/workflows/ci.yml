@@ -17,7 +17,7 @@ env:
   # Runtime GObject-introspection bindings needed by the unit tests.
   APT_TEST_DEPS: >-
     python3-gi gir1.2-glib-2.0 gir1.2-gtk-4.0 gir1.2-adw-1
-    gir1.2-nm-1.0 gir1.2-secret-1 gir1.2-soup-3.0
+    gir1.2-nm-1.0 gir1.2-secret-1 gir1.2-soup-3.0 python3-dnspython iso-codes
 
 # Each distribution gets its own packaging job. Add a Fedora job ("rpm",
 # running in a fedora container and building packaging/rpm/) next to "deb".

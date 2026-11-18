@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Callable, Iterable, Mapping
 
-from .rules import DEFAULT_OPENVPN_PORT, Resolution, RulesError, resolve_remotes
+from .rules import DEFAULT_OPENVPN_PORT, Resolution, RulesError, parse_remote_list, resolve_remotes
 
 
 class ProfileError(RulesError):
@@ -38,23 +38,52 @@ def _default_port(data: Mapping[str, str]) -> int:
     return port
 
 
-def endpoints_from_profile_data(
+def remotes_from_profile_data(
     data: Mapping[str, str],
     permissions: Iterable[str] | None,
     local_username: str,
     *,
-    resolver: Callable[[str, int, int, int], Iterable] | None = None,
-) -> Resolution:
-    """Validate ownership and turn the profile remote field into IP endpoints."""
+    remote_names: str | None = None,
+) -> tuple[tuple[tuple[str, int], ...], str]:
+    """Validate ownership and return the profile's ``(host, port)`` remotes and protocol.
+
+    While the kill switch is armed, the app pins the profile's ``remote``
+    field to resolved IP addresses and keeps the original server names in the
+    ``remote_names`` user-data value; those names are what must be resolved
+    again (new location, provider IP rotation).
+    """
     if not permissions_restricted_to_user(permissions, local_username):
         raise ProfileError("profile is not restricted to the current local user")
     if not isinstance(data, Mapping):
         raise ProfileError("profile data is malformed")
     if data.get("password") is not None:
         raise ProfileError("profile contains a password in non-secret data")
-    remote = data.get("remote")
+    remote = remote_names if isinstance(remote_names, str) and remote_names.strip() else data.get("remote")
     if not isinstance(remote, str):
         raise ProfileError("profile has no remote servers")
     protocol = "tcp" if data.get("proto-tcp") == "yes" else "udp"
     port = _default_port(data)
-    return resolve_remotes(remote, protocol, port, resolver=resolver)
+    return parse_remote_list(remote, port), protocol
+
+
+def endpoints_from_profile_data(
+    data: Mapping[str, str],
+    permissions: Iterable[str] | None,
+    local_username: str,
+    *,
+    remote_names: str | None = None,
+    resolver: Callable[[str, int, int, int], Iterable] | None = None,
+) -> Resolution:
+    """Validate ownership and turn the profile remotes into IP endpoints."""
+    remotes, protocol = remotes_from_profile_data(
+        data, permissions, local_username, remote_names=remote_names
+    )
+    return resolve_remotes(
+        ", ".join(_format_remote(host, port) for host, port in remotes),
+        protocol,
+        resolver=resolver,
+    )
+
+
+def _format_remote(host: str, port: int) -> str:
+    return f"[{host}]:{port}" if ":" in host else f"{host}:{port}"

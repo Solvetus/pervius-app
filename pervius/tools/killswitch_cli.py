@@ -91,13 +91,41 @@ def command_status(_args) -> int:
     return 0
 
 
+def _without_addresses(status: dict) -> dict:
+    status = dict(status)
+    resolved = status.pop("resolved", None)
+    if resolved is not None:
+        status["resolved_count"] = len(resolved)
+    return status
+
+
 def command_arm(args) -> int:
     status = _call(
         "Arm",
-        GLib.Variant("(sb)", (MANAGED_UUID, bool(args.allow_lan))),
+        GLib.Variant("(sbas)", (MANAGED_UUID, bool(args.allow_lan), list(args.allow_interface))),
+        "(a{sv})",
+    )
+    _print_status(_without_addresses(status))
+    return 0
+
+
+def command_configure(args) -> int:
+    status = _call(
+        "Configure",
+        GLib.Variant("(bas)", (bool(args.allow_lan), list(args.allow_interface))),
         "(a{sv})",
     )
     _print_status(status)
+    return 0
+
+
+def command_update_endpoints(args) -> int:
+    status = _call(
+        "UpdateEndpoints",
+        GLib.Variant("(sb)", (MANAGED_UUID, not args.merge)),
+        "(a{sv})",
+    )
+    _print_status(_without_addresses(status))
     return 0
 
 
@@ -141,10 +169,28 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("status", help="show the service state")
     arm = sub.add_parser("arm", help="install kill-switch rules for the managed profile")
-    arm.add_argument(
-        "--allow-lan",
+    configure = sub.add_parser("configure", help="change LAN access and allowed interfaces while armed")
+    for command in (arm, configure):
+        command.add_argument(
+            "--allow-lan",
+            action="store_true",
+            help="also allow RFC1918/ULA local-network traffic",
+        )
+        command.add_argument(
+            "--allow-interface",
+            action="append",
+            default=[],
+            metavar="IFACE",
+            help="always allow traffic on this interface (repeatable), e.g. wt0",
+        )
+    update = sub.add_parser(
+        "update-endpoints",
+        help="re-resolve the VPN server names and swap the allowed endpoints atomically",
+    )
+    update.add_argument(
+        "--merge",
         action="store_true",
-        help="also allow RFC1918/ULA local-network traffic",
+        help="keep the current endpoints as well (default: replace them)",
     )
     sub.add_parser("disarm", help="remove the kill-switch rules")
     sub.add_parser("diagnose", help="read-only environment checks")
@@ -154,6 +200,10 @@ def main(argv: list[str] | None = None) -> int:
             return command_status(args)
         if args.command == "arm":
             return command_arm(args)
+        if args.command == "configure":
+            return command_configure(args)
+        if args.command == "update-endpoints":
+            return command_update_endpoints(args)
         if args.command == "disarm":
             return command_disarm(args)
         if args.command == "diagnose":

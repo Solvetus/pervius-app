@@ -2,11 +2,15 @@
 
 Runs as root under systemd.  It owns exactly one nftables table, never flushes
 the global ruleset, and never invokes a shell.  The public D-Bus surface is
-limited to arming and disarming protection for the reserved app-owned profile.
+limited to protecting the reserved app-owned profile: arming, reconfiguring
+the allowed interfaces, swapping the VPN server endpoints atomically, and
+disarming.  Callers never supply rule text, paths or addresses; endpoints
+always come from the profile, resolved by the service itself.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import pwd
@@ -14,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,14 +29,29 @@ gi.require_version("Gio", "2.0")
 gi.require_version("NM", "1.0")
 from gi.repository import Gio, GLib, NM  # noqa: E402
 
-from ..config import MANAGED_UUID, OPENVPN_SERVICE_TYPE  # noqa: E402
-from .profile import ProfileError, endpoints_from_profile_data  # noqa: E402
+from ..config import (  # noqa: E402
+    MANAGED_UUID,
+    OPENVPN_SERVICE_TYPE,
+    TUNNEL_INTERFACE,
+    USER_DATA_REMOTE_NAMES,
+)
+from .profile import ProfileError, remotes_from_profile_data  # noqa: E402
 from .rules import (  # noqa: E402
+    GUARD_TABLE_SPEC,
+    MAX_ENDPOINTS,
     TABLE_SPEC,
     Endpoint,
+    Resolution,
     RulesError,
+    build_dns_window,
+    build_dns_window_close,
+    build_endpoint_swap,
     build_ruleset,
+    cgroup_match,
     endpoints_from_state,
+    resolve_remotes,
+    resolver_addresses,
+    validate_interfaces,
 )
 
 log = logging.getLogger(__name__)
@@ -42,12 +62,17 @@ INTERFACE = "com.solvetus.Pervius.KillSwitch1"
 POLKIT_ACTION = "com.solvetus.pervius.killswitch.control"
 STATE_DIR = Path("/run/pervius")
 STATE_FILE = STATE_DIR / "killswitch.json"
-STATE_VERSION = 1
+STATE_VERSION = 2
 NFT_TIMEOUT = 20
+# At most one DNS window per this many seconds.
+DNS_WINDOW_INTERVAL = 30.0
+CGROUP_ROOT = Path("/sys/fs/cgroup")
 
 PERMISSION_DENIED = f"{INTERFACE}.PermissionDenied"
 OPERATION_FAILED = f"{INTERFACE}.Failed"
 NOT_AVAILABLE = f"{INTERFACE}.NotAvailable"
+NOT_ARMED = f"{INTERFACE}.NotArmed"
+RESOLVE_FAILED = f"{INTERFACE}.ResolveFailed"
 
 _INTROSPECTION_XML = """
 <node>
@@ -55,6 +80,17 @@ _INTROSPECTION_XML = """
     <method name="Arm">
       <arg name="uuid" type="s" direction="in"/>
       <arg name="allow_lan" type="b" direction="in"/>
+      <arg name="interfaces" type="as" direction="in"/>
+      <arg name="status" type="a{sv}" direction="out"/>
+    </method>
+    <method name="Configure">
+      <arg name="allow_lan" type="b" direction="in"/>
+      <arg name="interfaces" type="as" direction="in"/>
+      <arg name="status" type="a{sv}" direction="out"/>
+    </method>
+    <method name="UpdateEndpoints">
+      <arg name="uuid" type="s" direction="in"/>
+      <arg name="replace" type="b" direction="in"/>
       <arg name="status" type="a{sv}" direction="out"/>
     </method>
     <method name="Disarm">
@@ -83,12 +119,194 @@ class NotAvailable(ServiceError):
     pass
 
 
+class NotArmed(ServiceError):
+    pass
+
+
+class ResolveFailed(ServiceError):
+    pass
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+def merge_endpoints(fresh, current) -> tuple[Endpoint, ...]:
+    """Fresh endpoints first, then the current ones (kept for the live tunnel)."""
+    merged: list[Endpoint] = []
+    seen = set()
+    for endpoint in (*fresh, *current):
+        key = (endpoint.address, endpoint.port, endpoint.protocol)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(endpoint)
+        if len(merged) >= MAX_ENDPOINTS:
+            break
+    return tuple(merged)
+
+
+class SystemBackend:
+    """Everything the service needs from the system; replaced in tests."""
+
+    def nft_path(self) -> str:
+        path = shutil.which("nft", path="/usr/sbin:/usr/bin:/sbin:/bin")
+        if not path:
+            raise NotAvailable("nftables is not installed")
+        return path
+
+    def run_nft(self, args: list[str], *, input_text: str | None = None) -> None:
+        command = [self.nft_path(), *args]
+        try:
+            result = subprocess.run(
+                command,
+                input=input_text,
+                text=True,
+                capture_output=True,
+                timeout=NFT_TIMEOUT,
+                env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C"},
+                check=False,
+            )
+        except FileNotFoundError as exc:
+            raise NotAvailable("nftables is not installed") from exc
+        except subprocess.TimeoutExpired as exc:
+            raise ServiceError("nftables command timed out") from exc
+        except OSError as exc:
+            raise ServiceError(f"could not run nftables: {exc}") from exc
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout or "").strip()
+            if len(detail) > 600:
+                detail = detail[:600] + "…"
+            raise ServiceError(f"nftables rejected the rules: {detail}")
+
+    def table_exists(self, spec: str) -> bool:
+        try:
+            self.run_nft(["list", "table", *spec.split()])
+        except ServiceError:
+            return False
+        return True
+
+    def _client(self) -> NM.Client:
+        try:
+            client = NM.Client.new(None)
+        except Exception as exc:
+            raise ServiceError("NetworkManager is unavailable") from exc
+        if client is None:
+            raise ServiceError("NetworkManager is unavailable")
+        return client
+
+    def profile_remotes(self, uuid: str, uid: int, local_username) -> tuple[tuple, str]:
+        """Load the reserved profile, check ownership, return (remotes, protocol)."""
+        client = self._client()
+        connection = None
+        try:
+            connection = client.get_connection_by_uuid(uuid)
+        except Exception:
+            connection = None
+        if connection is None:
+            raise ServiceError("managed profile not found")
+        s_con = connection.get_setting_connection()
+        s_vpn = connection.get_setting_vpn()
+        if not isinstance(s_con, NM.SettingConnection) or not isinstance(s_vpn, NM.SettingVpn):
+            raise ServiceError("managed profile is malformed")
+        if s_vpn.get_service_type() != OPENVPN_SERVICE_TYPE:
+            raise ServiceError("managed profile is not an OpenVPN connection")
+        permissions = list(s_con.props.permissions or [])
+        if uid == 0:
+            if len(permissions) != 1:
+                raise PermissionDenied("profile ownership is ambiguous")
+            parts = permissions[0].split(":", 2)
+            if len(parts) < 2 or parts[0] != "user":
+                raise PermissionDenied("profile ownership is ambiguous")
+            username = parts[1]
+        else:
+            username = local_username(uid)
+        remote_names = None
+        s_user = connection.get_setting_by_name("user")
+        if s_user is not None:
+            try:
+                remote_names = s_user.get_data(USER_DATA_REMOTE_NAMES)
+            except Exception:
+                remote_names = None
+        return remotes_from_profile_data(
+            dict(s_vpn.props.data), permissions, username, remote_names=remote_names
+        )
+
+    def resolve_system(self, remotes, protocol: str) -> Resolution:
+        text = ", ".join(f"[{h}]:{p}" if ":" in h else f"{h}:{p}" for h, p in remotes)
+        return resolve_remotes(text, protocol)
+
+    def resolve_direct(self, remotes, protocol: str, nameservers) -> Resolution:
+        from .dnsquery import resolve_remotes_direct
+
+        return resolve_remotes_direct(remotes, protocol, nameservers)
+
+    def link_nameservers(self) -> list[str]:
+        """DNS servers NetworkManager configured on the physical links."""
+        servers: list[str] = []
+        for device in self._client().get_devices():
+            try:
+                if device.get_iface() == TUNNEL_INTERFACE:
+                    continue
+                if device.get_state() != NM.DeviceState.ACTIVATED:
+                    continue
+                configs = (device.get_ip4_config(), device.get_ip6_config())
+            except Exception:
+                continue
+            for config in configs:
+                if config is None:
+                    continue
+                try:
+                    servers.extend(str(item) for item in config.get_nameservers() or [])
+                except Exception:
+                    continue
+        return servers
+
+    def tunnel_up(self) -> bool:
+        try:
+            flags = int((Path("/sys/class/net") / TUNNEL_INTERFACE / "flags").read_text().strip(), 16)
+        except (OSError, ValueError):
+            return False
+        return bool(flags & 0x1)
+
+    def service_cgroup(self) -> str | None:
+        """This process's cgroup v2 path, if it can be matched safely."""
+        try:
+            lines = Path("/proc/self/cgroup").read_text(encoding="ascii").splitlines()
+        except (OSError, UnicodeDecodeError):
+            return None
+        for line in lines:
+            if line.startswith("0::"):
+                path = line[3:].strip().strip("/")
+                if cgroup_match(path) is None or not (CGROUP_ROOT / path).is_dir():
+                    return None
+                return path
+        return None
+
+    def managed_vpn_active(self) -> bool:
+        try:
+            client = self._client()
+        except ServiceError:
+            return True  # unknown: leave the guard in place (fail closed)
+        for active in client.get_active_connections():
+            try:
+                if active.get_uuid() == MANAGED_UUID and active.get_state() in (
+                    NM.ActiveConnectionState.ACTIVATING,
+                    NM.ActiveConnectionState.ACTIVATED,
+                ):
+                    return True
+            except Exception:
+                continue
+        return False
+
+    def clock(self) -> float:
+        return time.monotonic()
+
+
 class KillSwitchService:
-    def __init__(self):
+    def __init__(self, backend: SystemBackend | None = None, *, state_file: Path = STATE_FILE):
+        self.backend = backend or SystemBackend()
+        self.state_file = state_file
         self._connection: Gio.DBusConnection | None = None
         self._registration_id: int | None = None
         self._armed = False
@@ -96,9 +314,13 @@ class KillSwitchService:
         self._detail = "Not armed"
         self._uuid = ""
         self._allow_lan = False
+        self._interfaces: tuple[str, ...] = ()
         self._since = ""
+        self._resolved_at = ""
         self._owner_uid: int | None = None
         self._endpoints: tuple[Endpoint, ...] = ()
+        self._window_rule = False
+        self._last_window: float | None = None
 
     # ------------------------------------------------------------- lifecycle
 
@@ -116,6 +338,7 @@ class KillSwitchService:
             log.error("could not own %s: %s", BUS_NAME, exc.message)
             return False
         self._recover_state()
+        self._clear_stale_guard()
         return True
 
     def _on_bus_acquired(self, connection: Gio.DBusConnection, _name: str):
@@ -140,21 +363,31 @@ class KillSwitchService:
 
     # ---------------------------------------------------------------- status
 
-    def _status(self) -> dict[str, GLib.Variant]:
+    def status(self) -> dict[str, GLib.Variant]:
         return {
             "armed": GLib.Variant("b", self._armed),
             "state": GLib.Variant("s", self._state),
             "detail": GLib.Variant("s", self._detail),
             "uuid": GLib.Variant("s", self._uuid),
             "allow_lan": GLib.Variant("b", self._allow_lan),
+            "interfaces": GLib.Variant("as", list(self._interfaces)),
             "endpoints": GLib.Variant("u", len(self._endpoints)),
+            "resolved_at": GLib.Variant("s", self._resolved_at),
+            "ipv6_guard": GLib.Variant("b", self.backend.table_exists(GUARD_TABLE_SPEC)),
             "backend": GLib.Variant("s", "nftables"),
             "table": GLib.Variant("s", TABLE_SPEC),
             "since": GLib.Variant("s", self._since),
         }
 
-    def _status_variant(self) -> GLib.Variant:
-        return GLib.Variant("(a{sv})", (self._status(),))
+    def _reply(self, resolved: tuple[Endpoint, ...] | None = None) -> GLib.Variant:
+        status = self.status()
+        if resolved is not None:
+            # Only the authorized caller gets the addresses, to pin its profile;
+            # GetStatus and StateChanged carry a count only.
+            status["resolved"] = GLib.Variant(
+                "a(sqs)", [(e.address, e.port, e.protocol) for e in resolved]
+            )
+        return GLib.Variant("(a{sv})", (status,))
 
     def _emit_status(self):
         if self._connection is None or self._registration_id is None:
@@ -165,7 +398,7 @@ class KillSwitchService:
                 OBJECT_PATH,
                 INTERFACE,
                 "StateChanged",
-                GLib.Variant("(a{sv})", (self._status(),)),
+                GLib.Variant("(a{sv})", (self.status(),)),
             )
         except GLib.Error as exc:
             log.warning("could not emit StateChanged: %s", exc.message)
@@ -186,30 +419,15 @@ class KillSwitchService:
             invocation.return_dbus_error(OPERATION_FAILED, "unknown interface")
             return None
         try:
-            if method_name == "GetStatus":
-                invocation.return_value(self._status_variant())
-                return None
-
-            if method_name == "Arm":
-                uuid, allow_lan = parameters.unpack()
-                uid = self._caller_uid(sender)
-                self._authorize(sender)
-                self._arm(str(uuid), bool(allow_lan), uid)
-                invocation.return_value(self._status_variant())
-                return None
-
-            if method_name == "Disarm":
-                uid = self._caller_uid(sender)
-                self._authorize(sender)
-                self._disarm(uid)
-                invocation.return_value(self._status_variant())
-                return None
-
-            invocation.return_dbus_error(OPERATION_FAILED, "unknown method")
+            invocation.return_value(self.handle(method_name, parameters.unpack(), sender))
         except PermissionDenied as exc:
             invocation.return_dbus_error(PERMISSION_DENIED, str(exc))
         except NotAvailable as exc:
             invocation.return_dbus_error(NOT_AVAILABLE, str(exc))
+        except NotArmed as exc:
+            invocation.return_dbus_error(NOT_ARMED, str(exc))
+        except ResolveFailed as exc:
+            invocation.return_dbus_error(RESOLVE_FAILED, str(exc))
         except (ServiceError, ProfileError, RulesError) as exc:
             invocation.return_dbus_error(OPERATION_FAILED, str(exc))
         except Exception as exc:
@@ -217,9 +435,29 @@ class KillSwitchService:
             invocation.return_dbus_error(OPERATION_FAILED, f"operation failed: {exc}")
         return None
 
+    def handle(self, method_name: str, args: tuple, sender: str | None) -> GLib.Variant:
+        if method_name == "GetStatus":
+            return self._reply()
+        if method_name not in {"Arm", "Configure", "UpdateEndpoints", "Disarm"}:
+            raise ServiceError("unknown method")
+        uid = self.caller_uid(sender)
+        self.authorize(sender, uid)
+        if method_name == "Arm":
+            uuid, allow_lan, interfaces = args
+            return self._reply(self.arm(str(uuid), bool(allow_lan), list(interfaces), uid))
+        if method_name == "Configure":
+            allow_lan, interfaces = args
+            self.configure(bool(allow_lan), list(interfaces), uid)
+            return self._reply()
+        if method_name == "UpdateEndpoints":
+            uuid, replace = args
+            return self._reply(self.update_endpoints(str(uuid), bool(replace), uid))
+        self.disarm(uid)
+        return self._reply()
+
     # ------------------------------------------------------------- authority
 
-    def _caller_uid(self, sender: str | None) -> int:
+    def caller_uid(self, sender: str | None) -> int:
         if not sender or self._connection is None:
             raise PermissionDenied("could not identify the caller")
         try:
@@ -238,8 +476,7 @@ class KillSwitchService:
         except Exception as exc:
             raise PermissionDenied("could not identify the caller") from exc
 
-    def _authorize(self, sender: str | None):
-        uid = self._caller_uid(sender)
+    def authorize(self, sender: str | None, uid: int):
         if uid == 0:
             return
         subject = (
@@ -271,285 +508,315 @@ class KillSwitchService:
         if not authorized:
             raise PermissionDenied("not authorized to control the kill switch")
 
-    def _local_username(self, uid: int) -> str:
+    @staticmethod
+    def local_username(uid: int) -> str:
         try:
             return pwd.getpwuid(uid).pw_name
         except KeyError as exc:
             raise PermissionDenied("caller has no local account") from exc
 
-    # ------------------------------------------------------------- nftables
+    def _require_owner(self, uid: int):
+        """The Disarm restriction: only the arming user, or root."""
+        if self._owner_uid is not None and uid not in {0, self._owner_uid}:
+            raise PermissionDenied("only the user who armed the kill switch may change it")
 
-    def _nft(self) -> str:
-        path = shutil.which("nft")
-        if not path:
-            raise NotAvailable("nftables is not installed")
-        return path
+    def _require_armed(self):
+        if not self._armed or self._state != "armed":
+            raise NotArmed("the kill switch is not armed")
 
-    def _run_nft(self, args: list[str], *, input_text: str | None = None):
-        command = [self._nft(), *args]
-        try:
-            result = subprocess.run(
-                command,
-                input=input_text,
-                text=True,
-                capture_output=True,
-                timeout=NFT_TIMEOUT,
-                env={
-                    "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
-                    "LC_ALL": "C",
-                },
-                check=False,
-            )
-        except FileNotFoundError as exc:
-            raise NotAvailable("nftables is not installed") from exc
-        except subprocess.TimeoutExpired as exc:
-            raise ServiceError("nftables command timed out") from exc
-        except OSError as exc:
-            raise ServiceError(f"could not run nftables: {exc}") from exc
-        if result.returncode != 0:
-            detail = (result.stderr or result.stdout or "").strip()
-            if len(detail) > 600:
-                detail = detail[:600] + "…"
-            raise ServiceError(f"nftables rejected the rules: {detail}")
-        return result
+    def _profile_remotes(self, uuid: str, uid: int):
+        if uuid != MANAGED_UUID:
+            raise PermissionDenied("this service only protects the reserved Pervius profile")
+        return self.backend.profile_remotes(uuid, uid, self.local_username)
 
-    def _table_exists(self) -> bool:
-        try:
-            result = subprocess.run(
-                [self._nft(), "list", "table", TABLE_SPEC],
-                text=True,
-                capture_output=True,
-                timeout=NFT_TIMEOUT,
-                env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C"},
-                check=False,
-            )
-        except Exception:
-            return False
-        return result.returncode == 0
+    # -------------------------------------------------------------- nftables
 
-    def _apply_rules(self, endpoints: tuple[Endpoint, ...], allow_lan: bool):
-        rules = build_ruleset(endpoints, allow_lan=allow_lan)
-        self._run_nft(["-f", "-"], input_text=rules)
-        if not self._table_exists():
+    def _apply_rules(self, endpoints, allow_lan: bool, interfaces: tuple[str, ...]):
+        cgroup = self.backend.service_cgroup()
+        rules = build_ruleset(
+            endpoints, allow_lan=allow_lan, interfaces=interfaces, service_cgroup=cgroup
+        )
+        self.backend.run_nft(["-f", "-"], input_text=rules)
+        if not self.backend.table_exists(TABLE_SPEC):
             raise ServiceError("nftables did not create the Pervius table")
-        log.info("kill switch armed with %d endpoint(s), allow_lan=%s", len(endpoints), allow_lan)
+        self._window_rule = cgroup is not None
+        log.info(
+            "kill-switch rules applied: %d endpoint(s), %d extra interface(s), allow_lan=%s, dns window=%s",
+            len(tuple(endpoints)),
+            len(interfaces),
+            allow_lan,
+            "available" if self._window_rule else "unavailable",
+        )
 
     def _delete_rules(self):
-        if not self._table_exists():
+        if not self.backend.table_exists(TABLE_SPEC):
             return
-        self._run_nft(["delete", "table", TABLE_SPEC])
-        if self._table_exists():
+        self.backend.run_nft(["delete", "table", *TABLE_SPEC.split()])
+        if self.backend.table_exists(TABLE_SPEC):
             raise ServiceError("Pervius nftables table still exists after deletion")
         log.info("kill switch disarmed")
 
-    # -------------------------------------------------------------- profile
+    # ----------------------------------------------------------------- arm
 
-    def _load_profile(self, uuid: str, uid: int) -> tuple[Endpoint, ...]:
-        if uuid != MANAGED_UUID:
-            raise PermissionDenied("this service only protects the reserved Pervius profile")
-        try:
-            client = NM.Client.new(None)
-        except Exception as exc:
-            raise ServiceError("NetworkManager is unavailable") from exc
-        if client is None:
-            raise ServiceError("NetworkManager is unavailable")
-        connection = None
-        try:
-            connection = client.get_connection_by_uuid(uuid)
-        except Exception:
-            connection = None
-        if connection is None:
-            for candidate in client.get_connections():
-                try:
-                    if candidate.get_uuid() == uuid:
-                        connection = candidate
-                        break
-                except Exception:
-                    continue
-        if connection is None:
-            raise ServiceError("managed profile not found")
-
-        s_con = connection.get_setting_connection()
-        s_vpn = connection.get_setting_vpn()
-        if not isinstance(s_con, NM.SettingConnection) or not isinstance(s_vpn, NM.SettingVpn):
-            raise ServiceError("managed profile is malformed")
-        if s_vpn.get_service_type() != OPENVPN_SERVICE_TYPE:
-            raise ServiceError("managed profile is not an OpenVPN connection")
-        permissions = list(s_con.props.permissions or [])
-        if uid == 0:
-            if len(permissions) != 1:
-                raise PermissionDenied("profile ownership is ambiguous")
-            parts = permissions[0].split(":", 2)
-            if len(parts) < 2 or parts[0] != "user":
-                raise PermissionDenied("profile ownership is ambiguous")
-            username = parts[1]
-        else:
-            username = self._local_username(uid)
-        data = dict(s_vpn.props.data)
-        result = endpoints_from_profile_data(data, permissions, username)
-        for warning in result.warnings:
-            log.warning("profile endpoint warning: %s", warning)
-        return result.endpoints
-
-    # ---------------------------------------------------------------- state
-
-    def _arm(self, uuid: str, allow_lan: bool, uid: int):
+    def arm(self, uuid: str, allow_lan: bool, interfaces: list, uid: int) -> tuple[Endpoint, ...]:
+        validated = validate_interfaces(interfaces)
         if self._armed:
-            if self._state == "armed" and self._uuid == uuid and self._allow_lan == allow_lan:
+            if (
+                self._state == "armed"
+                and self._uuid == uuid
+                and self._allow_lan == allow_lan
+                and self._interfaces == validated
+                and uid in {0, self._owner_uid}
+            ):
                 self._detail = "Already armed"
-                return
+                return self._endpoints
             raise ServiceError("kill switch is already armed; disarm it first")
 
-        endpoints = self._load_profile(uuid, uid)
-        self._apply_rules(endpoints, allow_lan)
+        remotes, protocol = self._profile_remotes(uuid, uid)
+        # No Pervius rules exist yet, so this uses the system resolver (through
+        # the tunnel's DNS when the VPN is up).
+        resolution = self.backend.resolve_system(remotes, protocol)
+        self._log_warnings(resolution)
+        self._apply_rules(resolution.endpoints, allow_lan, validated)
         self._armed = True
         self._state = "armed"
         self._detail = "Rules installed; VPN may still be connecting"
         self._uuid = uuid
         self._allow_lan = allow_lan
+        self._interfaces = validated
         self._owner_uid = uid
         self._since = utc_now()
-        self._endpoints = endpoints
+        self._resolved_at = self._since
+        self._endpoints = resolution.endpoints
+        self._save_state()
+        self._emit_status()
+        return resolution.endpoints
+
+    def configure(self, allow_lan: bool, interfaces: list, uid: int):
+        self._require_armed()
+        self._require_owner(uid)
+        validated = validate_interfaces(interfaces)
+        self._apply_rules(self._endpoints, allow_lan, validated)
+        self._allow_lan = allow_lan
+        self._interfaces = validated
+        self._detail = "Settings applied"
         self._save_state()
         self._emit_status()
 
-    def _disarm(self, uid: int):
-        if self._armed and self._owner_uid is not None and uid not in {0, self._owner_uid}:
-            raise PermissionDenied("only the user who armed the kill switch may disarm it")
+    def update_endpoints(self, uuid: str, replace: bool, uid: int) -> tuple[Endpoint, ...]:
+        self._require_armed()
+        self._require_owner(uid)
+        if uuid != self._uuid:
+            raise PermissionDenied("the kill switch protects a different profile")
+        remotes, protocol = self._profile_remotes(uuid, uid)
+        if self.backend.tunnel_up():
+            try:
+                resolution = self.backend.resolve_system(remotes, protocol)
+            except RulesError as exc:
+                raise ResolveFailed(str(exc)) from exc
+        else:
+            resolution = self._resolve_through_window(remotes, protocol)
+        self._log_warnings(resolution)
+        endpoints = (
+            resolution.endpoints if replace else merge_endpoints(resolution.endpoints, self._endpoints)
+        )
+        # One transaction: new endpoint sets in, DNS window closed.
+        self.backend.run_nft(["-f", "-"], input_text=build_endpoint_swap(endpoints))
+        self._endpoints = endpoints
+        self._resolved_at = utc_now()
+        self._detail = "VPN server addresses updated"
+        self._save_state()
+        self._emit_status()
+        log.info("endpoints updated: %d (%s)", len(endpoints), "replaced" if replace else "merged")
+        return resolution.endpoints
+
+    def _resolve_through_window(self, remotes, protocol: str) -> Resolution:
+        """Resolve server names while the tunnel is down.
+
+        The DNS window admits only this service's own queries (cgroup match),
+        only to the link's resolvers, only plain DNS, and expires in the
+        kernel after a few seconds even if the service dies.
+        """
+        if not self._window_rule:
+            raise ResolveFailed("the DNS window is unavailable (cgroup v2 match not possible)")
+        now = self.backend.clock()
+        if self._last_window is not None and now - self._last_window < DNS_WINDOW_INTERVAL:
+            raise ResolveFailed("the DNS window was used moments ago; try again shortly")
+        servers = resolver_addresses(self.backend.link_nameservers())
+        if not servers:
+            raise ResolveFailed("no DNS server is configured on the network links")
+        self._last_window = now
+        self.backend.run_nft(["-f", "-"], input_text=build_dns_window(servers))
+        log.info("DNS window opened for %d resolver(s)", len(servers))
+        try:
+            return self.backend.resolve_direct(remotes, protocol, servers)
+        except Exception as exc:
+            try:
+                self.backend.run_nft(["-f", "-"], input_text=build_dns_window_close())
+            except ServiceError:
+                log.warning("could not close the DNS window early; it expires on its own")
+            raise ResolveFailed(f"could not resolve the VPN servers: {exc}") from exc
+
+    @staticmethod
+    def _log_warnings(resolution: Resolution):
+        for warning in resolution.warnings:
+            log.warning("endpoint warning: %s", warning)
+
+    def disarm(self, uid: int):
+        if self._armed:
+            self._require_owner(uid)
         self._delete_rules()
         self._armed = False
         self._state = "off"
         self._detail = "Not armed"
         self._uuid = ""
         self._allow_lan = False
+        self._interfaces = ()
         self._owner_uid = None
         self._since = ""
+        self._resolved_at = ""
         self._endpoints = ()
+        self._window_rule = False
         self._delete_state()
         self._emit_status()
 
-    def _ensure_state_dir(self):
-        STATE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
-        os.chmod(STATE_DIR, 0o700)
+    # ---------------------------------------------------------------- state
 
     def _save_state(self):
-        self._ensure_state_dir()
+        directory = self.state_file.parent
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(directory, 0o700)
         payload = {
             "version": STATE_VERSION,
             "armed": True,
             "uuid": self._uuid,
             "allow_lan": self._allow_lan,
+            "interfaces": list(self._interfaces),
             "owner_uid": self._owner_uid,
             "since": self._since,
+            "resolved_at": self._resolved_at,
             "state": self._state,
             "detail": self._detail,
             "endpoints": [
-                {
-                    "address": endpoint.address,
-                    "port": endpoint.port,
-                    "protocol": endpoint.protocol,
-                }
-                for endpoint in self._endpoints
+                {"address": e.address, "port": e.port, "protocol": e.protocol}
+                for e in self._endpoints
             ],
         }
-        import json
-
         data = json.dumps(payload, sort_keys=True).encode("utf-8")
-        fd, temporary = tempfile.mkstemp(prefix=".killswitch-", dir=STATE_DIR)
+        fd, temporary = tempfile.mkstemp(prefix=".killswitch-", dir=directory)
         try:
             os.fchmod(fd, 0o600)
             with os.fdopen(fd, "wb") as handle:
                 handle.write(data)
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary, STATE_FILE)
-            os.chmod(STATE_FILE, 0o600)
+            os.replace(temporary, self.state_file)
+            os.chmod(self.state_file, 0o600)
         finally:
             try:
                 os.unlink(temporary)
             except FileNotFoundError:
                 pass
 
-    def _load_state(self) -> dict | None:
+    def load_state(self) -> dict | None:
         try:
-            import json
-
-            value = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+            value = json.loads(self.state_file.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return None
-        if not isinstance(value, dict) or value.get("version") != STATE_VERSION:
+        if not isinstance(value, dict) or value.get("version") not in {1, STATE_VERSION}:
             return None
-        if not value.get("uuid") or not isinstance(value.get("allow_lan"), bool):
+        if value.get("uuid") != MANAGED_UUID or not isinstance(value.get("allow_lan"), bool):
             return None
         try:
             endpoints = endpoints_from_state(value.get("endpoints") or [])
+            # Version 1 had no interface list (it allowed tun*).
+            interfaces = validate_interfaces(value.get("interfaces") or [])
         except (RulesError, TypeError, ValueError):
             return None
         owner = value.get("owner_uid")
-        if not isinstance(owner, int):
+        if not isinstance(owner, int) or isinstance(owner, bool):
             return None
         return {
-            "uuid": str(value["uuid"]),
-            "allow_lan": bool(value["allow_lan"]),
+            "uuid": MANAGED_UUID,
+            "allow_lan": value["allow_lan"],
+            "interfaces": interfaces,
             "owner_uid": owner,
             "since": str(value.get("since") or utc_now()),
+            "resolved_at": str(value.get("resolved_at") or value.get("since") or ""),
             "endpoints": endpoints,
+            "version": value["version"],
         }
 
     def _delete_state(self):
         try:
-            STATE_FILE.unlink()
+            self.state_file.unlink()
         except FileNotFoundError:
             pass
         except OSError as exc:
             log.warning("could not remove kill-switch state: %s", exc)
 
-    def _recover_state(self):
-        if self._table_exists():
-            state = self._load_state()
-            if state is None:
-                self._armed = True
-                self._state = "error"
-                self._detail = (
-                    "Pervius firewall table exists without recoverable state; "
-                    "Disarm before arming again"
-                )
-                log.error(self._detail)
-                return
-            self._armed = True
-            self._state = "armed"
-            self._detail = "Protection restored after service restart"
-            self._uuid = state["uuid"]
-            self._allow_lan = state["allow_lan"]
-            self._owner_uid = state["owner_uid"]
-            self._since = state["since"]
-            self._endpoints = state["endpoints"]
-            log.info("restored kill-switch state with %d endpoint(s)", len(self._endpoints))
-            return
+    def _restore(self, state: dict, detail: str):
+        self._armed = True
+        self._state = "armed"
+        self._detail = detail
+        self._uuid = state["uuid"]
+        self._allow_lan = state["allow_lan"]
+        self._interfaces = state["interfaces"]
+        self._owner_uid = state["owner_uid"]
+        self._since = state["since"]
+        self._resolved_at = state["resolved_at"]
+        self._endpoints = state["endpoints"]
 
-        state = self._load_state()
+    def _recover_state(self):
+        table = self.backend.table_exists(TABLE_SPEC)
+        state = self.load_state()
+        if table and state is None:
+            self._armed = True
+            self._state = "error"
+            self._detail = (
+                "Pervius firewall table exists without recoverable state; "
+                "Disarm before arming again"
+            )
+            log.error(self._detail)
+            return
         if state is None:
             self._armed = False
             self._state = "off"
             self._detail = "Not armed"
             return
-        # The table disappeared while state survived: reconstruct and verify.
+        # Rebuild in one transaction even when the table survived: the DNS
+        # window rule names this process's cgroup, which a restart replaces,
+        # and a version-1 table used the old layout.
         try:
-            self._apply_rules(state["endpoints"], state["allow_lan"])
+            self._apply_rules(state["endpoints"], state["allow_lan"], state["interfaces"])
         except Exception as exc:
-            self._armed = False
+            self._armed = table
             self._state = "error"
             self._detail = f"Could not restore protection: {exc}"
             log.error(self._detail)
             return
-        self._armed = True
-        self._state = "armed"
-        self._detail = "Protection reconstructed after service restart"
-        self._uuid = state["uuid"]
-        self._allow_lan = state["allow_lan"]
-        self._owner_uid = state["owner_uid"]
-        self._since = state["since"]
-        self._endpoints = state["endpoints"]
+        self._restore(
+            state,
+            "Protection restored after service restart"
+            if table
+            else "Protection reconstructed after service restart",
+        )
+        if state["version"] != STATE_VERSION:
+            self._save_state()
+        log.info("restored kill-switch state with %d endpoint(s)", len(self._endpoints))
+
+    def _clear_stale_guard(self):
+        """Remove an IPv6 guard left behind when NetworkManager crashed.
+
+        The dispatcher hook owns the guard; this is only a recovery path for a
+        VPN that went away without a vpn-down event.
+        """
+        try:
+            if self.backend.table_exists(GUARD_TABLE_SPEC) and not self.backend.managed_vpn_active():
+                self.backend.run_nft(["delete", "table", *GUARD_TABLE_SPEC.split()])
+                log.info("removed a stale IPv6 guard (the managed VPN is not active)")
+        except Exception as exc:
+            log.warning("could not check the IPv6 guard: %s", exc)
 
 
 def main() -> int:
