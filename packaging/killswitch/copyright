@@ -1,9 +1,0 @@
-Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: solvetus-vpn-killswitch
-Source: local test build
-
-Files: *
-Copyright: 2026 Solvetus project
-License: Proprietary-test-build
- No license has been granted for this test build. All rights are reserved by
- the author. Do not redistribute this package without permission.

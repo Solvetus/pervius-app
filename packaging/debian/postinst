@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+fi
+# Ask the system bus to re-read its policy. Works with dbus-broker and
+# dbus-daemon alike.
+if command -v busctl >/dev/null 2>&1; then
+    busctl call org.freedesktop.DBus /org/freedesktop/DBus \
+        org.freedesktop.DBus ReloadConfig >/dev/null 2>&1 || true
+fi
+exit 0

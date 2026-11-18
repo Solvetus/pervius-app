@@ -1,6 +1,6 @@
 [Unit]
 Description=Solvetus VPN kill switch
-Documentation=file:///usr/share/doc/solvetus-vpn-killswitch/security-design.md
+Documentation=file:///usr/share/doc/solvetus-vpn/ARCHITECTURE.md
 After=dbus.service NetworkManager.service
 Requires=dbus.service
 

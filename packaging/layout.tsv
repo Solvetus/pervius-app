@@ -1,0 +1,27 @@
+# Install layout shared by every distribution package.
+#
+# Columns (tab-separated): mode, source (relative to the repository root),
+# destination (absolute). Mode "tree" copies a directory recursively with
+# 0755 directories and 0644 files, skipping Python bytecode.
+#
+# {pythondir} is the only distribution-specific token: the system Python
+# module directory (Debian: /usr/lib/python3/dist-packages,
+# Fedora: %{python3_sitelib}). Everything else is an FHS path that is the
+# same on Debian/Ubuntu and Fedora.
+#
+# Consumed by packaging/stage.sh. Documentation files are installed by each
+# distribution's own packaging, because doc and license locations differ.
+tree	solvetus	{pythondir}/solvetus
+0755	data/bin/solvetus-vpn	/usr/bin/solvetus-vpn
+0755	data/bin/solvetus-vpn-proof	/usr/bin/solvetus-vpn-proof
+0755	data/bin/solvetus-vpn-inspect	/usr/bin/solvetus-vpn-inspect
+0755	data/bin/solvetus-killswitch	/usr/bin/solvetus-killswitch
+0644	data/org.solvetus.VPNManager.desktop	/usr/share/applications/org.solvetus.VPNManager.desktop
+0644	data/org.solvetus.VPNManager.metainfo.xml	/usr/share/metainfo/org.solvetus.VPNManager.metainfo.xml
+0644	data/icons/hicolor/scalable/apps/org.solvetus.VPNManager.svg	/usr/share/icons/hicolor/scalable/apps/org.solvetus.VPNManager.svg
+0644	data/icons/hicolor/scalable/apps/org.solvetus.VPNManager-connected.svg	/usr/share/icons/hicolor/scalable/apps/org.solvetus.VPNManager-connected.svg
+0644	data/icons/hicolor/scalable/apps/org.solvetus.VPNManager-disconnected.svg	/usr/share/icons/hicolor/scalable/apps/org.solvetus.VPNManager-disconnected.svg
+0644	data/systemd/solvetus-killswitchd.service	/usr/lib/systemd/system/solvetus-killswitchd.service
+0644	data/dbus/org.solvetus.KillSwitch1.conf	/usr/share/dbus-1/system.d/org.solvetus.KillSwitch1.conf
+0644	data/dbus/org.solvetus.KillSwitch1.service	/usr/share/dbus-1/system-services/org.solvetus.KillSwitch1.service
+0644	data/polkit/org.solvetus.killswitch.policy	/usr/share/polkit-1/actions/org.solvetus.killswitch.policy
