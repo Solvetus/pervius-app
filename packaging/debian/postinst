@@ -9,4 +9,11 @@ if command -v busctl >/dev/null 2>&1; then
     busctl call org.freedesktop.DBus /org/freedesktop/DBus \
         org.freedesktop.DBus ReloadConfig >/dev/null 2>&1 || true
 fi
+# A Pervius VPN that is already up when the package is installed or upgraded
+# never saw the vpn-up event: apply the leak guard to it now.
+if command -v nmcli >/dev/null 2>&1 &&
+    nmcli -t -f UUID connection show --active 2>/dev/null | grep -qx 22d97462-fd9d-5bc6-9f0b-7110f7153e4f; then
+    CONNECTION_UUID=22d97462-fd9d-5bc6-9f0b-7110f7153e4f VPN_IP_IFACE=pervius0 \
+        /bin/sh /usr/lib/NetworkManager/dispatcher.d/90-pervius-guard pervius0 vpn-up || true
+fi
 exit 0

@@ -77,6 +77,12 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
 - Connecting no longer freezes the window: the secret agent answers
   NetworkManager asynchronously instead of waiting on the keyring, every
   NetworkManager call has a timeout, and Quit works while connecting.
+- Switching location while the kill switch is armed keeps the old server
+  allowed until the new tunnel is up, and waits for the old tunnel to release
+  `pervius0`; before, the new activation failed ("Device or resource busy").
+- The leak guard is applied to a VPN that was already up when Pervius was
+  installed or upgraded, and the "IPv6 is not blocked" warning is based on
+  fresh service status.
 - Tray "Show Pervius" unminimises and focuses the window (it uses the tray
   host's activation token) instead of GNOME showing "Pervius is ready".
 

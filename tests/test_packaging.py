@@ -153,6 +153,11 @@ class AssetIdentifierTests(unittest.TestCase):
         self.assertIn(f"rm -rf {daemon.STATE_DIR}", postrm)
         self.assertIn("pervius-killswitchd.service", (REPO / "packaging" / "debian" / "prerm").read_text())
 
+    def test_install_applies_the_guard_to_an_already_active_vpn(self):
+        postinst = (REPO / "packaging" / "debian" / "postinst").read_text()
+        self.assertIn(config.MANAGED_UUID, postinst)
+        self.assertIn("/usr/lib/NetworkManager/dispatcher.d/90-pervius-guard pervius0 vpn-up", postinst)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -68,6 +68,7 @@ NFT_TIMEOUT = 20
 # At most one DNS window per this many seconds.
 DNS_WINDOW_INTERVAL = 30.0
 CGROUP_ROOT = Path("/sys/fs/cgroup")
+GUARD_HOOK = "/usr/lib/NetworkManager/dispatcher.d/90-pervius-guard"
 
 PERMISSION_DENIED = f"{INTERFACE}.PermissionDenied"
 OPERATION_FAILED = f"{INTERFACE}.Failed"
@@ -353,6 +354,27 @@ class SystemBackend:
             except FileNotFoundError:
                 pass
 
+    def apply_guard(self) -> None:
+        """Run the dispatcher hook for the active managed VPN (as NetworkManager would)."""
+        try:
+            result = subprocess.run(
+                ["/bin/sh", GUARD_HOOK, TUNNEL_INTERFACE, "vpn-up"],
+                env={
+                    "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+                    "LC_ALL": "C",
+                    "CONNECTION_UUID": MANAGED_UUID,
+                    "VPN_IP_IFACE": TUNNEL_INTERFACE,
+                },
+                capture_output=True,
+                text=True,
+                timeout=NFT_TIMEOUT,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise ServiceError(f"could not run the leak guard hook: {exc}") from exc
+        if result.returncode != 0:
+            raise ServiceError(f"the leak guard hook failed: {(result.stderr or '').strip()[:300]}")
+
     def clock(self) -> float:
         return time.monotonic()
 
@@ -392,7 +414,7 @@ class KillSwitchService:
             log.error("could not own %s: %s", BUS_NAME, exc.message)
             return False
         self._recover_state()
-        self._clear_stale_guard()
+        self._sync_guard()
         return True
 
     def _on_bus_acquired(self, connection: Gio.DBusConnection, _name: str):
@@ -690,9 +712,15 @@ class KillSwitchService:
             log.warning("could not update the VPN server addresses: %s", exc)
             raise
         self._log_warnings(resolution)
-        endpoints = (
-            resolution.endpoints if replace else merge_endpoints(resolution.endpoints, self._endpoints)
-        )
+        # The live tunnel's server always stays allowed, even when replacing:
+        # dropping it would cut the tunnel before the switch completes (the
+        # old OpenVPN process then cannot even say goodbye and holds the
+        # tunnel device for seconds).
+        live = self._live_endpoints(remotes, protocol)
+        if replace:
+            endpoints = merge_endpoints(resolution.endpoints, live)
+        else:
+            endpoints = merge_endpoints(resolution.endpoints, (*self._endpoints, *live))
         # One transaction: new endpoint sets in, DNS window closed.
         self.backend.run_nft(["-f", "-"], input_text=build_endpoint_swap(endpoints))
         self._endpoints = endpoints
@@ -735,6 +763,7 @@ class KillSwitchService:
         except OSError as exc:
             raise ServiceError(f"could not save the leak guard options: {exc}") from exc
         log.info("leak guard options saved: block_ipv6=%s, %d interface(s)", block_ipv6, len(validated))
+        self._sync_guard(reapply=True)
 
     def _resolve_through_window(self, remotes, protocol: str) -> Resolution:
         """Resolve server names while the tunnel is down.
@@ -911,19 +940,31 @@ class KillSwitchService:
             self._save_state()
         log.info("restored kill-switch state with %d endpoint(s)", len(self._endpoints))
 
-    def _clear_stale_guard(self):
-        """Remove an IPv6 guard left behind when NetworkManager crashed.
+    def _sync_guard(self, *, reapply: bool = False):
+        """Make the leak guard match the VPN's real state.
 
-        The dispatcher hook owns the guard; this is only a recovery path for a
-        VPN that went away without a vpn-down event.
+        The dispatcher hook installs the guard when the VPN comes up.  A VPN
+        that was already up when Pervius was installed or upgraded never saw
+        that event, so the service applies the guard to it (by running the
+        same hook); ``reapply`` does so after the options changed.  A guard
+        left behind after a NetworkManager crash is removed.
         """
         try:
+            active = self.backend.managed_vpn_active()
+            if active:
+                if reapply or not self.backend.table_exists(GUARD_TABLE_SPEC):
+                    self.backend.apply_guard()
+                    log.info("leak guard applied to the active VPN")
+                return
             for spec in (GUARD_TABLE_SPEC, LEGACY_GUARD_TABLE_SPEC):
-                if self.backend.table_exists(spec) and not self.backend.managed_vpn_active():
+                if self.backend.table_exists(spec):
                     self.backend.run_nft(["delete", "table", *spec.split()])
                     log.info("removed a stale leak guard %s (the managed VPN is not active)", spec)
         except Exception as exc:
-            log.warning("could not check the leak guard: %s", exc)
+            log.warning("could not synchronise the leak guard: %s", exc)
+
+    # Kept for callers and tests from before the guard was synchronised.
+    _clear_stale_guard = _sync_guard
 
 
 def main() -> int:

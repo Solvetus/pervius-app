@@ -254,9 +254,13 @@ and the tunnel is down, DNS is blocked. Pervius therefore:
    the tunnel. If that fails, the profile is pinned back to its previous
    addresses; it never stays on bare names.
 4. **Switches location without a gap.** A connected tunnel switching location
-   imports the new profile, calls `UpdateEndpoints(replace=true)` while the
-   old tunnel still carries DNS, pins the new addresses and only then
-   disconnects and reconnects. Protection never lapses.
+   imports the new profile, calls `UpdateEndpoints(replace=false)` while the
+   old tunnel still carries DNS (the old server stays allowed, so the old
+   OpenVPN can close cleanly and release `pervius0`), pins the new addresses,
+   disconnects, waits until `pervius0` is gone, and connects. Once the new
+   tunnel is up, `UpdateEndpoints(replace=true)` drops the old location's
+   servers; the service always keeps the live tunnel's server allowed.
+   Protection never lapses.
 5. **Uses a DNS window only when unavoidable.** When the tunnel is down (a new
    location while disconnected, or the first retry after a drop), the
    service adds the physical links' resolvers (from NetworkManager) to the
@@ -351,7 +355,10 @@ service because:
     unique local addresses (`fc00::/7`, not routable on the internet) and
     the always-allowed interfaces pass; all other IPv6 is dropped.
   - Other IPv4 is untouched.
-- `vpn-down`: delete the table. A guard left behind by a NetworkManager crash
+- `vpn-down`: delete the table.
+- A VPN that was already up when Pervius was installed or upgraded never saw
+  `vpn-up`: the package's `postinst` and the kill-switch service (at start
+  and whenever the options change) run the same hook for it. A guard left behind by a NetworkManager crash
   fails closed for IPv6 only; it is cleared by the next managed VPN event, by
   the kill-switch service when it starts (if the managed VPN is not active),
   by a reboot, or with `sudo nft delete table inet pervius_guard`.

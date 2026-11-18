@@ -208,6 +208,32 @@ class KillSwitchTests(NamespaceTestCase):
         self.assertBlocked("fd99::1", 53)
         self.assertAllowed("10.8.0.1", 53, device="pervius0")
 
+    def test_switch_while_armed_keeps_the_old_server_until_the_new_tunnel_is_up(self):
+        """Regression: replacing the endpoints before disconnecting cut the old
+        tunnel's packets ("write UDPv4: Operation not permitted"); the old
+        OpenVPN then held pervius0 and the new one could not open it."""
+        from pervius.killswitchd.daemon import merge_endpoints
+
+        old = (Endpoint("192.0.2.10", 1194, "udp"),)
+        new = (Endpoint("192.0.2.20", 1194, "udp"),)
+        nft(build_ruleset(old))
+        self.assertAllowed("192.0.2.10", 1194)  # the live tunnel's server
+        # 1. Before disconnecting: the new location's servers are merged in.
+        nft(build_endpoint_swap(merge_endpoints(new, old)))
+        self.assertAllowed("192.0.2.10", 1194)  # old tunnel can still close cleanly
+        self.assertAllowed("192.0.2.20", 1194)
+        # 2. New tunnel up: replace, keeping the live (new) server.
+        nft(build_endpoint_swap(merge_endpoints(new, new)))
+        self.assertAllowed("192.0.2.20", 1194)
+        self.assertBlocked("192.0.2.10", 1194)
+        self.assertAllowed("198.51.100.1", 443, proto="tcp", device="pervius0")  # tunnel traffic flows
+
+    def test_tunnel_traffic_flows_while_armed(self):
+        nft(build_ruleset((Endpoint("192.0.2.10", 1194, "udp"),)))
+        for dest, port, proto in (("198.51.100.1", 443, "tcp"), ("198.51.100.1", 53, "udp"), ("10.8.0.1", 80, "tcp")):
+            self.assertAllowed(dest, port, proto=proto, device="pervius0")
+        self.assertBlocked("198.51.100.1", 443, proto="tcp")  # same traffic outside the tunnel
+
     def test_rejected_transaction_leaves_the_old_set_intact(self):
         self.arm()
         broken = build_endpoint_swap((Endpoint("192.0.2.20", 1194, "udp"),)) + "add element inet pervius_ks nope { 1 }\n"

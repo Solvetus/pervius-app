@@ -62,9 +62,9 @@ def scenario(window, checks, done):
 
     def after_connect():
         checks.equal(
-            "armed connect: names, resolve, pin, guard options, activate",
+            "armed connect: names, resolve, pin, activate (guard options sent at startup)",
             events,
-            [("write", "names"), ("update", True), ("write", ("192.0.2.30",)), ("guard", True, ()), ("activate", False)],
+            [("write", "names"), ("update", True), ("write", ("192.0.2.30",)), ("activate", False)],
         )
         events.clear()
         begin()
@@ -107,9 +107,9 @@ def scenario(window, checks, done):
 
     def after_switch():
         checks.equal(
-            "switch resolves through the live tunnel before dropping it",
+            "switch resolves through the live tunnel and keeps the old server",
             events,
-            [("write", "names"), ("update", True), ("write", ("192.0.2.30",)), ("disconnect",)],
+            [("write", "names"), ("update", False), ("write", ("192.0.2.30",)), ("disconnect",)],
         )
         checks.equal("switch selected the new location", window.settings.location_key, "PT/Lisbon")
         events.clear()

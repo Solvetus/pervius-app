@@ -86,6 +86,10 @@ class FakeBackend:
     def write_guard_options(self, block_ipv6, interfaces):
         self.guard_options = (block_ipv6, interfaces)
 
+    def apply_guard(self):
+        self.guard_applied = getattr(self, "guard_applied", 0) + 1
+        self.tables.add("inet pervius_guard")
+
     def clock(self):
         return self.now
 
@@ -175,6 +179,50 @@ class ArmWhileConnectedTests(ServiceTestCase):
         with self.assertRaises(RulesError):
             self.service.arm(MANAGED_UUID, False, [], OWNER)
         self.assertEqual(self.backend.nft_calls, [])
+
+
+class SwitchKeepsTheLiveTunnelTests(ServiceTestCase):
+    """Regression: a switch removed the old server, so the old OpenVPN could
+    not exit cleanly, held pervius0, and the new one failed with
+    "TUNSETIFF pervius0: Device or resource busy"."""
+
+    def test_replacing_keeps_the_live_server_allowed(self):
+        self.armed()
+        self.backend.tunnel = True
+        self.backend.gateways = ["192.0.2.10"]  # the server the tunnel uses now
+        self.backend.system_result = Resolution(NEW, ())
+        self.service.update_endpoints(MANAGED_UUID, True, OWNER)
+        swap = self.last_script()
+        self.assertIn("192.0.2.20 . udp . 1194", swap)
+        self.assertIn("192.0.2.10 . udp . 1194", swap)
+
+    def test_replacing_without_a_live_tunnel_drops_the_old_server(self):
+        self.armed()
+        self.backend.system_result = Resolution(NEW, ())
+        self.backend.tunnel = True
+        self.service.update_endpoints(MANAGED_UUID, True, OWNER)
+        self.assertNotIn("192.0.2.10", self.last_script())
+
+
+class GuardSyncTests(ServiceTestCase):
+    """Regression: a VPN already up at install/upgrade never got the guard."""
+
+    def test_guard_is_applied_to_an_active_vpn_at_start(self):
+        self.backend.vpn_active = True
+        self.service._sync_guard()
+        self.assertEqual(getattr(self.backend, "guard_applied", 0), 1)
+
+    def test_existing_guard_is_left_alone(self):
+        self.backend.vpn_active = True
+        self.backend.tables.add("inet pervius_guard")
+        self.service._sync_guard()
+        self.assertEqual(getattr(self.backend, "guard_applied", 0), 0)
+
+    def test_new_options_are_applied_to_the_active_vpn(self):
+        self.backend.vpn_active = True
+        self.backend.tables.add("inet pervius_guard")
+        self.service.set_guard_options(False, [], OWNER)
+        self.assertEqual(self.backend.guard_applied, 1)
 
 
 class GuardOptionsTests(ServiceTestCase):

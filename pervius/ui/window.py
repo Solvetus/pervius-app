@@ -801,7 +801,12 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             self._killswitch_status = status
             self._killswitch_last_error = ""
+        first = not self._killswitch_ready
         self._killswitch_ready = True
+        if first and status is not None:
+            # Make sure the leak guard has the options (and is on an already
+            # active tunnel) right after install or upgrade.
+            self._send_guard_options()
         self._render_killswitch_state()
         if self._killswitch_armed and not was_armed:
             self._isp_ip_checked = True
@@ -1177,8 +1182,10 @@ class MainWindow(Adw.ApplicationWindow):
                         on_error=lambda message: log.warning("could not re-pin the profile: %s", message),
                     )
 
+            # Now that this tunnel is up, drop servers of earlier locations; the
+            # service always keeps the live server allowed.
             self._resolve_for_kill_switch(
-                connection, replace=False, then=self._pin_now, on_error=restore
+                connection, replace=True, then=self._pin_now, on_error=restore
             )
 
         fetch_settings_async(connection, with_previous)
@@ -2316,7 +2323,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._ensure_profile(
             then=lambda connection: self._resolve_for_kill_switch(
                 connection,
-                replace=True,
+                # Keep the old server allowed until the new tunnel is up, so
+                # the old OpenVPN can close cleanly and free pervius0.
+                replace=False,
                 then=lambda: ready(connection),
                 on_error=lambda error: failed(killswitch_error_text(error)),
             ),
@@ -2325,9 +2334,30 @@ class MainWindow(Adw.ApplicationWindow):
             quiet=True,
         )
 
-    def _activate(self, connection, *, reconnecting: bool = False):
+    @staticmethod
+    def _tunnel_device_busy() -> bool:
+        return (Path("/sys/class/net") / TUNNEL_INTERFACE).exists()
+
+    def _activate(self, connection, *, reconnecting: bool = False, waited: float = 0.0):
+        """Activate, once the previous tunnel has released ``pervius0``.
+
+        The device name is pinned, so a new OpenVPN cannot open it while the
+        previous one is still exiting ("TUNSETIFF pervius0: Device or resource
+        busy"); wait for it (at most 15 s) before asking NetworkManager.
+        """
         self._reconnect_in_flight = reconnecting
         self._set_state("connecting")
+        if self.active is None and self._tunnel_device_busy() and waited < 15.0:
+            attempt = self._attempt
+            self.status_subtitle.set_label(_("Waiting for the previous tunnel to close…"))
+
+            def retry():
+                if attempt == self._attempt and self._intent_connected and not self._disposed:
+                    self._activate(connection, reconnecting=reconnecting, waited=waited + 0.25)
+                return False
+
+            GLib.timeout_add(250, retry)
+            return
         self._connect_deadline = time.monotonic() + 90
         self._start_poll()
 
@@ -2626,7 +2656,7 @@ class MainWindow(Adw.ApplicationWindow):
         """Warn when protection that should be active is not."""
         if self._disposed or self._state != "connected":
             return False
-        if not (Path("/sys/class/net") / TUNNEL_INTERFACE).exists():
+        if not self._tunnel_device_busy():
             # Translators: {0} is a network interface name.
             self._show_banner(
                 _(
@@ -2635,17 +2665,22 @@ class MainWindow(Adw.ApplicationWindow):
                 ).format(TUNNEL_INTERFACE)
             )
             return False
-        status = self._killswitch_status
-        if (
-            self.settings.block_ipv6
-            and status is not None
-            and not bool(status.get("guard", True))
-            and not self._guard_warned
-        ):
-            self._guard_warned = True
-            self._show_banner(
-                _("IPv6 is not blocked outside the tunnel. Reconnect to apply the IPv6 guard.")
-            )
+        if self._killswitch_status is None or self._guard_warned:
+            return False
+
+        # Ask the service now: the 5-second status poll may predate this
+        # connection and would report a guard that is in fact in place.
+        def fresh(status, error):
+            if self._disposed or self._state != "connected" or error is not None:
+                return
+            self._killswitch_status = status
+            if not bool(status.get("guard", True)) and not self._guard_warned:
+                self._guard_warned = True
+                self._show_banner(
+                    _("IPv6 is not blocked outside the tunnel. Reconnect to apply the IPv6 guard.")
+                )
+
+        call_async(self.killswitch.status, fresh)
         return False
 
     def _start_timer(self):
