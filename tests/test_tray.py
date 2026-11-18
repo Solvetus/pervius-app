@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import unittest
 
-from gi.repository import GLib
 
 from pervius.ui.tray import MenuItem, TrayIcon
 

@@ -22,7 +22,7 @@ from ..config import (
     MAX_PROFILE_BYTES,
     MAX_UNCOMPRESSED_BYTES,
 )
-from .models import Catalogue, Location, ProfileRef, clean_city_name, location_key, utc_now_iso
+from .models import Catalogue, Location, ProfileRef, clean_city_name, utc_now_iso
 from .parser import ProfileError, parse_profile
 
 FILENAME_RE = re.compile(r"^NCVPN-([A-Z]{2})-(.+)-(TCP|UDP)\.ovpn$", re.ASCII)

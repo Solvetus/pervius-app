@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from dataclasses import dataclass
 from typing import Callable
 
 import gi
@@ -13,7 +12,7 @@ gi.require_version("NM", "1.0")
 from gi.repository import GLib, NM  # noqa: E402
 
 from ..config import MANAGED_UUID  # noqa: E402
-from ..catalogue.models import ParsedProfile, ProfileRef  # noqa: E402
+from ..catalogue.models import ProfileRef  # noqa: E402
 from .importer import import_and_prepare  # noqa: E402
 from .profile import PreparedProfile  # noqa: E402
 

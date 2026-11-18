@@ -60,7 +60,7 @@ def _dates(items) -> list[datetime]:
 def render(package: str, maintainer: str) -> str:
     out = []
     items = releases()
-    for release, date in zip(items, _dates(items)):
+    for release, date in zip(items, _dates(items), strict=True):
         out.append(f"{package} ({release.version}) unstable; urgency=medium\n")
         for item in _items(release.body):
             out.append(textwrap.fill(item, width=78, initial_indent="  * ", subsequent_indent="    "))

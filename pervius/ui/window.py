@@ -42,7 +42,7 @@ from ..config import (  # noqa: E402
     local_username,
 )
 from ..credentials import CredentialError, CredentialStore  # noqa: E402
-from ..killswitch_client import KillSwitchClient, KillSwitchError, call_async  # noqa: E402
+from ..killswitch_client import KillSwitchClient, call_async  # noqa: E402
 from ..migration import REFUSED, migrate_profile  # noqa: E402
 from ..nm.agent import AgentError, NetworkManagerSecretAgent  # noqa: E402
 from ..nm.client import (  # noqa: E402
@@ -51,7 +51,6 @@ from ..nm.client import (  # noqa: E402
     active_vpn_for_uuid,
     add_connection_async,
     deactivate_async,
-    get_connection_by_uuid,
     new_client,
     prepare_managed_profile_async,
     update_connection_async,
@@ -67,7 +66,7 @@ from ..ownership import (
     check_create_collision,
     find_managed_connection,
 )
-from ..public_ip import PublicIPError, fetch_public_ip  # noqa: E402
+from ..public_ip import fetch_public_ip  # noqa: E402
 from ..reconnect import ReconnectPolicy  # noqa: E402
 from ..settings import Settings, SettingsStore  # noqa: E402
 from .tray import MenuItem, TrayError, TrayIcon  # noqa: E402
@@ -2138,11 +2137,6 @@ class MainWindow(Adw.ApplicationWindow):
             self.connect_button.add_css_class("suggested-action")
             self.connect_button.remove_css_class("destructive-action")
 
-        controls_enabled = (
-            state not in _ACTIVE_STATES
-            and state not in {"loading", "blocked"}
-            and not self._killswitch_armed
-        )
         self._update_controls()
         self._refresh_connection_details()
         self._refresh_tray()

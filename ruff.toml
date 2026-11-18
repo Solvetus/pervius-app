@@ -1,0 +1,18 @@
+# Ruff lint configuration. CI pins the ruff version (.github/workflows/ci.yml).
+target-version = "py310"
+line-length = 110
+extend-exclude = ["dist", "build"]
+
+[lint]
+# pycodestyle errors and warnings, pyflakes, and bugbear-style checks that
+# catch real defects. Formatting is not enforced.
+select = ["E", "W", "F", "B"]
+ignore = [
+    "E501",  # long lines: strings and dialog texts are wrapped by hand
+]
+
+[lint.per-file-ignores]
+# GObject introspection requires gi.require_version() before importing from
+# gi.repository, and the manual harnesses must configure stubs before imports.
+"pervius/**" = ["E402"]
+"tests/**" = ["E402"]

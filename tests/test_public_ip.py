@@ -4,7 +4,6 @@ import types
 import unittest
 from unittest.mock import patch
 
-from gi.repository import GLib
 
 from pervius import public_ip
 from pervius.public_ip import PublicIPError, fetch_public_ip

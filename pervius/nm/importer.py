@@ -33,7 +33,6 @@ from ..config import (  # noqa: E402
 from ..catalogue.models import ParsedProfile  # noqa: E402
 from .profile import (  # noqa: E402
     PreparedProfile,
-    ProfileBuildError,
     build_managed_connection,
     build_variant,
     low_risk_warnings,
