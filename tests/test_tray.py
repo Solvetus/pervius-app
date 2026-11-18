@@ -4,7 +4,7 @@ import unittest
 
 from gi.repository import GLib
 
-from solvetus.ui.tray import MenuItem, TrayIcon
+from pervius.ui.tray import MenuItem, TrayIcon
 
 
 def make_tray(icon_provider=None):
@@ -31,7 +31,7 @@ class TrayTests(unittest.TestCase):
             raise RuntimeError("not today")
 
         tray = make_tray(broken)
-        with self.assertLogs("solvetus.ui.tray", level="ERROR"):
+        with self.assertLogs("pervius.ui.tray", level="ERROR"):
             self.assertEqual(tray._current_icon(), "org.solvetus.VPNManager")
 
     def test_separator_properties(self):

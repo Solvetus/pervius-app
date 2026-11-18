@@ -3,7 +3,7 @@ from __future__ import annotations
 import socket
 import unittest
 
-from solvetus.killswitchd.profile import ProfileError, endpoints_from_profile_data
+from pervius.killswitchd.profile import ProfileError, endpoints_from_profile_data
 
 
 def resolver(*addresses):

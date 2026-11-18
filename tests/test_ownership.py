@@ -9,8 +9,8 @@ import gi
 gi.require_version("NM", "1.0")
 from gi.repository import NM  # noqa: E402
 
-from solvetus.config import MANAGED_CONNECTION_ID, MANAGED_UUID, OPENVPN_SERVICE_TYPE  # noqa: E402
-from solvetus.ownership import (  # noqa: E402
+from pervius.config import MANAGED_CONNECTION_ID, MANAGED_UUID, OPENVPN_SERVICE_TYPE  # noqa: E402
+from pervius.ownership import (  # noqa: E402
     OwnershipEntry,
     OwnershipError,
     OwnershipStore,

@@ -12,8 +12,8 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk  # noqa: E402
 
-from solvetus.catalogue import CatalogueStore  # noqa: E402
-from solvetus.ui.window import LocationWindow  # noqa: E402
+from pervius.catalogue import CatalogueStore  # noqa: E402
+from pervius.ui.window import LocationWindow  # noqa: E402
 
 Gtk.init()
 Adw.init()

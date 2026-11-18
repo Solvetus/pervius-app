@@ -11,7 +11,7 @@
 #
 # Consumed by packaging/stage.sh. Documentation files are installed by each
 # distribution's own packaging, because doc and license locations differ.
-tree	solvetus	{pythondir}/solvetus
+tree	pervius	{pythondir}/pervius
 0755	data/bin/solvetus-vpn	/usr/bin/solvetus-vpn
 0755	data/bin/solvetus-vpn-proof	/usr/bin/solvetus-vpn-proof
 0755	data/bin/solvetus-vpn-inspect	/usr/bin/solvetus-vpn-inspect

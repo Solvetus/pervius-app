@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from solvetus.reconnect import DEFAULT_DELAYS, ReconnectPolicy
+from pervius.reconnect import DEFAULT_DELAYS, ReconnectPolicy
 
 
 class ReconnectPolicyTests(unittest.TestCase):

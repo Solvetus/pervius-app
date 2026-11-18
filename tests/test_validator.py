@@ -5,14 +5,14 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from solvetus.catalogue.validator import (
+from pervius.catalogue.validator import (
     ArchiveError,
     CatalogueError,
     inspect_archive,
     parse_catalogue,
     validate_archive,
 )
-from solvetus.config import MAX_PROFILE_BYTES
+from pervius.config import MAX_PROFILE_BYTES
 
 from .fixtures import catalogue_zip, malicious_symlink_zip, profile_text, zip_with
 

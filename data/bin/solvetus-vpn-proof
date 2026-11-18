@@ -1,4 +1,4 @@
 #!/usr/bin/python3
-from solvetus.tools.proof_connect import main
+from pervius.tools.proof_connect import main
 
 raise SystemExit(main())

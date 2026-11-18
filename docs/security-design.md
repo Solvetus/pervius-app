@@ -122,7 +122,7 @@ Ship a separate, optional package, for example `solvetus-vpn-killswitch`:
 - The service never accepts arbitrary rule text, shell commands, paths, or
   firewall expressions. It reads the reserved NetworkManager profile by UUID
   and extracts only validated remote hosts/ports/protocols.
-- All state lives in root-owned `/run/solvetus/` (tmpfs). The GUI cannot write
+- All state lives in root-owned `/run/pervius/` (tmpfs). The GUI cannot write
   it directly.
 - The base application remains unprivileged. If the optional package is not
   installed, the GUI shows an explanation and no switch.

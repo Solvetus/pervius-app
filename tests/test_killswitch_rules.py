@@ -3,7 +3,7 @@ from __future__ import annotations
 import socket
 import unittest
 
-from solvetus.killswitchd.rules import (
+from pervius.killswitchd.rules import (
     Endpoint,
     RulesError,
     build_ruleset,

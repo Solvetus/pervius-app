@@ -1,4 +1,4 @@
 #!/usr/bin/python3
-from solvetus.ui.app import main
+from pervius.ui.app import main
 
 raise SystemExit(main())

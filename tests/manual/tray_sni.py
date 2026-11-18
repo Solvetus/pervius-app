@@ -18,7 +18,7 @@ gi.require_version("GLib", "2.0")
 gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib  # noqa: E402
 
-from solvetus.ui.tray import MENU_INTERFACE, MENU_PATH, SNI_INTERFACE, SNI_PATH, MenuItem, TrayIcon  # noqa: E402
+from pervius.ui.tray import MENU_INTERFACE, MENU_PATH, SNI_INTERFACE, SNI_PATH, MenuItem, TrayIcon  # noqa: E402
 
 checks = Checks("tray_sni")
 

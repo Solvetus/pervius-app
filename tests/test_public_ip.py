@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 from gi.repository import GLib
 
-from solvetus import public_ip
-from solvetus.public_ip import PublicIPError, fetch_public_ip
+from pervius import public_ip
+from pervius.public_ip import PublicIPError, fetch_public_ip
 
 
 class FakeProps:

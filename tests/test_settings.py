@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from solvetus.settings import Settings, SettingsStore
+from pervius.settings import Settings, SettingsStore
 
 
 class SettingsTests(unittest.TestCase):

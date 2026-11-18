@@ -7,14 +7,14 @@ import gi
 gi.require_version("NM", "1.0")
 from gi.repository import NM  # noqa: E402
 
-from solvetus.config import MANAGED_CONNECTION_ID, MANAGED_UUID, OPENVPN_SERVICE_TYPE  # noqa: E402
-from solvetus.nm.profile import (  # noqa: E402
+from pervius.config import MANAGED_CONNECTION_ID, MANAGED_UUID, OPENVPN_SERVICE_TYPE  # noqa: E402
+from pervius.nm.profile import (  # noqa: E402
     ProfileBuildError,
     build_managed_connection,
     build_variant,
     low_risk_warnings,
 )
-from solvetus.catalogue.parser import parse_profile  # noqa: E402
+from pervius.catalogue.parser import parse_profile  # noqa: E402
 
 from .fixtures import profile_text
 

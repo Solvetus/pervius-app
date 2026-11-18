@@ -32,60 +32,60 @@ as the system bus, and UFW active on the nftables backend.
 
 ### Desktop application
 
-- `solvetus/ui/app.py` — `Adw.Application`, single instance; relaunching
+- `pervius/ui/app.py` — `Adw.Application`, single instance; relaunching
   presents the existing window; an app-level `present` action serves
   notification clicks.
-- `solvetus/ui/window.py` — main window, location chooser, credentials dialog,
+- `pervius/ui/window.py` — main window, location chooser, credentials dialog,
   connection state machine, tray menu callbacks, kill-switch controls,
   connection details, notifications and quit/close prompts.
-- `solvetus/ui/tray.py` — native StatusNotifierItem + DBusMenu implementation
+- `pervius/ui/tray.py` — native StatusNotifierItem + DBusMenu implementation
   over Gio D-Bus. No AppIndicator library dependency.
 
 ### NetworkManager integration
 
-- `solvetus/nm/client.py` — async/sync add, update, activate and deactivate
+- `pervius/nm/client.py` — async/sync add, update, activate and deactivate
   helpers, and the profile-preparation worker.
-- `solvetus/nm/importer.py` — runs `nmcli connection import --temporary` with
+- `pervius/nm/importer.py` — runs `nmcli connection import --temporary` with
   `NM_CERT_PATH` pointing at an app-owned directory, verifies the imported
   settings against the parsed profile field by field, builds the managed
   profile, deletes the temporary profile and keeps the CA file (mode 0600).
-- `solvetus/nm/profile.py` — builds the reserved managed profile. The **local
+- `pervius/nm/profile.py` — builds the reserved managed profile. The **local
   profile owner and the VPN account name are separate**: the local login (for
   example `alice`) goes into `connection.permissions`; the VPN account (for
   example `vpnuser@example`) goes into `vpn.user-name`.
-- `solvetus/nm/agent.py` — system-bus NetworkManager SecretAgent. Only
+- `pervius/nm/agent.py` — system-bus NetworkManager SecretAgent. Only
   NetworkManager (uid 0) may call it. It checks the UUID, connection ID,
   OpenVPN service type and an exact single-user permission before returning a
   password. Passwords are looked up by VPN account name.
-- `solvetus/ownership.py` — ownership manifest and reserved UUID/ID
+- `pervius/ownership.py` — ownership manifest and reserved UUID/ID
   validation. Exactly one `user:<local-user>:` permission is required; empty
   permissions mean "all users" and are rejected.
-- `solvetus/credentials.py` — memory-only by default, optional Secret Service
+- `pervius/credentials.py` — memory-only by default, optional Secret Service
   persistence, no plaintext fallback.
 
 ### Catalogue and profiles
 
 - The public server catalogue ZIP is downloaded over HTTPS from
   `vpn.ncapi.io` with strict archive limits, path safety, duplicate handling
-  and size caps (`solvetus/catalogue/fetcher.py`, libsoup 3).
-- `solvetus/catalogue/parser.py` — strict OpenVPN allowlist. It rejects
+  and size caps (`pervius/catalogue/fetcher.py`, libsoup 3).
+- `pervius/catalogue/parser.py` — strict OpenVPN allowlist. It rejects
   external CA/cert/key files, inline certificates and keys, TLS-auth keys,
   scripts, plugins, compression, proxies and unknown options.
-- `solvetus/catalogue/validator.py` — archive validation and catalogue parsing.
-- `solvetus/catalogue/store.py` — last-known-good cache with atomic writes,
+- `pervius/catalogue/validator.py` — archive validation and catalogue parsing.
+- `pervius/catalogue/store.py` — last-known-good cache with atomic writes,
   mode 0600.
-- `solvetus/catalogue/countries.py` — ISO country names, flags, aliases and
+- `pervius/catalogue/countries.py` — ISO country names, flags, aliases and
   accent-insensitive search.
 
 ### Other modules
 
-- `solvetus/reconnect.py` — deterministic retry policy: 2, 5, 10, 20, 30, 60 s.
-- `solvetus/settings.py` — non-secret settings, favorites and preferences.
-- `solvetus/public_ip.py` — HTTPS public-IP lookup via `api64.ipify.org`.
-- `solvetus/killswitch_client.py` — unprivileged client for the kill-switch
+- `pervius/reconnect.py` — deterministic retry policy: 2, 5, 10, 20, 30, 60 s.
+- `pervius/settings.py` — non-secret settings, favorites and preferences.
+- `pervius/public_ip.py` — HTTPS public-IP lookup via `api64.ipify.org`.
+- `pervius/killswitch_client.py` — unprivileged client for the kill-switch
   service.
-- `solvetus/killswitchd/` — root service and pure policy helpers.
-- `solvetus/tools/` — catalogue inspector, live proof CLI and kill-switch CLI.
+- `pervius/killswitchd/` — root service and pure policy helpers.
+- `pervius/tools/` — catalogue inspector, live proof CLI and kill-switch CLI.
 
 ## 4. Connection model
 
@@ -156,7 +156,7 @@ Status keys: `armed`, `state` (`off`/`armed`/`error`), `detail`, `uuid`,
 
 ### State and recovery
 
-- State lives in `/run/solvetus/killswitch.json`, root-only, mode 0600.
+- State lives in `/run/pervius/killswitch.json`, root-only, mode 0600.
 - On service start: table + valid state → restore armed; state without table →
   rebuild the rules from the saved endpoints; table without valid state →
   report `error` and require Disarm (fail closed).

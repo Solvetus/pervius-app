@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import unittest
 
-from solvetus.catalogue.countries import (
+from pervius.catalogue.countries import (
     COUNTRY_NAMES,
     country_flag,
     country_name,
     fold_text,
 )
-from solvetus.catalogue.models import Location
+from pervius.catalogue.models import Location
 
 
 def location(code: str, city: str) -> Location:

@@ -7,8 +7,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from solvetus.catalogue.store import CatalogueStore, StoreError, atomic_write
-from solvetus.catalogue.validator import parse_catalogue
+from pervius.catalogue.store import CatalogueStore, StoreError, atomic_write
+from pervius.catalogue.validator import parse_catalogue
 
 from .fixtures import catalogue_zip
 

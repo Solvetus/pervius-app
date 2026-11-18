@@ -6,7 +6,7 @@ from harness import run_window_harness
 
 
 def scenario(window, checks, done):
-    from solvetus.ui import window as window_module
+    from pervius.ui import window as window_module
 
     window_module.verify_managed_profile = lambda *_args, **_kwargs: ()
     window_module._RECONNECT = window_module.ReconnectPolicy((30, 30))

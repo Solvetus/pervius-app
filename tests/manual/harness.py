@@ -65,7 +65,7 @@ def synthetic_catalogue_zip() -> bytes:
 
 
 def seed_catalogue() -> None:
-    from solvetus.catalogue import CatalogueStore, parse_catalogue
+    from pervius.catalogue import CatalogueStore, parse_catalogue
 
     blob = synthetic_catalogue_zip()
     CatalogueStore().save(blob, parse_catalogue(blob, source_url="https://example.com/catalogue.zip"))
@@ -73,9 +73,9 @@ def seed_catalogue() -> None:
 
 def install_stubs() -> None:
     """Keep the harness away from privileged or external services."""
-    from solvetus import killswitch_client
-    from solvetus.nm.agent import NetworkManagerSecretAgent
-    from solvetus.ui import window as window_module
+    from pervius import killswitch_client
+    from pervius.nm.agent import NetworkManagerSecretAgent
+    from pervius.ui import window as window_module
 
     def fake_register(self):
         self._registered = True
@@ -137,7 +137,7 @@ def run_window_harness(name: str, scenario, *, delay_ms: int = 2000, catalogue: 
     gi.require_version("Adw", "1")
     from gi.repository import Adw, Gio, GLib, Gtk
 
-    from solvetus.ui.window import MainWindow
+    from pervius.ui.window import MainWindow
 
     checks = Checks(name)
 

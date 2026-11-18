@@ -1,4 +1,4 @@
 #!/usr/bin/python3
-from solvetus.tools.killswitch_cli import main
+from pervius.tools.killswitch_cli import main
 
 raise SystemExit(main())

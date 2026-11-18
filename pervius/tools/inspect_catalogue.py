@@ -8,10 +8,10 @@ import json
 import sys
 from pathlib import Path
 
-if __package__ in (None, ""):  # direct execution: python3 solvetus/tools/inspect_catalogue.py
+if __package__ in (None, ""):  # direct execution: python3 pervius/tools/inspect_catalogue.py
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from solvetus.catalogue.validator import inspect_archive
+from pervius.catalogue.validator import inspect_archive
 
 
 def main(argv: list[str] | None = None) -> int:

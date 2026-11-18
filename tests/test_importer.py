@@ -11,9 +11,9 @@ import gi
 gi.require_version("NM", "1.0")
 from gi.repository import NM  # noqa: E402
 
-from solvetus.config import OPENVPN_SERVICE_TYPE  # noqa: E402
-from solvetus.catalogue.parser import parse_profile  # noqa: E402
-from solvetus.nm.importer import (  # noqa: E402
+from pervius.config import OPENVPN_SERVICE_TYPE  # noqa: E402
+from pervius.catalogue.parser import parse_profile  # noqa: E402
+from pervius.nm.importer import (  # noqa: E402
     ImportVerificationError,
     verify_imported_profile,
     verify_managed_profile,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import unittest
 
-from solvetus.catalogue.parser import ProfileError, parse_profile
+from pervius.catalogue.parser import ProfileError, parse_profile
 
 from .fixtures import CA_PEM, profile_text
 

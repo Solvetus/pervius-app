@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 from gi.repository import GLib
 
-from solvetus.catalogue import fetcher
-from solvetus.catalogue.fetcher import FetchError, fetch_bytes
+from pervius.catalogue import fetcher
+from pervius.catalogue.fetcher import FetchError, fetch_bytes
 
 
 class FakeProps:

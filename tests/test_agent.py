@@ -7,19 +7,19 @@ import gi
 gi.require_version("GLib", "2.0")
 from gi.repository import GLib  # noqa: E402
 
-from solvetus.config import (
+from pervius.config import (
     MANAGED_CONNECTION_ID,
     MANAGED_UUID,
     OPENVPN_SERVICE_TYPE,
 )
-from solvetus.nm.agent import (
+from pervius.nm.agent import (
     NOT_AUTHORIZED,
     AgentError,
     NetworkManagerSecretAgent,
     _unpack_connection_hash,
     ownership_matches,
 )
-from solvetus.ownership import OwnershipEntry
+from pervius.ownership import OwnershipEntry
 
 USER = "tester"
 

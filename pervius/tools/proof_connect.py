@@ -16,7 +16,7 @@ import sys
 import time
 from pathlib import Path
 
-if __package__ in (None, ""):  # direct execution: python3 solvetus/tools/proof_connect.py
+if __package__ in (None, ""):  # direct execution: python3 pervius/tools/proof_connect.py
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import gi
@@ -24,13 +24,13 @@ import gi
 gi.require_version("NM", "1.0")
 from gi.repository import GLib  # noqa: E402
 
-from solvetus.catalogue import CatalogueStore  # noqa: E402
-from solvetus.catalogue.fetcher import fetch_catalogue  # noqa: E402
-from solvetus.catalogue.validator import parse_catalogue  # noqa: E402
-from solvetus.config import CATALOGUE_URL, certificate_dir, local_username  # noqa: E402
-from solvetus.credentials import CredentialStore  # noqa: E402
-from solvetus.nm.agent import AgentError, NetworkManagerSecretAgent  # noqa: E402
-from solvetus.nm.client import (  # noqa: E402
+from pervius.catalogue import CatalogueStore  # noqa: E402
+from pervius.catalogue.fetcher import fetch_catalogue  # noqa: E402
+from pervius.catalogue.validator import parse_catalogue  # noqa: E402
+from pervius.config import CATALOGUE_URL, certificate_dir, local_username  # noqa: E402
+from pervius.credentials import CredentialStore  # noqa: E402
+from pervius.nm.agent import AgentError, NetworkManagerSecretAgent  # noqa: E402
+from pervius.nm.client import (  # noqa: E402
     NetworkManagerError,
     active_vpn_for_uuid,
     add_connection_sync,
@@ -42,15 +42,15 @@ from solvetus.nm.client import (  # noqa: E402
     vpn_state_name,
     vpn_state_reason,
 )
-from solvetus.nm.importer import verify_managed_profile  # noqa: E402
-from solvetus.ownership import (  # noqa: E402
+from pervius.nm.importer import verify_managed_profile  # noqa: E402
+from pervius.ownership import (  # noqa: E402
     OwnershipEntry,
     OwnershipError,
     OwnershipStore,
     check_create_collision,
     find_managed_connection,
 )
-from solvetus.settings import SettingsStore  # noqa: E402
+from pervius.settings import SettingsStore  # noqa: E402
 
 
 def _pick_location(catalogue, query: str, protocol: str):

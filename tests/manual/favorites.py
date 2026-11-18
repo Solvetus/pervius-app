@@ -17,7 +17,7 @@ def walk(widget):
 
 
 def scenario(window, checks, done):
-    from solvetus.ui.window import LocationWindow
+    from pervius.ui.window import LocationWindow
 
     window._start_poll = lambda: None
     window.settings.favorites = ["PT/Lisbon", "ES/Madrid"]

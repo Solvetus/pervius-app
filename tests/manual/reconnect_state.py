@@ -13,8 +13,8 @@ GIVE_UP = (
 
 
 def scenario(window, checks, done):
-    from solvetus.reconnect import ReconnectPolicy
-    from solvetus.ui import window as window_module
+    from pervius.reconnect import ReconnectPolicy
+    from pervius.ui import window as window_module
 
     window_module._RECONNECT = ReconnectPolicy((1, 1))
     window_module.verify_managed_profile = lambda *_args, **_kwargs: ()
