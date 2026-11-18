@@ -14,7 +14,7 @@ from gi.repository import GLib, NM  # noqa: E402
 from ..config import MANAGED_UUID  # noqa: E402
 from ..catalogue.models import ProfileRef  # noqa: E402
 from .importer import import_and_prepare  # noqa: E402
-from .profile import PreparedProfile  # noqa: E402
+from .profile import GuardOptions, PreparedProfile  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -101,6 +101,7 @@ def prepare_managed_profile(
     ref: ProfileRef,
     vpn_username: str,
     local_username: str,
+    guard: GuardOptions | None = None,
 ) -> PreparedProfile:
     """Import + verify in a worker thread; does not mutate the managed profile."""
     profile = ref.profile
@@ -111,6 +112,7 @@ def prepare_managed_profile(
         profile,
         vpn_username=vpn_username,
         local_username=local_username,
+        guard=guard,
     )
 
 
@@ -119,6 +121,7 @@ def prepare_managed_profile_async(
     vpn_username: str,
     local_username: str,
     callback: Callable[[PreparedProfile | None, Exception | None], None],
+    guard: GuardOptions | None = None,
 ) -> threading.Thread:
     """Run prepare_managed_profile in a worker and deliver on the GLib loop."""
 
@@ -128,7 +131,7 @@ def prepare_managed_profile_async(
 
     def worker() -> None:
         try:
-            result = prepare_managed_profile(ref, vpn_username, local_username)
+            result = prepare_managed_profile(ref, vpn_username, local_username, guard)
         except Exception as exc:  # surfaced to the UI with a clear message
             log.warning("profile preparation failed: %s", exc)
             GLib.idle_add(deliver, None, exc)

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import ipaddress
+from dataclasses import dataclass, field
 
 import gi
 
@@ -13,12 +14,34 @@ from ..config import (  # noqa: E402
     MANAGED_CONNECTION_ID,
     MANAGED_UUID,
     OPENVPN_SERVICE_TYPE,
+    TUNNEL_INTERFACE,
+    USER_DATA_ALLOWED_INTERFACES,
+    USER_DATA_BLOCK_IPV6,
+    USER_DATA_REMOTE_NAMES,
 )
+
+# Exclusive VPN DNS with NetworkManager: a negative priority excludes DNS
+# servers of every other connection with a higher value, and the "~." routing
+# domain makes the tunnel the default DNS route under systemd-resolved.
+VPN_DNS_PRIORITY = -1
+VPN_DNS_ROUTING_DOMAIN = "~."
 from ..catalogue.models import ParsedProfile  # noqa: E402
 
 
 class ProfileBuildError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class GuardOptions:
+    """Settings the root components read from the profile's user-data.
+
+    The NetworkManager dispatcher hook (IPv6 guard) receives them as
+    CONNECTION_USER_* environment variables and validates them itself.
+    """
+
+    block_ipv6: bool = True
+    allowed_interfaces: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -43,6 +66,7 @@ def build_managed_connection(
     *,
     local_username: str,
     vpn_username: str,
+    guard: GuardOptions | None = None,
 ) -> NM.Connection:
     """Copy an imported profile into our reserved, user-restricted profile.
 
@@ -88,9 +112,171 @@ def build_managed_connection(
     if data.get("password-flags") not in (None, str(int(NM.SettingSecretFlags.AGENT_OWNED))):
         raise ProfileBuildError("imported profile has unexpected password secret flags")
 
+    remote = data.get("remote")
+    if not remote:
+        raise ProfileBuildError("imported profile has no remote servers")
+    apply_tunnel_settings(connection)
+    sync_user_data(connection, guard or GuardOptions(), remote_names=remote)
+
     if not connection.verify():
         raise ProfileBuildError("the generated NetworkManager profile is not valid")
     return connection
+
+
+def _ip_setting(connection: NM.Connection, family: int):
+    setting = connection.get_setting_ip4_config() if family == 4 else connection.get_setting_ip6_config()
+    if setting is None:
+        setting = NM.SettingIP4Config.new() if family == 4 else NM.SettingIP6Config.new()
+        setting.props.method = "auto"
+        connection.add_setting(setting)
+    return setting
+
+
+def apply_tunnel_settings(connection: NM.Connection) -> None:
+    """Pin the tunnel device name and route all DNS through the tunnel."""
+    s_vpn = connection.get_setting_vpn()
+    if not isinstance(s_vpn, NM.SettingVpn):
+        raise ProfileBuildError("profile has no VPN setting")
+    s_vpn.add_data_item("dev", TUNNEL_INTERFACE)
+    s_vpn.add_data_item("dev-type", "tun")
+    for family in (4, 6):
+        setting = _ip_setting(connection, family)
+        setting.props.dns_priority = VPN_DNS_PRIORITY
+    s_ip4 = _ip_setting(connection, 4)
+    if VPN_DNS_ROUTING_DOMAIN not in list(s_ip4.props.dns_search or []):
+        s_ip4.add_dns_search(VPN_DNS_ROUTING_DOMAIN)
+
+
+def tunnel_settings_problem(connection: NM.Connection) -> str | None:
+    """Explain why a stored profile lacks the pinned device or exclusive DNS."""
+    s_vpn = connection.get_setting_vpn()
+    if not isinstance(s_vpn, NM.SettingVpn):
+        return "profile has no VPN setting"
+    if s_vpn.get_data_item("dev") != TUNNEL_INTERFACE or s_vpn.get_data_item("dev-type") != "tun":
+        return "the tunnel device is not pinned"
+    s_ip4 = connection.get_setting_ip4_config()
+    s_ip6 = connection.get_setting_ip6_config()
+    if s_ip4 is None or s_ip4.props.dns_priority != VPN_DNS_PRIORITY:
+        return "VPN DNS is not exclusive"
+    if s_ip6 is not None and s_ip6.props.dns_priority != VPN_DNS_PRIORITY:
+        return "VPN DNS is not exclusive"
+    if VPN_DNS_ROUTING_DOMAIN not in list(s_ip4.props.dns_search or []):
+        return "the tunnel is not the default DNS route"
+    return None
+
+
+def _user_setting(connection: NM.Connection) -> NM.SettingUser:
+    setting = connection.get_setting_by_name(NM.SETTING_USER_SETTING_NAME)
+    if setting is None:
+        setting = NM.SettingUser.new()
+        connection.add_setting(setting)
+    return setting
+
+
+def user_data(connection: NM.Connection, key: str) -> str | None:
+    setting = connection.get_setting_by_name(NM.SETTING_USER_SETTING_NAME)
+    if setting is None:
+        return None
+    return setting.get_data(key)
+
+
+def sync_user_data(
+    connection: NM.Connection,
+    guard: GuardOptions,
+    *,
+    remote_names: str | None = None,
+) -> bool:
+    """Write the guard options (and, once, the original server names).
+
+    Returns True if anything changed.  The interface list is joined with
+    commas; every consumer validates each name again.
+    """
+    setting = _user_setting(connection)
+    wanted = {
+        USER_DATA_BLOCK_IPV6: "yes" if guard.block_ipv6 else "no",
+        USER_DATA_ALLOWED_INTERFACES: ",".join(guard.allowed_interfaces),
+    }
+    if remote_names is not None:
+        wanted[USER_DATA_REMOTE_NAMES] = remote_names
+    changed = False
+    for key, value in wanted.items():
+        current = setting.get_data(key)
+        if value == "" and key == USER_DATA_ALLOWED_INTERFACES:
+            if current is not None:
+                setting.set_data(key, None)
+                changed = True
+            continue
+        if current != value:
+            setting.set_data(key, value)
+            changed = True
+    return changed
+
+
+def guard_options_match(connection: NM.Connection, guard: GuardOptions) -> bool:
+    return (
+        user_data(connection, USER_DATA_BLOCK_IPV6) == ("yes" if guard.block_ipv6 else "no")
+        and (user_data(connection, USER_DATA_ALLOWED_INTERFACES) or "")
+        == ",".join(guard.allowed_interfaces)
+    )
+
+
+def format_remote(host: str, port: int) -> str:
+    return f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+
+
+def pinned_remote_value(endpoints) -> str:
+    """The OpenVPN remote list for resolved endpoints (IP literals)."""
+    values = []
+    for endpoint in endpoints:
+        ipaddress.ip_address(endpoint.address)  # defensive: literals only
+        value = format_remote(endpoint.address, endpoint.port)
+        if value not in values:
+            values.append(value)
+    if not values:
+        raise ProfileBuildError("no resolved endpoints to pin")
+    return ", ".join(values)
+
+
+def is_pinned(connection: NM.Connection) -> bool:
+    s_vpn = connection.get_setting_vpn()
+    names = user_data(connection, USER_DATA_REMOTE_NAMES)
+    return bool(isinstance(s_vpn, NM.SettingVpn) and names and s_vpn.get_data_item("remote") != names)
+
+
+def clone(connection: NM.Connection) -> NM.SimpleConnection:
+    copy = NM.SimpleConnection.new_clone(connection)
+    if not isinstance(copy, NM.SimpleConnection):
+        raise ProfileBuildError("could not copy the managed profile")
+    return copy
+
+
+def pin_remote(connection: NM.Connection, endpoints, protocol: str) -> NM.SimpleConnection:
+    """A copy whose remote list holds the resolved IPs (kill switch armed).
+
+    OpenVPN then needs no DNS while the tunnel is down.  The CA and
+    verify-x509-name checks still decide whether a server is genuine.
+    """
+    copy = clone(connection)
+    s_vpn = copy.get_setting_vpn()
+    if not isinstance(s_vpn, NM.SettingVpn):
+        raise ProfileBuildError("profile has no VPN setting")
+    names = user_data(copy, USER_DATA_REMOTE_NAMES)
+    if not names:
+        raise ProfileBuildError("profile has no recorded server names")
+    selected = [e for e in endpoints if e.protocol == protocol]
+    s_vpn.add_data_item("remote", pinned_remote_value(selected))
+    return copy
+
+
+def unpin_remote(connection: NM.Connection) -> NM.SimpleConnection:
+    """A copy whose remote list is the provider's server names again."""
+    copy = clone(connection)
+    s_vpn = copy.get_setting_vpn()
+    names = user_data(copy, USER_DATA_REMOTE_NAMES)
+    if not isinstance(s_vpn, NM.SettingVpn) or not names:
+        raise ProfileBuildError("profile has no recorded server names")
+    s_vpn.add_data_item("remote", names)
+    return copy
 
 
 def build_variant(connection: NM.Connection) -> GLib.Variant:

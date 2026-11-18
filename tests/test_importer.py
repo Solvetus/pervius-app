@@ -12,10 +12,19 @@ from gi.repository import NM  # noqa: E402
 
 from pervius.config import OPENVPN_SERVICE_TYPE  # noqa: E402
 from pervius.catalogue.parser import parse_profile  # noqa: E402
+from pervius.killswitchd.rules import Endpoint  # noqa: E402
 from pervius.nm.importer import (  # noqa: E402
     ImportVerificationError,
     verify_imported_profile,
     verify_managed_profile,
+)
+from pervius.nm.profile import (  # noqa: E402
+    GuardOptions,
+    apply_tunnel_settings,
+    is_pinned,
+    pin_remote,
+    sync_user_data,
+    unpin_remote,
 )
 
 from .fixtures import profile_text
@@ -47,6 +56,17 @@ def make_connection(parsed, ca_path: Path) -> NM.SimpleConnection:
     return connection
 
 
+def make_managed(parsed, ca_path: Path) -> NM.SimpleConnection:
+    connection = make_connection(parsed, ca_path)
+    apply_tunnel_settings(connection)
+    sync_user_data(
+        connection,
+        GuardOptions(),
+        remote_names=", ".join(f"{h}:{p}" for h, p in parsed.remotes),
+    )
+    return connection
+
+
 class ImportVerificationTests(unittest.TestCase):
     def setUp(self):
         self._temp = tempfile.TemporaryDirectory()
@@ -69,9 +89,59 @@ class ImportVerificationTests(unittest.TestCase):
 
     def test_managed_verification_passes(self):
         warnings = verify_managed_profile(
-            make_connection(self.parsed, self.ca_path), self.parsed, self.cert_dir
+            make_managed(self.parsed, self.ca_path), self.parsed, self.cert_dir
         )
         self.assertEqual(warnings, ())
+
+    def test_profiles_from_older_releases_are_reimported(self):
+        # No pinned device and no exclusive DNS: verification fails, which makes
+        # the app import the profile again.
+        with self.assertRaisesRegex(ImportVerificationError, "tunnel device is not pinned"):
+            verify_managed_profile(make_connection(self.parsed, self.ca_path), self.parsed, self.cert_dir)
+
+    def test_non_exclusive_dns_is_rejected(self):
+        connection = make_managed(self.parsed, self.ca_path)
+        connection.get_setting_ip4_config().props.dns_priority = 50
+        with self.assertRaisesRegex(ImportVerificationError, "not exclusive"):
+            verify_managed_profile(connection, self.parsed, self.cert_dir)
+
+    def test_missing_default_dns_route_is_rejected(self):
+        connection = make_managed(self.parsed, self.ca_path)
+        connection.get_setting_ip4_config().clear_dns_searches()
+        with self.assertRaisesRegex(ImportVerificationError, "default DNS route"):
+            verify_managed_profile(connection, self.parsed, self.cert_dir)
+
+    def test_pinned_remote_passes_and_unpins(self):
+        managed = make_managed(self.parsed, self.ca_path)
+        port = self.parsed.remotes[0][1]
+        pinned = pin_remote(
+            managed,
+            (Endpoint("192.0.2.10", port, self.parsed.protocol), Endpoint("2001:db8::10", port, self.parsed.protocol)),
+            self.parsed.protocol,
+        )
+        self.assertEqual(
+            pinned.get_setting_vpn().get_data_item("remote"),
+            f"192.0.2.10:{port}, [2001:db8::10]:{port}",
+        )
+        self.assertTrue(is_pinned(pinned))
+        verify_managed_profile(pinned, self.parsed, self.cert_dir)
+        restored = unpin_remote(pinned)
+        self.assertFalse(is_pinned(restored))
+        verify_managed_profile(restored, self.parsed, self.cert_dir)
+
+    def test_pinned_remote_must_be_ip_literals_on_profile_ports(self):
+        for bad in ("evil.example.com:1194", "192.0.2.10:9999", "192.0.2.10", "[2001:db8::1]9", ""):
+            connection = make_managed(self.parsed, self.ca_path)
+            connection.get_setting_vpn().add_data_item("remote", bad)
+            with self.assertRaises(ImportVerificationError, msg=bad):
+                verify_managed_profile(connection, self.parsed, self.cert_dir)
+
+    def test_pinning_requires_the_original_names_to_match(self):
+        connection = make_managed(self.parsed, self.ca_path)
+        sync_user_data(connection, GuardOptions(), remote_names="evil.example.com:1194")
+        connection.get_setting_vpn().add_data_item("remote", "192.0.2.10:1194")
+        with self.assertRaises(ImportVerificationError):
+            verify_managed_profile(connection, self.parsed, self.cert_dir)
 
     def test_tampered_remote_is_rejected(self):
         connection = make_connection(self.parsed, self.ca_path)

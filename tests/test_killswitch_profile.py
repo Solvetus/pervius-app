@@ -83,5 +83,27 @@ class ProfileValidationTests(unittest.TestCase):
             )
 
 
+
+
+class PinnedProfileTests(unittest.TestCase):
+    def test_recorded_server_names_are_resolved_instead_of_pinned_ips(self):
+        from pervius.killswitchd.profile import remotes_from_profile_data
+
+        pinned = dict(VALID, remote="192.0.2.10:1194")
+        remotes, protocol = remotes_from_profile_data(
+            pinned, ["user:tester:"], "tester", remote_names="vpn.example:1194, backup.example:1194"
+        )
+        self.assertEqual(remotes, (("vpn.example", 1194), ("backup.example", 1194)))
+        self.assertEqual(protocol, "udp")
+        remotes, _ = remotes_from_profile_data(pinned, ["user:tester:"], "tester", remote_names="")
+        self.assertEqual(remotes, (("192.0.2.10", 1194),))
+
+    def test_ownership_is_still_required(self):
+        from pervius.killswitchd.profile import remotes_from_profile_data
+
+        with self.assertRaises(ProfileError):
+            remotes_from_profile_data(VALID, ["user:other:"], "tester", remote_names="vpn.example:1194")
+
+
 if __name__ == "__main__":
     unittest.main()

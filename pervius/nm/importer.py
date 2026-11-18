@@ -10,6 +10,7 @@ managed profile is built.
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import logging
 import os
 import re
@@ -26,16 +27,20 @@ from gi.repository import GLib, NM  # noqa: E402
 
 from ..config import (  # noqa: E402
     OPENVPN_SERVICE_TYPE,
+    USER_DATA_REMOTE_NAMES,
     certificate_dir,
     ensure_private_dir,
     runtime_dir,
 )
 from ..catalogue.models import ParsedProfile  # noqa: E402
 from .profile import (  # noqa: E402
+    GuardOptions,
     PreparedProfile,
     build_managed_connection,
     build_variant,
     low_risk_warnings,
+    tunnel_settings_problem,
+    user_data,
 )
 
 log = logging.getLogger(__name__)
@@ -131,10 +136,40 @@ def check_ca_file(path_value: str | None, cert_dir: Path, expected_hash: str) ->
     return _check_ca_path(path_value, cert_dir, expected_hash)
 
 
+def _pinned_remote_ok(value: str | None, parsed: ParsedProfile) -> bool:
+    """A pinned remote list: IP literals only, each on a port the profile uses."""
+    if not value:
+        return False
+    ports = {port for _host, port in parsed.remotes}
+    entries = [part.strip() for part in value.split(",") if part.strip()]
+    if not entries or len(entries) > 256:
+        return False
+    for entry in entries:
+        if entry.startswith("["):
+            host, _, rest = entry[1:].partition("]")
+            if not rest.startswith(":"):
+                return False
+            port_text = rest[1:]
+        else:
+            host, sep, port_text = entry.rpartition(":")
+            if not sep:
+                return False
+        try:
+            ipaddress.ip_address(host)
+            port = int(port_text, 10)
+        except ValueError:
+            return False
+        if port not in ports:
+            return False
+    return True
+
+
 def _verify_vpn_fields(
     connection: NM.Connection,
     parsed: ParsedProfile,
     cert_dir: Path,
+    *,
+    managed: bool = False,
 ) -> tuple[Path, tuple[str, ...]]:
     s_con = connection.get_setting_connection()
     s_vpn = connection.get_setting_vpn()
@@ -155,7 +190,18 @@ def _verify_vpn_fields(
             )
 
     expected_remote = ", ".join(f"{host}:{port}" for host, port in parsed.remotes)
-    require("remote", expected_remote)
+    if not managed:
+        require("remote", expected_remote)
+    elif data.get("remote") != expected_remote:
+        # While the kill switch is armed the remote list is pinned to resolved
+        # IP literals; the original names must still be the profile's.
+        if user_data(connection, USER_DATA_REMOTE_NAMES) != expected_remote or not _pinned_remote_ok(
+            data.get("remote"), parsed
+        ):
+            raise ImportVerificationError(
+                f"preservation check failed for 'remote': expected {expected_remote!r}, "
+                f"got {data.get('remote')!r}"
+            )
     if parsed.protocol == "tcp":
         require("proto-tcp", "yes")
     else:
@@ -206,8 +252,20 @@ def verify_managed_profile(
     parsed: ParsedProfile,
     cert_dir: Path,
 ) -> tuple[str, ...]:
-    """Verify an already-managed profile before reusing it."""
-    _ca_path, warnings = _verify_vpn_fields(connection, parsed, cert_dir)
+    """Verify an already-managed profile before reusing it.
+
+    Besides the imported fields it requires the pinned tunnel device and
+    exclusive VPN DNS; profiles from older releases fail here and are
+    re-imported.
+    """
+    _ca_path, warnings = _verify_vpn_fields(connection, parsed, cert_dir, managed=True)
+    problem = tunnel_settings_problem(connection)
+    if problem:
+        raise ImportVerificationError(problem)
+    if user_data(connection, USER_DATA_REMOTE_NAMES) != ", ".join(
+        f"{host}:{port}" for host, port in parsed.remotes
+    ):
+        raise ImportVerificationError("the recorded server names do not match the profile")
     return warnings
 
 
@@ -282,6 +340,7 @@ def import_and_prepare(
     vpn_username: str,
     local_username: str,
     cert_dir: Path | None = None,
+    guard: GuardOptions | None = None,
 ) -> PreparedProfile:
     if hashlib.sha256(profile_bytes).hexdigest() != parsed.source_sha256:
         raise ImportError("source profile bytes do not match the validated profile hash")
@@ -327,6 +386,7 @@ def import_and_prepare(
             imported.connection,
             local_username=local_username,
             vpn_username=vpn_username,
+            guard=guard,
         )
         variant = build_variant(managed)
     except Exception:

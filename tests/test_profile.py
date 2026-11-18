@@ -9,10 +9,15 @@ from gi.repository import NM  # noqa: E402
 
 from pervius.config import MANAGED_CONNECTION_ID, MANAGED_UUID, OPENVPN_SERVICE_TYPE  # noqa: E402
 from pervius.nm.profile import (  # noqa: E402
+    GuardOptions,
     ProfileBuildError,
     build_managed_connection,
     build_variant,
+    guard_options_match,
     low_risk_warnings,
+    sync_user_data,
+    tunnel_settings_problem,
+    user_data,
 )
 from pervius.catalogue.parser import parse_profile  # noqa: E402
 
@@ -65,6 +70,40 @@ class ProfileTests(unittest.TestCase):
         )
         self.assertIsNone(s_vpn.get_secret("password"))
         self.assertTrue(managed.verify())
+
+    def test_tunnel_device_is_pinned_and_dns_is_exclusive(self):
+        managed = make_managed(imported_connection())
+        s_vpn = managed.get_setting_vpn()
+        self.assertEqual(s_vpn.get_data_item("dev"), "pervius0")
+        self.assertEqual(s_vpn.get_data_item("dev-type"), "tun")
+        s_ip4 = managed.get_setting_ip4_config()
+        s_ip6 = managed.get_setting_ip6_config()
+        self.assertEqual(s_ip4.props.dns_priority, -1)
+        self.assertEqual(s_ip6.props.dns_priority, -1)
+        self.assertIn("~.", list(s_ip4.props.dns_search))
+        self.assertIsNone(tunnel_settings_problem(managed))
+
+    def test_user_data_carries_guard_options_and_server_names(self):
+        managed = build_managed_connection(
+            imported_connection(),
+            local_username=USER,
+            vpn_username=VPN_USER,
+            guard=GuardOptions(block_ipv6=False, allowed_interfaces=("wt0", "eth1")),
+        )
+        self.assertEqual(user_data(managed, "com.solvetus.pervius.block-ipv6"), "no")
+        self.assertEqual(user_data(managed, "com.solvetus.pervius.allowed-interfaces"), "wt0,eth1")
+        self.assertEqual(user_data(managed, "com.solvetus.pervius.remote-names"), "vpn.example.com:1194")
+        self.assertTrue(guard_options_match(managed, GuardOptions(False, ("wt0", "eth1"))))
+        self.assertFalse(guard_options_match(managed, GuardOptions(True, ("wt0", "eth1"))))
+
+    def test_default_guard_blocks_ipv6_without_extra_interfaces(self):
+        managed = make_managed(imported_connection())
+        self.assertEqual(user_data(managed, "com.solvetus.pervius.block-ipv6"), "yes")
+        self.assertIsNone(user_data(managed, "com.solvetus.pervius.allowed-interfaces"))
+        self.assertTrue(sync_user_data(managed, GuardOptions(True, ("wt0",))))
+        self.assertFalse(sync_user_data(managed, GuardOptions(True, ("wt0",))))
+        self.assertTrue(sync_user_data(managed, GuardOptions(True, ())))
+        self.assertIsNone(user_data(managed, "com.solvetus.pervius.allowed-interfaces"))
 
     def test_vpn_username_is_not_used_for_ownership(self):
         managed = make_managed(imported_connection())
