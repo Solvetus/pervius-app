@@ -176,8 +176,9 @@ def resolve_remotes(
 def build_ruleset(endpoints: Iterable[Endpoint], *, allow_lan: bool = False) -> str:
     """Build the dedicated nftables table.
 
-    The table is independent of UFW.  It only ever adds or deletes its own
-    table; it never flushes the global ruleset.
+    The table is independent of any firewall front end (see ``pervius.distro``).
+    It only ever adds or deletes its own table; it never flushes the global
+    ruleset.
     """
     unique = sorted(
         {(endpoint.address, endpoint.port, endpoint.protocol) for endpoint in endpoints},

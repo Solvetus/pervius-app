@@ -1,7 +1,8 @@
 """StatusNotifierItem tray icon with a DBusMenu.
 
-GNOME on Ubuntu exposes a StatusNotifierWatcher (provided by the AppIndicator
-support in the shell), so no extra Python package is needed.  The tray is a
+Desktops with StatusNotifierItem support (for example GNOME with the
+AppIndicator extension) expose a StatusNotifierWatcher, so no extra Python
+package is needed.  The tray is a
 secondary control surface: NetworkManager's own VPN indicator remains the
 system source of truth.
 """

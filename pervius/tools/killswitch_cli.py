@@ -20,6 +20,7 @@ gi.require_version("GLib", "2.0")
 gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib  # noqa: E402
 
+from .. import distro  # noqa: E402
 from ..config import MANAGED_UUID  # noqa: E402
 from ..killswitchd.daemon import (  # noqa: E402
     BUS_NAME,
@@ -126,6 +127,9 @@ def command_diagnose(_args) -> int:
     print("service installed/active:", _service_available())
     print("reserved profile UUID:", MANAGED_UUID)
     print("state directory:", STATE_DIR)
+    for finding in distro.report():
+        line = f"{finding.name}: {finding.value}"
+        print(f"{line} ({finding.note})" if finding.note else line)
     return 0
 
 
