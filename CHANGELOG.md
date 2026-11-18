@@ -8,6 +8,8 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-18
+
 ### Changed
 
 - Renamed the project to **Pervius**, an unofficial Linux client for FastVPN
@@ -217,5 +219,6 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
   validation, import through NetworkManager's OpenVPN plugin, ownership
   manifest, system-bus secret agent, Debian package.
 
-[Unreleased]: https://github.com/Solvetus/pervius-app/compare/v0.1.19...HEAD
+[Unreleased]: https://github.com/Solvetus/pervius-app/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Solvetus/pervius-app/compare/v0.1.19...v0.2.0
 [0.1.19]: https://github.com/Solvetus/pervius-app/tree/v0.1.19
