@@ -12,8 +12,10 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, Gtk  # noqa: E402
 
+from .. import i18n  # noqa: E402
 from ..config import APP_ID, APP_NAME, NOTIFICATION_ID  # noqa: E402
 from ..migration import migrate_user_data  # noqa: E402
+from ..settings import SettingsStore  # noqa: E402
 from .window import MainWindow  # noqa: E402
 
 
@@ -51,6 +53,8 @@ def main(argv: list[str] | None = None) -> int:
     # Adopt settings and saved passwords from a 0.1.x installation before the
     # window loads anything.  A no-op on fresh installs.
     migrate_user_data()
+    # The language override must be in place before GTK and gettext start.
+    i18n.setup(SettingsStore().load().language)
     Gtk.init()
     Adw.init()
     app = PerviusApplication()

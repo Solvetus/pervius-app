@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .config import settings_path
 from .catalogue.store import atomic_write
+from .i18n import SUPPORTED_LANGUAGES
 
 
 @dataclass
@@ -21,6 +22,8 @@ class Settings:
     favorites: list[str] = field(default_factory=list)
     killswitch_allow_lan: bool = False
     last_version: str = ""
+    # "" follows the system language; otherwise one of SUPPORTED_LANGUAGES.
+    language: str = ""
 
     @classmethod
     def from_dict(cls, value: dict) -> "Settings":
@@ -54,6 +57,9 @@ class Settings:
                     favorites.append(key)
                 if len(favorites) >= 50:
                     break
+        language = value.get("language", "")
+        if language not in SUPPORTED_LANGUAGES:
+            language = ""
         return cls(
             username=str(value.get("username") or "")[:255],
             location_key=str(value.get("location_key") or "")[:512],
@@ -64,6 +70,7 @@ class Settings:
             favorites=favorites,
             killswitch_allow_lan=killswitch_allow_lan,
             last_version=str(value.get("last_version") or "")[:32],
+            language=language,
         )
 
 
