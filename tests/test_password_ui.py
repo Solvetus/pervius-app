@@ -19,7 +19,6 @@ REPO = Path(__file__).resolve().parents[1]
 LOOKUP_ALLOWED = {
     "pervius/credentials.py",  # the store itself
     "pervius/nm/agent.py",  # GetSecrets, after authorization
-    "pervius/migration.py",  # one-time keyring move, verified read-back
 }
 
 
@@ -52,7 +51,7 @@ class FakeStore:
 
 
 class StaticTests(unittest.TestCase):
-    def test_only_the_agent_store_and_migration_read_passwords(self):
+    def test_only_the_agent_and_the_store_read_passwords(self):
         offenders = []
         for path, rel in python_files():
             tree = ast.parse(path.read_text(encoding="utf-8"))

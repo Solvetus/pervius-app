@@ -38,7 +38,6 @@ from ..config import (  # noqa: E402
 from .profile import ProfileError, remotes_from_profile_data  # noqa: E402
 from .rules import (  # noqa: E402
     GUARD_TABLE_SPEC,
-    LEGACY_GUARD_TABLE_SPEC,
     TABLE_SPEC,
     Endpoint,
     Resolution,
@@ -941,10 +940,9 @@ class KillSwitchService:
                     self.backend.apply_guard()
                     log.info("leak guard applied to the active VPN")
                 return
-            for spec in (GUARD_TABLE_SPEC, LEGACY_GUARD_TABLE_SPEC):
-                if self.backend.table_exists(spec):
-                    self.backend.run_nft(["delete", "table", *spec.split()])
-                    log.info("removed a stale leak guard %s (the managed VPN is not active)", spec)
+            if self.backend.table_exists(GUARD_TABLE_SPEC):
+                self.backend.run_nft(["delete", "table", *GUARD_TABLE_SPEC.split()])
+                log.info("removed a stale leak guard (the managed VPN is not active)")
         except Exception as exc:
             log.warning("could not synchronise the leak guard: %s", exc)
 

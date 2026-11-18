@@ -118,11 +118,8 @@ class ActionTests(HookTestCase):
         self.assertNotIn("meta nfproto ipv6 drop", out)
         self.assertNotIn("chain forward", out)
 
-    def test_down_removes_the_guard_and_the_legacy_table(self):
-        self.assertEqual(
-            self.run_hook("vpn-down").strip().splitlines(),
-            ["ARGS delete table inet pervius_guard", "ARGS delete table inet pervius_v6"],
-        )
+    def test_down_removes_the_guard(self):
+        self.assertEqual(self.run_hook("vpn-down").strip().splitlines(), ["ARGS delete table inet pervius_guard"])
 
     def test_other_actions_do_nothing(self):
         for action in ("up", "down", "pre-up", "vpn-pre-down", "connectivity-change", "hostname", "", "vpn-up;x"):

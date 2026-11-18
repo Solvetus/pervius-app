@@ -131,7 +131,7 @@ class ImportVerificationTests(unittest.TestCase):
                 verify_managed_profile(connection, self.parsed, self.cert_dir)
 
     def test_profile_without_user_data_still_verifies(self):
-        # The 0.2.0-migrated and NetworkManager-reloaded profiles have no user-data.
+        # NetworkManager drops the user setting on reload, so profiles may have none.
         managed = make_managed(self.parsed, self.ca_path)
         self.assertIsNone(managed.get_setting_by_name("user"))
         verify_managed_profile(managed, self.parsed, self.cert_dir)

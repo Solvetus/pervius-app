@@ -75,8 +75,7 @@ class LanguageOverrideTests(unittest.TestCase):
 
         order = []
         settings = Settings(language="fr")
-        with mock.patch.object(app, "migrate_user_data", lambda: order.append("migrate")), \
-                mock.patch.object(app.SettingsStore, "load", lambda self: settings), \
+        with mock.patch.object(app.SettingsStore, "load", lambda self: settings), \
                 mock.patch.object(app.i18n, "setup", lambda lang: order.append(f"setup:{lang}")), \
                 mock.patch.object(app.Gtk, "init", lambda: order.append("gtk")), \
                 mock.patch.object(app.Adw, "init", lambda: order.append("adw")), \
@@ -84,7 +83,7 @@ class LanguageOverrideTests(unittest.TestCase):
                 mock.patch.object(app.os, "geteuid", lambda: 1000):
             application.return_value.run.return_value = 0
             app.main(["pervius"])
-        self.assertEqual(order[:4], ["migrate", "setup:fr", "gtk", "adw"])
+        self.assertEqual(order[:3], ["setup:fr", "gtk", "adw"])
 
 
 class CountryNameTests(unittest.TestCase):

@@ -131,7 +131,7 @@ class NamespaceTestCase(unittest.TestCase):
         time.sleep(0.5)  # let link-local addresses appear
 
     def tearDown(self):
-        for table in ("inet pervius_ks", "inet pervius_guard", "inet pervius_v6"):
+        for table in ("inet pervius_ks", "inet pervius_guard"):
             run(NFT, "delete", "table", *table.split(), check=False)
 
     def assertAllowed(self, *args, **kwargs):

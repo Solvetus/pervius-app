@@ -475,11 +475,11 @@ class RecoveryTests(ServiceTestCase):
 
 class StaleGuardTests(ServiceTestCase):
     def test_stale_guard_is_removed_when_the_vpn_is_gone(self):
-        self.backend.tables.update({"inet pervius_guard", "inet pervius_v6"})
+        self.backend.tables.add("inet pervius_guard")
         self.service._clear_stale_guard()
         self.assertEqual(
             [call[0] for call in self.backend.nft_calls],
-            [["delete", "table", "inet", "pervius_guard"], ["delete", "table", "inet", "pervius_v6"]],
+            [["delete", "table", "inet", "pervius_guard"]],
         )
 
     def test_live_guard_is_kept(self):

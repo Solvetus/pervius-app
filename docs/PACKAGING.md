@@ -78,9 +78,6 @@ package needs no lintian overrides; `lintianrc` holds the lintian settings.
 Debian-specific behaviour, all under `packaging/debian/`:
 
 - `Depends` alternatives (`polkitd | policykit-1`, `dbus-broker | dbus-daemon | dbus`).
-- `Conflicts`/`Replaces`/`Provides` for the pre-rename packages.
-- `preinst` refuses to install over an armed 0.1.x kill switch (effective
-  for `dpkg -i`; apt removes the old package first).
 - `postinst`/`postrm` reload systemd and the system bus policy; `prerm` stops
   the service; `postrm` removes the `inet pervius_ks` and `inet pervius_guard`
   tables on removal.

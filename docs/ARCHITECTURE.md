@@ -47,7 +47,7 @@ dbus-broker as the system bus. Fedora support is planned; see
 - `pervius/ui/tray.py` — native StatusNotifierItem + DBusMenu implementation
   over Gio D-Bus. No AppIndicator library dependency.
 - `pervius/i18n.py` — gettext setup (domain `pervius`) and country names
-  through iso-codes (section 12).
+  through iso-codes (section 11).
 - `pervius/autostart.py` — the XDG autostart entry for start at login.
 
 ### NetworkManager integration
@@ -107,7 +107,6 @@ dbus-broker as the system bus. Fedora support is planned; see
 - `data/networkmanager/90-pervius-guard` — the IPv6 leak guard, a
   NetworkManager dispatcher hook (section 6).
 - `pervius/tools/` — catalogue inspector, live proof CLI and kill-switch CLI.
-- `pervius/migration.py` — one-time upgrade from 0.1.x (section 10).
 - `pervius/distro.py` — documented, report-only distribution checks
   (section 9).
 
@@ -281,13 +280,9 @@ and the tunnel is down, DNS is blocked. Pervius therefore:
   interfaces and the last resolution time), root-only, mode 0600.
 - On service start: valid state → rebuild the table atomically from the saved
   endpoints and interfaces, whether or not the table survived (the DNS window
-  rule names the service's cgroup, which a restart replaces; a version 1
-  table had the old `tun*` layout); table without valid state → report
+  rule names the service's cgroup, which a restart replaces); table without valid state → report
   `error` and require Disarm (fail closed). A rebuild failure keeps the old
   table.
-- After upgrading from 0.2.0 while armed and connected, the old tunnel
-  (`tun0`) is blocked until you reconnect through the new profile
-  (`pervius0`). This fails closed.
 - Reboot clears `/run` and the nftables ruleset: protection fails open, with
   no automatic re-arming.
 - Quitting the GUI can keep protection armed or disarm it; the rules survive
@@ -303,14 +298,14 @@ DNS resolution, traffic bound to the physical interface and a direct TCP
 connection to a public address all timed out; status stayed armed; disarm
 restored IPv4 connectivity; only the dedicated table was touched.
 
-The 0.3.0 rules are tested in CI inside a throwaway network namespace with
+The rules are tested in CI inside a throwaway network namespace with
 dummy interfaces (`tests/integration/`), using the kernel as the oracle
 (`EPERM` from the output hook): endpoints on their exact protocol and port,
 the pinned tunnel versus other tunnels, always-allowed interfaces, LAN
 access, atomic endpoint swaps, a rejected transaction keeping the old set,
 the DNS window admitting only its cgroup and expiring, and the leak guard.
 
-Verified live with 0.3.0 (Ubuntu 26.10, home LAN): no DNS on the physical
+Verified live (Ubuntu 26.10, home LAN): no DNS on the physical
 link while connected (tcpdump, including a catalogue refresh and with
 NetBird installed), the leak guard present on the first connection after
 install, arming while connected without dropping the tunnel, traffic
@@ -324,7 +319,7 @@ The FastVPN profiles are IPv4-only. Without a guard, IPv6 traffic would leave
 over the physical link while the VPN is "connected", and DNS could still
 reach the physical link's resolver: a tool such as NetBird can put its search
 domain on that link, and failed lookups are then retried with the suffix
-against the router (observed on the 0.3.0 test machine).
+against the router (observed on the test machine).
 
 ### Design: a NetworkManager dispatcher hook
 
@@ -360,7 +355,7 @@ service because:
     the always-allowed interfaces pass; all other IPv6 is dropped.
   - Other IPv4 is untouched.
 - `vpn-down`: delete the table.
-- A VPN that was already up when Pervius was installed or upgraded never saw
+- A VPN that was already up when Pervius was installed never saw
   `vpn-up`: the package's `postinst` and the kill-switch service (at start
   and whenever the options change) run the same hook for it. A guard left behind by a NetworkManager crash
   fails closed for IPv6 only; it is cleared by the next managed VPN event, by
@@ -441,8 +436,8 @@ service because:
    provider billing or history.
 8. **Switch IP is a reconnect**, not a server-selection API; it can return the
    same exit IP.
-9. **The 0.3.0 kill-switch and guard paths are verified live only through
-   the release checklist**; the rules themselves are tested in CI in a network
+9. **The kill-switch and guard paths are verified live only through the
+   release checklist**; the rules themselves are tested in CI in a network
    namespace.
 10. **City names are not translated**; they come from the provider's
     catalogue. Country names are translated through iso-codes.
@@ -453,11 +448,7 @@ service because:
 13. **No multiple simultaneous VPNs or accounts; no split tunnelling.**
 14. **No signed packages or reproducible builds.** Releases publish a
     `SHA256SUMS` file next to the `.deb`.
-15. **Upgrades from 0.1.x with `apt` bypass the armed-kill-switch guard**,
-    because apt removes the old package (whose removal script deletes its
-    table) before unpacking Pervius. `dpkg -i` is guarded. See section 10.
-
-16. **The leak guard and the kill switch protect this machine's traffic**;
+15. **The leak guard and the kill switch protect this machine's traffic**;
     the guard also drops forwarded IPv6, but containers or VMs in their own
     network namespaces are outside both.
 17. **The DNS window needs cgroup v2** (standard on current distributions).
@@ -487,37 +478,7 @@ that knows about distribution differences is `pervius/distro.py`, and it only
 Install paths are listed once in `packaging/layout.tsv`; see
 [`PACKAGING.md`](PACKAGING.md).
 
-## 10. Upgrade migration from 0.1.x
-
-Releases up to 0.1.19 used different identifiers. `pervius/migration.py` is
-the only module that knows them. Each step runs once, is recorded in
-`~/.local/share/pervius/migration.json`, and runs only if the old data
-directory exists:
-
-1. **Files** (before settings load): settings and favorites, the ownership
-   manifest, the cached catalogue and the CA file are copied into the new data
-   directory (directories 0700, files 0600, regular files only, never
-   overwriting). The old directory is left in place.
-2. **Keyring:** saved passwords are copied from the old Secret Service schema
-   to `com.solvetus.Pervius`, read back to verify, then the old entries are
-   deleted. A locked or unavailable keyring postpones the step to the next
-   start. Secrets and account names are never logged.
-3. **Profile** (before the secret agent registers): the profile with the
-   reserved UUID must pass the usual ownership checks, using its old
-   connection ID, and the copied CA must match the manifest hash. It is then
-   renamed to **Pervius (managed)**, pointed at the copied CA, and the manifest
-   is updated. Anything that does not validate is left untouched, and the
-   strict ownership check then blocks with an explanation. If the VPN is up
-   during the upgrade, the stored profile is still renamed; a
-   reauthentication during that one session may fail, after which automatic
-   reconnect uses the renamed profile.
-
-The Debian `preinst` refuses to install while the old kill-switch table
-exists, and never deletes it. apt removes the conflicting old package first,
-and the old package's removal script deletes its own table, so the guard
-protects `dpkg -i` upgrades only.
-
-## 11. Future work
+## 10. Future work
 
 - **Auto-protect** needs a background component that is not tied to the
   window, a trusted-network model, an auto-connect and credential policy,
@@ -533,7 +494,7 @@ protects `dpkg -i` upgrades only.
   firewall front end active. The rules themselves are already tested in a
   network namespace.
 
-## 12. Translations
+## 11. Translations
 
 - gettext domain `pervius`; English source strings, catalogues for European
   Portuguese, French, Spanish and Italian in `po/`, compiled at build time by
@@ -547,7 +508,7 @@ protects `dpkg -i` upgrades only.
   a restart.
 - The command-line tools and manual pages stay in English.
 
-## 13. Test status
+## 12. Test status
 
 - Unit tests cover the parser, validator, store, settings, ownership, profile
   building, import verification, agent authorization, the password-never-in-UI
@@ -555,17 +516,16 @@ protects `dpkg -i` upgrades only.
   public-IP parsing, kill-switch rules and service (authorization, atomic
   updates, DNS window, recovery), the dnspython lookups against malformed and
   spoofed replies, the leak-guard hook, translation completeness and coverage,
-  the language override, start at login, every upgrade-migration path, the
-  Debian preinst guard, the distribution checks, and version and identifier
-  consistency.
+  the language override, start at login, the distribution checks, and
+  version consistency.
 - Integration tests (`tests/integration/`) enforce the kill-switch and IPv6
   guard rules in a network namespace; CI runs them with `sudo unshare --net`.
 - UI harnesses in [`tests/manual/`](../tests/manual/README.md) exercise the
   window on a private Broadway display.
-- Verified live with 0.2.0: first VPN import/activation and browsing; keyring
-  store, lookup and clear with a temporary entry; public-IP lookup; the
-  kill-switch arm/leak/disarm test; connected IPs, traffic totals, protocol
-  display and Switch IP.
+- Verified live: first VPN import/activation and browsing; keyring store,
+  lookup and clear with a temporary entry; public-IP lookup; the kill-switch
+  arm/leak/disarm test; connected IPs, traffic totals, protocol display and
+  Switch IP.
 - Not yet verified live: a real unexpected drop with auto-reconnect, long
   hidden-window residency and reauthentication, a saved password across a
-  full restart, and the 0.3.0 release checklist.
+  full restart.

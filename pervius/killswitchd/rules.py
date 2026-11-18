@@ -18,10 +18,8 @@ from ..config import TUNNEL_INTERFACE
 TABLE_NAME = "pervius_ks"
 TABLE_SPEC = f"inet {TABLE_NAME}"
 # The leak guard's table (DNS and IPv6 outside the tunnel while connected),
-# owned by the NetworkManager dispatcher hook.  The second name was used by
-# 0.3.0 development builds and is still removed.
+# owned by the NetworkManager dispatcher hook.
 GUARD_TABLE_SPEC = "inet pervius_guard"
-LEGACY_GUARD_TABLE_SPEC = "inet pervius_v6"
 DEFAULT_OPENVPN_PORT = 1194
 MAX_ENDPOINTS = 256
 MAX_INTERFACES = 16

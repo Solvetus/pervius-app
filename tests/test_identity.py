@@ -8,8 +8,8 @@ from pervius import config
 
 class IdentityTests(unittest.TestCase):
     def test_reserved_profile_uuid_never_changes(self):
-        # Upgraded installations adopt their existing NetworkManager profile
-        # by this UUID; changing it would orphan every existing profile.
+        # Installed copies find their NetworkManager profile by this UUID, and
+        # the dispatcher hook gates on it; changing it would orphan profiles.
         self.assertEqual(config.MANAGED_UUID, "22d97462-fd9d-5bc6-9f0b-7110f7153e4f")
 
     def test_identifiers(self):

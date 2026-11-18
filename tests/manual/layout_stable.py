@@ -73,7 +73,7 @@ def scenario(window, checks, done):
         win = {(ww, wh) for _s, _w, _h, ww, wh in sizes}
         checks.equal("card size is identical in every state", len(card), 1)
         checks.equal("window size is identical in every state", len(win), 1)
-        checks.equal("default window is 470 wide and keeps the 0.3.0 height", sorted(win), [(470, 760)])
+        checks.equal("default window is 470 x 760", sorted(win), [(470, 760)])
         lan = next(
             w for w in walk(window)
             if isinstance(w, Gtk.Label) and (w.get_label() or "").startswith("Permit RFC")

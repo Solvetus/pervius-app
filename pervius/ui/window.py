@@ -51,7 +51,6 @@ from ..credentials import CredentialStore  # noqa: E402
 from ..i18n import C_, _, ngettext  # noqa: E402
 from ..killswitch_client import KillSwitchClient, call_async  # noqa: E402
 from ..killswitchd.rules import Endpoint, RulesError, validate_interfaces  # noqa: E402
-from ..migration import REFUSED, migrate_profile  # noqa: E402
 from ..nm.agent import AgentError, NetworkManagerSecretAgent  # noqa: E402
 from ..nm.client import (  # noqa: E402
     NetworkManagerError,
@@ -400,7 +399,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._disposed = False
         self._warning = ""
         self._blocked_reason = ""
-        self._migration_problem = ""
         self._pending_switch_key: str | None = None
 
         self._build_actions()
@@ -777,11 +775,6 @@ class MainWindow(Adw.ApplicationWindow):
             # Translators: {0} is a technical error message.
             self._blocked(_("NetworkManager is unavailable: {0}").format(exc))
             return
-        # Adopt the 0.1.x managed profile before anything looks it up.
-        result = migrate_profile(self.client.get_connections(), self.local_username)
-        if result.status == REFUSED:
-            log.warning("could not adopt the previous managed profile: %s", result.detail)
-            self._migration_problem = result.detail
         try:
             self.agent = NetworkManagerSecretAgent(
                 self.credentials,
@@ -2553,11 +2546,6 @@ class MainWindow(Adw.ApplicationWindow):
                 pass
 
     def _blocked(self, message: str):
-        if self._migration_problem:
-            # Translators: {0} is the problem, {1} a technical reason.
-            message = _(
-                "{0} The profile from the previous release could not be adopted: {1}."
-            ).format(message, self._migration_problem)
         self._blocked_reason = message
         self._intent_connected = False
         self._pending_switch_key = None

@@ -14,7 +14,6 @@ from gi.repository import Adw, Gio, Gtk  # noqa: E402
 
 from .. import i18n  # noqa: E402
 from ..config import APP_ID, APP_NAME, NOTIFICATION_ID  # noqa: E402
-from ..migration import migrate_user_data  # noqa: E402
 from ..settings import SettingsStore  # noqa: E402
 from .window import MainWindow  # noqa: E402
 
@@ -62,9 +61,6 @@ def main(argv: list[str] | None = None) -> int:
     start_hidden = HIDDEN_OPTION in argv[1:]
     argv = [argv[0], *[arg for arg in argv[1:] if arg != HIDDEN_OPTION]] if argv else argv
     logging.basicConfig(level=logging.INFO, format="%(name)s: %(levelname)s %(message)s")
-    # Adopt settings and saved passwords from a 0.1.x installation before the
-    # window loads anything.  A no-op on fresh installs.
-    migrate_user_data()
     # The language override must be in place before GTK and gettext start.
     i18n.setup(SettingsStore().load().language)
     Gtk.init()

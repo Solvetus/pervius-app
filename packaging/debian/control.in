@@ -7,9 +7,6 @@ Maintainer: Solvetus Labs <info@solvetus.com>
 Installed-Size: @INSTALLED_SIZE@
 Homepage: https://github.com/Solvetus/pervius-app
 Depends: python3 (>= 3.10), python3-gi, gir1.2-glib-2.0, gir1.2-gtk-4.0, gir1.2-adw-1, gir1.2-nm-1.0, gir1.2-secret-1, gir1.2-soup-3.0, python3-dnspython, iso-codes, network-manager, network-manager-openvpn, openvpn, nftables, polkitd, dbus-broker | dbus-daemon | dbus, systemd
-Conflicts: solvetus-vpn, solvetus-vpn-killswitch
-Replaces: solvetus-vpn, solvetus-vpn-killswitch
-Provides: solvetus-vpn, solvetus-vpn-killswitch
 Description: unofficial Linux client for FastVPN
  Pervius is a GTK 4/libadwaita desktop client for an existing FastVPN
  (OpenVPN) subscription. It validates the provider's public server

@@ -150,7 +150,7 @@ def tunnel_settings_problem(connection: NM.Connection) -> str | None:
 
 
 def strip_user_data(connection: NM.Connection) -> bool:
-    """Drop connection user-data (written by an earlier 0.3.0 build).
+    """Drop any connection user-data.
 
     NetworkManager 1.58 loses it when it reads the profile back, so Pervius
     keeps nothing there.  Returns True if anything was removed.

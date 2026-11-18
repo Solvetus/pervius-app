@@ -53,7 +53,7 @@ Let `%py_byte_compile` / brp scripts compile the package as usual.
   org.freedesktop.DBus ReloadConfig`); `%preun`: stop
   `pervius-killswitchd.service`; `%postun` on erase (`$1 -eq 0`): delete
   `inet pervius_ks`, `inet pervius_guard`, `/run/pervius` and (on purge) `/var/lib/pervius`. Do not enable the service; it is D-Bus
-  activated. There is no 0.1.x RPM, so no upgrade guard is needed.
+  activated.
 
 ## To verify on Fedora before shipping
 

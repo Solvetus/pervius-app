@@ -53,8 +53,6 @@ valid_ifname() {
 
 remove_guard() {
     "$NFT" delete table inet pervius_guard >/dev/null 2>&1 || true
-    # Name used by 0.3.0 development builds.
-    "$NFT" delete table inet pervius_v6 >/dev/null 2>&1 || true
 }
 
 if [ "$action" = vpn-down ]; then
@@ -125,4 +123,3 @@ $ipv6_output
 $ipv6_forward
 }
 RULES
-"$NFT" delete table inet pervius_v6 >/dev/null 2>&1 || true
