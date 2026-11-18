@@ -72,6 +72,15 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.0.1" date="2026-11-19" type="stable">
+      <url type="details">https://github.com/Solvetus/pervius-app/releases/tag/v1.0.1</url>
+      <description>
+        <p>
+          Security fixes for the kill switch and the leak guard, from an
+          independent review of the privileged code.
+        </p>
+      </description>
+    </release>
     <release version="1.0.0" date="2026-11-19" type="stable">
       <url type="details">https://github.com/Solvetus/pervius-app/releases/tag/v1.0.0</url>
       <description>

@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-19
+
+Security fixes from an independent review of the privileged code.
+
+### Security
+
+- Kill switch: addresses learned through the DNS window are capped at four
+  public addresses per server name and address family, and are provisional:
+  unless the tunnel is up 90 seconds later they are removed again. A hostile
+  resolver on the local network could otherwise open many allowlist holes on
+  the VPN's port while the switch showed "armed". Private, shared, loopback,
+  link-local and documentation addresses are never allowed from a lookup.
+- Endpoint addresses with an IPv6 scope id (`fe80::1%…`) or in IPv4-mapped
+  form are rejected, and only the canonical address reaches the nftables
+  input; before, arbitrary text after `%` was copied into it.
+- The tunnel is matched by name and device kind (tun or OpenVPN data channel
+  offload) in the kill switch and the leak guard, so another device named
+  `pervius0` is not trusted.
+- DHCP is allowed only to broadcast or local addresses (DHCPv6 only to
+  `ff02::1:2` and `fe80::/10`); the DHCP ports were an open path to any host.
+- DNS over QUIC (UDP 853) is dropped like DNS over TLS, and the leak guard
+  now also drops DNS forwarded for containers and VMs outside the tunnel.
+- After a failed recovery the kill switch keeps its saved owner; with no
+  saved owner only root may disarm it (before, any active-session user
+  could).
+- The secret agent answers only the connection that owns NetworkManager's
+  bus name, not any root process.
+- The importer rejects any NetworkManager OpenVPN setting outside a reviewed
+  allowlist, and the parser rejects `verify-x509-name` values starting with
+  `-`.
+- The catalogue download never follows redirects and stops reading as soon
+  as the response exceeds the size cap.
+- The live VPN server is taken only from the active Pervius connection's
+  device and only if the profile or the allowlist already names it, not from
+  any host route.
+
+### Changed
+
+- `GetStatus` no longer runs `nft` on every call (the leak-guard state is
+  cached for two seconds), and oversized interface lists are refused before
+  any work.
+- The service unit is sandboxed further (`python3 -I`, `PrivateDevices`,
+  `ProtectKernel*`, `ProtectControlGroups`, `ProtectProc`,
+  `RestrictNamespaces`, `SystemCallFilter=@system-service`, `UMask=0077` and
+  more).
+- Roadmap: a CA change warning, re-authentication for operations that weaken
+  protection, and an opt-in boot-time ruleset ("Always-on VPN") are
+  documented in `docs/ARCHITECTURE.md`.
+
 ## [1.0.0] - 2026-11-19
 
 1.0.0 — first public release.
@@ -39,5 +88,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hidden in the tray; the window remembers its size.
 - Debian package with lintian-clean CI builds and published SHA-256 checksums.
 
-[Unreleased]: https://github.com/Solvetus/pervius-app/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Solvetus/pervius-app/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Solvetus/pervius-app/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Solvetus/pervius-app/releases/tag/v1.0.0
