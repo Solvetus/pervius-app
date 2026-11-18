@@ -95,7 +95,11 @@ def drop_tun():
 
 
 def run(*args, input_text=None, check=True):
-    return subprocess.run(args, input=input_text, text=True, capture_output=True, check=check)
+    result = subprocess.run(args, input=input_text, text=True, capture_output=True, check=False)
+    if check and result.returncode != 0:
+        # Show nft's own diagnosis, not just the exit status.
+        raise AssertionError(f"{' '.join(map(str, args))} failed: {result.stderr.strip()}")
+    return result
 
 
 def nft(script: str, check=True):
