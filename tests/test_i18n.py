@@ -57,6 +57,7 @@ def entries(path: Path) -> dict[tuple[str, str], dict]:
 @unittest.skipUnless(TOOLS, "GNU gettext tools are required")
 class CatalogueTests(unittest.TestCase):
     def test_languages(self):
+        self.assertEqual(LANGUAGES, ("pt", "fr", "es", "it"))
         for lang in LANGUAGES:
             self.assertTrue((PO / f"{lang}.po").is_file(), lang)
 
