@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUFF_VERSION: "0.17.3"
+  # Runtime GObject-introspection bindings needed by the unit tests.
+  APT_TEST_DEPS: >-
+    python3-gi gir1.2-glib-2.0 gir1.2-gtk-4.0 gir1.2-adw-1
+    gir1.2-nm-1.0 gir1.2-secret-1 gir1.2-soup-3.0
+
+# Each distribution gets its own packaging job. Add a Fedora job ("rpm",
+# running in a fedora container and building packaging/rpm/) next to "deb".
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends shellcheck appstream desktop-file-utils
+      - name: ruff
+        run: pipx run "ruff==${RUFF_VERSION}" check .
+      - name: shellcheck
+        run: |
+          shellcheck packaging/stage.sh packaging/debian/build.sh packaging/debian/preinst \
+            packaging/debian/postinst packaging/debian/prerm packaging/debian/postrm \
+            tests/manual/run.sh
+      - name: AppStream metadata
+        run: appstreamcli validate --no-net data/com.solvetus.Pervius.metainfo.xml
+      - name: Desktop file
+        run: desktop-file-validate data/com.solvetus.Pervius.desktop
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $APT_TEST_DEPS
+      - name: Run unit tests
+        run: /usr/bin/python3 -m unittest discover -s tests -t . -v
+
+  deb:
+    name: Debian package
+    needs: [lint, test]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lintian
+      - name: Build
+        run: packaging/debian/build.sh
+      - name: lintian (errors fail, warnings are reported)
+        run: lintian --cfg packaging/debian/lintianrc --fail-on error dist/pervius_*_all.deb
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: deb
+          path: dist/pervius_*_all.deb
+          if-no-files-found: error
+          retention-days: 14

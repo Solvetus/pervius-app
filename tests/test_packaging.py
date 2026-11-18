@@ -80,6 +80,20 @@ class LayoutTests(unittest.TestCase):
                 self.assertTrue(destination.startswith("{pythondir}/"), destination)
 
 
+class WorkflowTests(unittest.TestCase):
+    def test_actions_are_pinned_to_full_commit_shas(self):
+        for workflow in sorted((REPO / ".github" / "workflows").glob("*.yml")):
+            for line in workflow.read_text(encoding="utf-8").splitlines():
+                if "uses:" in line:
+                    self.assertRegex(line, r"uses: [\w.-]+/[\w.-]+@[0-9a-f]{40} # v\d", f"{workflow.name}: {line}")
+
+    def test_default_permissions_are_read_only(self):
+        for workflow in sorted((REPO / ".github" / "workflows").glob("*.yml")):
+            text = workflow.read_text(encoding="utf-8")
+            self.assertIn("\npermissions:\n  contents: read\n", text, workflow.name)
+            self.assertLessEqual(text.count("contents: write"), 1, workflow.name)
+
+
 class AssetIdentifierTests(unittest.TestCase):
     def test_desktop_file(self):
         parser = configparser.ConfigParser(interpolation=None)
