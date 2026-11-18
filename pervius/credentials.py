@@ -22,7 +22,7 @@ import logging
 import gi
 
 gi.require_version("Secret", "1")
-from gi.repository import GLib, Secret  # noqa: E402
+from gi.repository import Gio, GLib, Secret  # noqa: E402
 
 from .config import (  # noqa: E402
     SECRET_PURPOSE,
@@ -122,6 +122,61 @@ class CredentialStore:
         if value:
             self._memory[username] = value
         return value or None
+
+    def lookup_async(self, username: str, callback, *, timeout: int = 25) -> None:
+        """Look the password up without blocking the main loop.
+
+        A locked keyring can show an unlock prompt and take a long time; the
+        synchronous lookup would freeze the app meanwhile.  ``callback`` gets
+        the password or None, exactly once, on the main loop, within
+        ``timeout`` seconds.  Only the secret agent may call this.
+        """
+        if not username:
+            GLib.idle_add(lambda: callback(None) and False)
+            return
+        if username in self._memory:
+            value = self._memory[username]
+            GLib.idle_add(lambda: callback(value) and False)
+            return
+        if self._schema is None:
+            GLib.idle_add(lambda: callback(None) and False)
+            return
+        cancellable = Gio.Cancellable()
+        state = {"done": False}
+
+        def finish(value):
+            if state["done"]:
+                return
+            state["done"] = True
+            if value:
+                self._memory[username] = value
+            callback(value or None)
+
+        def expire():
+            if not state["done"]:
+                log.warning("Secret Service lookup timed out")
+                cancellable.cancel()
+                finish(None)
+            return False
+
+        timer = GLib.timeout_add_seconds(timeout, expire)
+
+        def done(_source, result, _data=None):
+            GLib.source_remove(timer) if not state["done"] else None
+            try:
+                value = Secret.password_lookup_finish(result)
+            except GLib.Error as exc:
+                if not state["done"]:
+                    log.warning("Secret Service lookup failed: %s", exc.message)
+                value = None
+            finish(value)
+
+        try:
+            Secret.password_lookup(self._schema, self._attributes(username), cancellable, done, None)
+        except Exception as exc:  # pragma: no cover - host keyring
+            log.warning("Secret Service lookup could not start: %s", exc)
+            GLib.source_remove(timer)
+            finish(None)
 
     def store(self, username: str, password: str, *, persist: bool) -> bool:
         """Keep a password for this session and optionally in the keyring.

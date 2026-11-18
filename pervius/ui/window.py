@@ -317,6 +317,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._killswitch_pending = ""
         self._killswitch_ready = False
         self._interfaces_row = None
+        # Incremented by every connect and cancel; late callbacks of an older
+        # attempt see a different value and do nothing.
+        self._attempt = 0
+        self._activation_cancellable = None
         # (location key, protocol, endpoints, monotonic time) from the service.
         self._pins: tuple | None = None
         self._guard_warned = False
@@ -1412,8 +1416,13 @@ class MainWindow(Adw.ApplicationWindow):
             primary = _("Stop Retrying")
             primary_enabled = True
         elif state in {"preparing", "connecting", "disconnecting"}:
-            primary = _("Disconnecting…") if state == "disconnecting" else _("Connecting…")
-            primary_enabled = False
+            if state == "disconnecting":
+                primary = _("Disconnecting…")
+                primary_enabled = False
+            else:
+                # Translators: tray menu item that stops a connection attempt.
+                primary = _("Cancel Connecting")
+                primary_enabled = True
         else:
             # Translators: tray menu; {0} is the location.
             primary = _("Connect — {0}").format(where) if where else _("Connect…")
@@ -1474,6 +1483,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._present_from_tray()
         if self._state == "connected":
             self._disconnect()
+        elif self._state in {"preparing", "connecting"}:
+            self._cancel_connect()
         elif self._state == "reconnecting":
             self._cancel_reconnect(_("Automatic reconnection stopped."))
         elif self._state in {"idle", "error"}:
@@ -1949,6 +1960,8 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_connect_clicked(self, *_args):
         if self._state == "connected":
             self._disconnect()
+        elif self._state in {"preparing", "connecting"}:
+            self._cancel_connect()
         elif self._state == "reconnecting":
             self._cancel_reconnect(_("Automatic reconnection stopped."))
         elif self._state in {"idle", "error"}:
@@ -1984,9 +1997,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._warning = ""
         self.banner.set_revealed(False)
         self._intent_connected = True
+        self._attempt += 1
+        attempt = self._attempt
         self._ensure_profile(
-            then=lambda connection: self._finalize_and_activate(connection),
-            on_error=self._fail,
+            then=lambda connection: self._finalize_and_activate(connection)
+            if attempt == self._attempt
+            else None,
+            on_error=lambda message: self._fail(message) if attempt == self._attempt else None,
             on_blocked=lambda message: self._blocked(
                 # Translators: {0} is a technical error message.
                 _("The managed VPN profile cannot be used safely: {0}").format(message)
@@ -2120,7 +2137,11 @@ class MainWindow(Adw.ApplicationWindow):
         OpenVPN connects to the IP addresses the kill-switch service resolved;
         the certificate checks still decide whether a server is genuine.
         """
-        activate = lambda conn: self._activate(conn, reconnecting=reconnecting)  # noqa: E731
+        attempt = self._attempt
+
+        def activate(conn):
+            if attempt == self._attempt and self._intent_connected:
+                self._activate(conn, reconnecting=reconnecting)
 
         def failed(message: str):
             if reconnecting and self._should_retry_after_failure():
@@ -2200,8 +2221,15 @@ class MainWindow(Adw.ApplicationWindow):
         self._connect_deadline = time.monotonic() + 90
         self._start_poll()
 
+        attempt = self._attempt
+
         def done(active, error):
             if self._disposed:
+                return
+            if attempt != self._attempt:
+                # Cancelled meanwhile: drop whatever NetworkManager started.
+                if active is not None and self.client is not None:
+                    deactivate_async(self.client, active, lambda *_args: None)
                 return
             if error is not None:
                 if self._should_retry_after_failure():
@@ -2228,7 +2256,29 @@ class MainWindow(Adw.ApplicationWindow):
             else:
                 self._set_state("connecting")
 
-        activate_async(self.client, connection, done)
+        self._activation_cancellable = activate_async(self.client, connection, done)
+
+    def _cancel_connect(self):
+        """Stop a connection attempt: nothing started for it may continue."""
+        self._attempt += 1
+        self._intent_connected = False
+        self._pending_switch_key = None
+        self._reconnect_after_disconnect = False
+        if self._activation_cancellable is not None:
+            self._activation_cancellable.cancel()
+            self._activation_cancellable = None
+        self._reset_reconnect_state()
+        self._stop_poll()
+        active = self.active or (
+            active_vpn_for_uuid(self.client) if self.client is not None else None
+        )
+        self.active = None
+        self._connected_since = None
+        if active is not None and self.client is not None:
+            deactivate_async(self.client, active, lambda *_args: None)
+        self._reset_footer()
+        self._set_state("idle")
+        self._show_banner(_("Connection attempt cancelled."))
 
     def _should_retry_after_failure(self) -> bool:
         return bool(
@@ -2364,14 +2414,15 @@ class MainWindow(Adw.ApplicationWindow):
         elif state == "preparing":
             self.status_title.set_label(_("Preparing VPN profile…"))
             self.status_subtitle.set_label(_("Importing and verifying the selected profile."))
-            self.connect_button.set_label(_("Connecting…"))
-            self.connect_button.set_sensitive(False)
+            self.connect_button.set_label(_("Cancel"))
+            self.connect_button.set_sensitive(True)
             self.connect_button.remove_css_class("destructive-action")
         elif state == "connecting":
             self.status_title.set_label(_("Connecting…"))
             self.status_subtitle.set_label(_("Waiting for NetworkManager and the OpenVPN plugin."))
-            self.connect_button.set_label(_("Connecting…"))
-            self.connect_button.set_sensitive(False)
+            # Translators: stops a connection attempt in progress.
+            self.connect_button.set_label(_("Cancel"))
+            self.connect_button.set_sensitive(True)
             self.connect_button.remove_css_class("destructive-action")
         elif state == "reconnecting":
             self.status_title.set_label(_("Reconnecting…"))
@@ -3034,7 +3085,9 @@ class MainWindow(Adw.ApplicationWindow):
             )
             return True
         if self._state in {"preparing", "connecting", "disconnecting"}:
-            self._show_banner(_("Wait for the current connection operation to finish."))
+            # Keep working in the background; the tray and the app menu bring
+            # the window back.
+            self.hide()
             return True
         if self._killswitch_armed:
             def response(response_id):
@@ -3133,8 +3186,16 @@ class MainWindow(Adw.ApplicationWindow):
                 on_response=response,
             )
             return
-        if self._state in {"preparing", "connecting", "disconnecting"}:
-            self._show_banner(_("Wait for the current connection operation to finish."))
+        if self._state in {"preparing", "connecting"} and not self._reconnect_in_flight:
+            # Quit always works: stop the attempt and leave.
+            self._cancel_connect()
+            if self._killswitch_armed:
+                self._request_quit_with_killswitch()
+            else:
+                self._quit_now()
+            return
+        if self._state == "disconnecting":
+            self._quit_now()
             return
         if self._killswitch_armed:
             self._request_quit_with_killswitch()
@@ -3248,9 +3309,10 @@ class MainWindow(Adw.ApplicationWindow):
             self.settings_store.save(self.settings)
         except Exception:
             pass
+        app = self.get_application()
         self.destroy()
-        if self.get_application() is not None:
-            self.get_application().quit()
+        if app is not None:
+            app.quit()
 
     def cleanup(self):
         if self._disposed:

@@ -9,7 +9,7 @@ from typing import Callable
 import gi
 
 gi.require_version("NM", "1.0")
-from gi.repository import GLib, NM  # noqa: E402
+from gi.repository import Gio, GLib, NM  # noqa: E402
 
 from ..config import MANAGED_UUID  # noqa: E402
 from ..catalogue.models import ProfileRef  # noqa: E402
@@ -143,20 +143,55 @@ def prepare_managed_profile_async(
     return thread
 
 
+# Every NetworkManager call from the GUI is bounded: a timed-out call is
+# cancelled and reported as an error instead of leaving the app waiting.
+NM_CALL_TIMEOUT = 20
+NM_ACTIVATE_TIMEOUT = 30
+
+
+class _Once:
+    """Deliver a callback exactly once (completion or timeout, whichever first)."""
+
+    def __init__(self, callback, seconds: int, what: str):
+        self._callback = callback
+        self._done = False
+        self.cancellable = Gio.Cancellable()
+        self._what = what
+        self._timer = GLib.timeout_add_seconds(seconds, self._expire)
+
+    def _expire(self):
+        self._timer = None
+        if not self._done:
+            self.cancellable.cancel()
+            self.deliver(None, NetworkManagerError(f"{self._what} timed out"))
+        return False
+
+    def deliver(self, value, error):
+        if self._done:
+            return
+        self._done = True
+        if self._timer is not None:
+            GLib.source_remove(self._timer)
+            self._timer = None
+        self._callback(value, error)
+
+
 def add_connection_async(
     client: NM.Client,
     variant: GLib.Variant,
     callback: Callable[[NM.RemoteConnection | None, Exception | None], None],
 ) -> None:
+    once = _Once(callback, NM_CALL_TIMEOUT, "creating the managed profile")
+
     def done(source, result, _user_data=None):
         try:
             connection, _out = source.add_connection2_finish(result)
         except GLib.Error as exc:
-            callback(None, NetworkManagerError(f"could not create the managed profile: {exc.message}"))
+            once.deliver(None, NetworkManagerError(f"could not create the managed profile: {exc.message}"))
         except Exception as exc:
-            callback(None, exc)
+            once.deliver(None, exc)
         else:
-            callback(connection, None)
+            once.deliver(connection, None)
 
     try:
         client.add_connection2(
@@ -164,11 +199,11 @@ def add_connection_async(
             NM.SettingsAddConnection2Flags.TO_DISK,
             None,
             False,
-            None,
+            once.cancellable,
             done,
         )
     except Exception as exc:
-        callback(None, exc)
+        once.deliver(None, exc)
 
 
 def update_connection_async(
@@ -176,47 +211,53 @@ def update_connection_async(
     variant: GLib.Variant,
     callback: Callable[[NM.RemoteConnection | None, Exception | None], None],
 ) -> None:
+    once = _Once(callback, NM_CALL_TIMEOUT, "updating the managed profile")
+
     def done(source, result, _user_data=None):
         try:
             source.update2_finish(result)
         except GLib.Error as exc:
-            callback(None, NetworkManagerError(f"could not update the managed profile: {exc.message}"))
+            once.deliver(None, NetworkManagerError(f"could not update the managed profile: {exc.message}"))
         except Exception as exc:
-            callback(None, exc)
+            once.deliver(None, exc)
         else:
-            callback(connection, None)
+            once.deliver(connection, None)
 
     try:
         connection.update2(
             variant,
             NM.SettingsUpdate2Flags.TO_DISK,
             None,
-            None,
+            once.cancellable,
             done,
         )
     except Exception as exc:
-        callback(None, exc)
+        once.deliver(None, exc)
 
 
 def activate_async(
     client: NM.Client,
     connection: NM.Connection,
     callback: Callable[[NM.ActiveConnection | None, Exception | None], None],
-) -> None:
+) -> Gio.Cancellable:
+    """Start activation; returns a cancellable that aborts the request."""
+    once = _Once(callback, NM_ACTIVATE_TIMEOUT, "starting the VPN")
+
     def done(source, result, _user_data=None):
         try:
             active = source.activate_connection_finish(result)
         except GLib.Error as exc:
-            callback(None, NetworkManagerError(f"could not activate the VPN: {exc.message}"))
+            once.deliver(None, NetworkManagerError(f"could not activate the VPN: {exc.message}"))
         except Exception as exc:
-            callback(None, exc)
+            once.deliver(None, exc)
         else:
-            callback(active, None)
+            once.deliver(active, None)
 
     try:
-        client.activate_connection_async(connection, None, None, None, done)
+        client.activate_connection_async(connection, None, None, once.cancellable, done)
     except Exception as exc:
-        callback(None, exc)
+        once.deliver(None, exc)
+    return once.cancellable
 
 
 def deactivate_async(
@@ -224,20 +265,22 @@ def deactivate_async(
     active: NM.ActiveConnection,
     callback: Callable[[bool, Exception | None], None],
 ) -> None:
+    once = _Once(lambda value, error: callback(bool(value), error), NM_CALL_TIMEOUT, "disconnecting")
+
     def done(source, result, _user_data=None):
         try:
             source.deactivate_connection_finish(result)
         except GLib.Error as exc:
-            callback(False, NetworkManagerError(f"could not disconnect: {exc.message}"))
+            once.deliver(False, NetworkManagerError(f"could not disconnect: {exc.message}"))
         except Exception as exc:
-            callback(False, exc)
+            once.deliver(False, exc)
         else:
-            callback(True, None)
+            once.deliver(True, None)
 
     try:
-        client.deactivate_connection_async(active, None, done)
+        client.deactivate_connection_async(active, once.cancellable, done)
     except Exception as exc:
-        callback(False, exc)
+        once.deliver(False, exc)
 
 
 # Synchronous helpers for the proof/diagnostic CLI.  The GUI uses the async

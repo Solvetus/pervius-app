@@ -15,6 +15,8 @@ from .config import MANAGED_UUID  # noqa: E402
 from .killswitchd.daemon import BUS_NAME, INTERFACE, OBJECT_PATH  # noqa: E402
 
 T = TypeVar("T")
+# The service answers within NFT_TIMEOUT plus at most one DNS window (5 s).
+CALL_TIMEOUT_MS = 15000
 
 
 class KillSwitchError(RuntimeError):
@@ -51,7 +53,7 @@ class KillSwitchClient:
                 parameters,
                 GLib.VariantType("(a{sv})"),
                 Gio.DBusCallFlags.NONE,
-                30000,
+                CALL_TIMEOUT_MS,
                 None,
             )
         except GLib.Error as exc:

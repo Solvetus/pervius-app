@@ -214,17 +214,20 @@ class NetworkManagerSecretAgent:
         self._registered = True
 
     def unregister(self) -> None:
+        # Fire and forget: NetworkManager also drops the agent when our bus
+        # name goes away, so quitting never waits for this call.
         if self._bus is not None and self._registered:
             try:
-                self._bus.call_sync(
+                self._bus.call(
                     "org.freedesktop.NetworkManager",
                     AGENT_MANAGER_PATH,
                     AGENT_MANAGER_INTERFACE,
                     "Unregister",
                     None,
                     None,
-                    Gio.DBusCallFlags.NONE,
-                    5000,
+                    Gio.DBusCallFlags.NO_AUTO_START,
+                    1000,
+                    None,
                     None,
                 )
             except GLib.Error as exc:
@@ -258,7 +261,7 @@ class NetworkManagerSecretAgent:
                 GLib.Variant("(s)", (sender,)),
                 GLib.VariantType.new("(u)"),
                 Gio.DBusCallFlags.NONE,
-                5000,
+                2000,
                 None,
             )
             uid = reply.unpack()[0]
@@ -275,6 +278,26 @@ class NetworkManagerSecretAgent:
             # secrets.
             log.warning("could not read ownership manifest in secret agent: %s", exc)
             return None
+
+    def _reply_secrets(self, invocation, password: str | None) -> None:
+        try:
+            if not password:
+                invocation.return_dbus_error(NO_SECRETS, "no password is available")
+                return
+            secrets = {"vpn": {"password": GLib.Variant("s", password)}}
+            invocation.return_value(GLib.Variant("(a{sa{sv}})", (secrets,)))
+        except Exception:
+            log.exception("could not answer a secret request")
+
+    def _lookup_password_async(self, callback) -> None:
+        try:
+            vpn_username = (self._vpn_username_provider() or "").strip()
+        except Exception:
+            vpn_username = ""
+        if not vpn_username:
+            callback(None)
+            return
+        self._credentials.lookup_async(vpn_username, callback)
 
     def _lookup_password(self) -> str | None:
         try:
@@ -307,16 +330,16 @@ class NetworkManagerSecretAgent:
                 _unpack_connection_hash(connection_hash, self._username)
                 if not ownership_matches(self._manifest_entry()):
                     raise AgentError(NOT_AUTHORIZED, "connection is not in the ownership manifest")
-                password = self._lookup_password()
-                if not password:
-                    raise AgentError(NO_SECRETS, "no password is available")
-                secrets = {"vpn": {"password": GLib.Variant("s", password)}}
-                invocation.return_value(GLib.Variant("(a{sa{sv}})", (secrets,)))
             except AgentError as exc:
                 invocation.return_dbus_error(exc.dbus_name, str(exc))
+                return None
             except Exception:
                 log.exception("unexpected error while serving a secret request")
                 invocation.return_dbus_error(NO_SECRETS, "could not provide secrets")
+                return None
+            # Answer later: the keyring may need to be unlocked, which must not
+            # block the main loop (and with it the whole app).
+            self._lookup_password_async(lambda password: self._reply_secrets(invocation, password))
             return None
 
         if method_name in {"SaveSecrets", "DeleteSecrets"}:
