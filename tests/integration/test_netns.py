@@ -20,10 +20,10 @@ firewall is never touched.  CI runs them with:
 
 from __future__ import annotations
 
-import errno
 import os
 import shutil
 import socket
+import struct
 import subprocess
 import time
 import unittest
@@ -75,29 +75,35 @@ def own_cgroup() -> str:
     return ""
 
 
+def tcp_syn(port: int) -> bytes:
+    """A bare TCP SYN header; netfilter matches it before any checksum matters."""
+    return struct.pack("!HHIIBBHHH", 40000, port, 0, 0, 5 << 4, 0x02, 64240, 0, 0)
+
+
 def send(dest: str, port: int, *, proto: str = "udp", device: str | None = None) -> bool:
-    """True if the output hook let the first packet out, False on EPERM."""
+    """True if the output hook let the first packet out, False on EPERM.
+
+    UDP uses sendto() on a datagram socket.  TCP uses a raw socket carrying a
+    SYN, because a non-blocking connect() reports EINPROGRESS even when the SYN
+    is dropped; a raw sendto() gets the output hook's verdict synchronously.
+    """
     family = socket.AF_INET6 if ":" in dest else socket.AF_INET
-    kind = socket.SOCK_DGRAM if proto == "udp" else socket.SOCK_STREAM
+    if proto == "udp":
+        kind, number, payload = socket.SOCK_DGRAM, 0, b"pervius"
+    else:
+        kind, number, payload = socket.SOCK_RAW, socket.IPPROTO_TCP, tcp_syn(port)
     address = dest
     scope = 0
     if "%" in dest:
         address, ifname = dest.split("%", 1)
         scope = socket.if_nametoindex(ifname)
-    sockaddr = (address, port, 0, scope) if family == socket.AF_INET6 else (address, port)
-    with socket.socket(family, kind) as sock:
+    target_port = port if proto == "udp" else 0
+    sockaddr = (address, target_port, 0, scope) if family == socket.AF_INET6 else (address, target_port)
+    with socket.socket(family, kind, number) as sock:
         if device:
             sock.setsockopt(socket.SOL_SOCKET, SO_BINDTODEVICE, device.encode())
         try:
-            if proto == "udp":
-                sock.sendto(b"pervius", sockaddr)
-            else:
-                sock.setblocking(False)
-                code = sock.connect_ex(sockaddr)
-                if code in (errno.EPERM, errno.EACCES):
-                    return False
-                if code not in (0, errno.EINPROGRESS):
-                    raise OSError(code, os.strerror(code))
+            sock.sendto(payload, sockaddr)
         except PermissionError:
             return False
     return True
