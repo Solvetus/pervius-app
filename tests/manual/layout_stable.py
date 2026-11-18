@@ -104,6 +104,9 @@ def scenario(window, checks, done):
         footer = window.footer
         checks.equal("footer is centred", (footer.get_xalign(), footer.get_justify()), (0.5, Gtk.Justification.CENTER))
         checks.true("footer wraps inside the column", footer.get_width() <= window.get_width())
+        checks.equal("footer is two lines, each on one line", footer.get_layout().get_line_count(), 2)
+        from pervius import __version__
+        checks.true("footer shows the version", footer.get_label().startswith(f"Pervius {__version__} · "))
         print("sizes:", sorted(card), sorted(win), flush=True)
 
         # One column: banner, status card and every group share left edge and width.
@@ -136,22 +139,16 @@ def scenario(window, checks, done):
         window._show_banner("Something needs attention")
         checks.equal("a new attempt shows it again", window.banner.get_revealed(), True)
 
-        # Header: a little taller, with room above, below and between the lines.
+        # Header: a little taller, only the title, centred on the whole window.
         header = next(w for w in walk(window) if isinstance(w, Adw.HeaderBar))
-        labels = [w for w in walk(header) if isinstance(w, Gtk.Label) and w.get_label() in ("Pervius", "Unofficial client for FastVPN")]
-        title = next(w for w in labels if w.get_label() == "Pervius")
-        sub = next(w for w in labels if w.get_label() != "Pervius")
-        _ok1, t_rect = title.compute_bounds(header)
-        _ok2, s_rect = sub.compute_bounds(header)
-        top = t_rect.get_y()
-        gap = s_rect.get_y() - (t_rect.get_y() + t_rect.get_height())
-        bottom = header.get_height() - (s_rect.get_y() + s_rect.get_height())
+        wtitle = next(w for w in walk(header) if isinstance(w, Adw.WindowTitle))
+        checks.equal("header has no subtitle", wtitle.get_subtitle(), "")
+        title = next(w for w in walk(header) if isinstance(w, Gtk.Label) and w.get_label() == "Pervius")
+        _ok, t_rect = title.compute_bounds(window)
+        centre = t_rect.get_x() + t_rect.get_width() / 2
         checks.equal("title centred on the whole window", header.get_centering_policy(), Adw.CenteringPolicy.STRICT)
-        print(f"header: height={header.get_height()} top={top:.1f} gap={gap:.1f} bottom={bottom:.1f}", flush=True)
+        checks.true(f"title centre {centre:.1f} is the window centre", abs(centre - window.get_width() / 2) <= 1)
         checks.true("header is taller", header.get_height() >= 56)
-        checks.true("room above the title", top >= 6)
-        checks.true("room between title and subtitle", gap >= 2)
-        checks.true("room below the subtitle", bottom >= 6)
         window.queue_resize()
 
         waited = {"n": 0}

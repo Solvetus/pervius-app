@@ -72,6 +72,12 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.3.2" date="2026-11-18" type="stable">
+      <url type="details">https://github.com/Solvetus/pervius-app/releases/tag/v0.3.2</url>
+      <description>
+        <p>The header shows only the app name, centred, and the footer is two short lines.</p>
+      </description>
+    </release>
     <release version="0.3.1" date="2026-11-18" type="stable">
       <url type="details">https://github.com/Solvetus/pervius-app/releases/tag/v0.3.1</url>
       <description>

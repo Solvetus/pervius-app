@@ -8,6 +8,15 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-18
+
+### Changed
+
+- The header shows only the title "Pervius", centred on the full window width;
+  the subtitle is gone. The disclaimer stays in the footer and in About.
+- The footer is two centred lines: the version with "Unofficial client for
+  FastVPN", then "Not affiliated with Namecheap" and the catalogue server.
+
 ## [0.3.1] - 2026-11-18
 
 ### Changed
@@ -339,7 +348,8 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
   validation, import through NetworkManager's OpenVPN plugin, ownership
   manifest, system-bus secret agent, Debian package.
 
-[Unreleased]: https://github.com/Solvetus/pervius-app/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/Solvetus/pervius-app/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/Solvetus/pervius-app/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/Solvetus/pervius-app/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Solvetus/pervius-app/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Solvetus/pervius-app/compare/v0.1.19...v0.2.0

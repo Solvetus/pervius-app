@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-18 20:36+0100\n"
+"POT-Creation-Date: 2026-11-18 23:38+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -29,17 +29,17 @@ msgid ""
 "trademark of Namecheap, Inc."
 msgstr ""
 
-#: pervius/ui/account.py:61 pervius/ui/window.py:652
+#: pervius/ui/account.py:61 pervius/ui/window.py:667
 msgid "Account"
 msgstr ""
 
 #. Translators: stops a connection attempt in progress.
-#: pervius/ui/account.py:68 pervius/ui/account.py:216 pervius/ui/window.py:991
-#: pervius/ui/window.py:1012 pervius/ui/window.py:1637
-#: pervius/ui/window.py:2589 pervius/ui/window.py:2596
-#: pervius/ui/window.py:3278 pervius/ui/window.py:3314
-#: pervius/ui/window.py:3353 pervius/ui/window.py:3380
-#: pervius/ui/window.py:3423 pervius/ui/window.py:3455
+#: pervius/ui/account.py:68 pervius/ui/account.py:216 pervius/ui/window.py:1009
+#: pervius/ui/window.py:1030 pervius/ui/window.py:1655
+#: pervius/ui/window.py:2607 pervius/ui/window.py:2614
+#: pervius/ui/window.py:3309 pervius/ui/window.py:3345
+#: pervius/ui/window.py:3384 pervius/ui/window.py:3411
+#: pervius/ui/window.py:3454 pervius/ui/window.py:3486
 msgid "Cancel"
 msgstr ""
 
@@ -140,301 +140,302 @@ msgid "The password is in memory for this session, but could not be saved: {0}"
 msgstr ""
 
 #. Translators: a VPN location; {0} is the city, {1} the country.
-#: pervius/ui/window.py:145
+#: pervius/ui/window.py:147
 #, python-brace-format
 msgid "{0}, {1}"
 msgstr ""
 
-#: pervius/ui/window.py:153
+#: pervius/ui/window.py:155
 msgid "You are not allowed to change the kill switch."
 msgstr ""
 
-#: pervius/ui/window.py:155
+#: pervius/ui/window.py:157
 msgid "The kill-switch service is not available."
 msgstr ""
 
-#: pervius/ui/window.py:157
+#: pervius/ui/window.py:159
 msgid "The kill switch is not armed."
 msgstr ""
 
-#: pervius/ui/window.py:159 pervius/ui/window.py:2298 pervius/ui/window.py:2314
-#: pervius/ui/window.py:2345
+#: pervius/ui/window.py:161 pervius/ui/window.py:2316 pervius/ui/window.py:2332
+#: pervius/ui/window.py:2363
 msgid "The VPN server addresses could not be resolved."
 msgstr ""
 
 #. Translators: {0} is a technical error message (English).
-#: pervius/ui/window.py:161
+#: pervius/ui/window.py:163
 #, python-brace-format
 msgid "The kill-switch service reported an error: {0}"
 msgstr ""
 
-#: pervius/ui/window.py:181
+#: pervius/ui/window.py:183
 msgid "Choose Location"
 msgstr ""
 
-#: pervius/ui/window.py:188
+#: pervius/ui/window.py:190
 msgid "Close"
 msgstr ""
 
-#: pervius/ui/window.py:200
+#: pervius/ui/window.py:202
 msgid "Search city or country"
 msgstr ""
 
-#: pervius/ui/window.py:207
+#: pervius/ui/window.py:209
 msgid "Show favorites only"
 msgstr ""
 
-#: pervius/ui/window.py:234
+#: pervius/ui/window.py:236
 msgid ""
 "Locations come from the provider's public catalogue. Star a location to add "
 "it to Favorites and the tray menu; search understands city names, country "
 "names, codes, and common aliases."
 msgstr ""
 
-#: pervius/ui/window.py:280 pervius/ui/window.py:300
+#: pervius/ui/window.py:282 pervius/ui/window.py:302
 msgid "Add to favorites"
 msgstr ""
 
-#: pervius/ui/window.py:280 pervius/ui/window.py:300
+#: pervius/ui/window.py:282 pervius/ui/window.py:302
 msgid "Remove from favorites"
 msgstr ""
 
-#: pervius/ui/window.py:418
-msgid "Unofficial client for FastVPN"
-msgstr ""
-
-#: pervius/ui/window.py:422
+#: pervius/ui/window.py:437
 msgid "Refresh Locations"
 msgstr ""
 
-#: pervius/ui/window.py:423 pervius/ui/window.py:1665
+#: pervius/ui/window.py:438 pervius/ui/window.py:1683
 msgid "Settings"
 msgstr ""
 
-#: pervius/ui/window.py:424 pervius/ui/window.py:3042
+#: pervius/ui/window.py:439 pervius/ui/window.py:3060
 msgid "Help"
 msgstr ""
 
-#: pervius/ui/window.py:425
+#: pervius/ui/window.py:440
 msgid "About Pervius"
 msgstr ""
 
-#: pervius/ui/window.py:426 pervius/ui/window.py:1573 pervius/ui/window.py:3278
-#: pervius/ui/window.py:3380
+#: pervius/ui/window.py:441 pervius/ui/window.py:1591 pervius/ui/window.py:3309
+#: pervius/ui/window.py:3411
 msgid "Quit"
 msgstr ""
 
-#: pervius/ui/window.py:430
+#: pervius/ui/window.py:445
 msgid "Main menu"
 msgstr ""
 
-#: pervius/ui/window.py:471
+#: pervius/ui/window.py:486
 msgid "Starting…"
 msgstr ""
 
-#: pervius/ui/window.py:492 pervius/ui/window.py:2572 pervius/ui/window.py:2578
+#: pervius/ui/window.py:507 pervius/ui/window.py:2590 pervius/ui/window.py:2596
 msgid "Connect"
 msgstr ""
 
-#: pervius/ui/window.py:513
+#: pervius/ui/window.py:528
 msgid "IP ADDRESSES"
 msgstr ""
 
-#: pervius/ui/window.py:531
+#: pervius/ui/window.py:546
 msgid "ISP IP"
 msgstr ""
 
-#: pervius/ui/window.py:536
+#: pervius/ui/window.py:551
 msgid "VPN exit IP"
 msgstr ""
 
-#: pervius/ui/window.py:547
+#: pervius/ui/window.py:562
 msgid "Switch IP"
 msgstr ""
 
-#: pervius/ui/window.py:551
+#: pervius/ui/window.py:566
 msgid "Reconnect the VPN to request a different server IP."
 msgstr ""
 
-#: pervius/ui/window.py:579
+#: pervius/ui/window.py:594
 msgid "Traffic received since this connection"
 msgstr ""
 
-#: pervius/ui/window.py:581
+#: pervius/ui/window.py:596
 msgid "Traffic sent since this connection"
 msgstr ""
 
-#: pervius/ui/window.py:584
+#: pervius/ui/window.py:599
 msgid "Time since the VPN connected"
 msgstr ""
 
-#: pervius/ui/window.py:586
+#: pervius/ui/window.py:601
 msgctxt "traffic"
 msgid "Download"
 msgstr ""
 
-#: pervius/ui/window.py:588
+#: pervius/ui/window.py:603
 msgctxt "traffic"
 msgid "Upload"
 msgstr ""
 
 #. Translators: caption under the time since the VPN connected.
-#: pervius/ui/window.py:591
+#: pervius/ui/window.py:606
 msgctxt "duration"
 msgid "Connected"
 msgstr ""
 
-#: pervius/ui/window.py:595 pervius/ui/window.py:616
-msgid "Protocol"
-msgstr ""
-
-#: pervius/ui/window.py:602 pervius/ui/window.py:1732
+#: pervius/ui/window.py:617 pervius/ui/window.py:1750
 msgid "Connection"
 msgstr ""
 
-#: pervius/ui/window.py:604
+#: pervius/ui/window.py:619
 msgid "Location"
 msgstr ""
 
-#: pervius/ui/window.py:605 pervius/ui/window.py:2018
+#: pervius/ui/window.py:620 pervius/ui/window.py:2036
 msgid "Not selected"
 msgstr ""
 
-#: pervius/ui/window.py:607
+#: pervius/ui/window.py:622
 msgid "Change"
 msgstr ""
 
-#: pervius/ui/window.py:619
+#: pervius/ui/window.py:631
+msgid "Protocol"
+msgstr ""
+
+#: pervius/ui/window.py:634
 msgid ""
 "UDP is the usual default. Try TCP only when UDP is blocked. Both carry the "
 "same encrypted tunnel; see Help for details."
 msgstr ""
 
-#: pervius/ui/window.py:634
+#: pervius/ui/window.py:649
 msgid "UDP — lower latency; the usual choice."
 msgstr ""
 
-#: pervius/ui/window.py:636
+#: pervius/ui/window.py:651
 msgid "TCP — use when the network blocks or filters UDP."
 msgstr ""
 
-#: pervius/ui/window.py:653 pervius/ui/window.py:2027
+#: pervius/ui/window.py:668 pervius/ui/window.py:2045
 msgid "Credentials not set"
 msgstr ""
 
-#: pervius/ui/window.py:655
+#: pervius/ui/window.py:670
 msgid "Edit"
 msgstr ""
 
-#: pervius/ui/window.py:664 pervius/ui/window.py:1734
+#: pervius/ui/window.py:679 pervius/ui/window.py:1752
 msgid "Reconnect automatically"
 msgstr ""
 
-#: pervius/ui/window.py:667 pervius/ui/window.py:1737
+#: pervius/ui/window.py:682 pervius/ui/window.py:1755
 msgid ""
 "Retry after an unexpected drop, with increasing delays. Manual disconnects "
 "and failed first attempts never retry."
 msgstr ""
 
-#: pervius/ui/window.py:680
+#: pervius/ui/window.py:695
 msgid "Security"
 msgstr ""
 
-#: pervius/ui/window.py:682 pervius/ui/window.py:1566 pervius/ui/window.py:3089
+#: pervius/ui/window.py:697 pervius/ui/window.py:1584 pervius/ui/window.py:3107
 msgid "Kill switch"
 msgstr ""
 
-#: pervius/ui/window.py:683
+#: pervius/ui/window.py:698
 msgid "Checking the system service…"
 msgstr ""
 
-#: pervius/ui/window.py:690
+#: pervius/ui/window.py:705
 msgid "Allow local network"
 msgstr ""
 
-#: pervius/ui/window.py:692
+#: pervius/ui/window.py:707
 msgid "Permit RFC 1918/ULA traffic while the kill switch is armed."
 msgstr ""
 
-#: pervius/ui/window.py:701
+#: pervius/ui/window.py:716
 msgid "Traffic outside the VPN is blocked"
 msgstr ""
 
-#: pervius/ui/window.py:704
+#: pervius/ui/window.py:719
 msgid ""
 "Only the VPN servers, the tunnel, the interfaces you always allow, DHCP and "
 "link control may pass. DNS outside the tunnel and global IPv6 are blocked."
 msgstr ""
 
-#: pervius/ui/window.py:750
+#. Translators: footer, first line; {0} is the app name, {1} its version.
+#: pervius/ui/window.py:767
 #, python-brace-format
-msgid ""
-"{0} {1} · independent project, not affiliated with the VPN provider · "
-"catalogue source: vpn.ncapi.io"
+msgid "{0} {1} · Unofficial client for FastVPN"
 msgstr ""
 
-#. Translators: {0} is a technical error message.
-#: pervius/ui/window.py:760
+#. Translators: footer, second line; {0} is the catalogue host name.
+#: pervius/ui/window.py:769
 #, python-brace-format
-msgid "NetworkManager is unavailable: {0}"
+msgid "Not affiliated with Namecheap · Servers: {0}"
 msgstr ""
 
 #. Translators: {0} is a technical error message.
 #: pervius/ui/window.py:778
 #, python-brace-format
+msgid "NetworkManager is unavailable: {0}"
+msgstr ""
+
+#. Translators: {0} is a technical error message.
+#: pervius/ui/window.py:796
+#, python-brace-format
 msgid "The NetworkManager secret agent could not be registered: {0}"
 msgstr ""
 
-#: pervius/ui/window.py:888 pervius/ui/window.py:1086
+#: pervius/ui/window.py:906 pervius/ui/window.py:1104
 msgid "The kill-switch service is unavailable."
 msgstr ""
 
-#: pervius/ui/window.py:890
+#: pervius/ui/window.py:908
 msgid "System service unavailable; the optional package is not active."
 msgstr ""
 
-#: pervius/ui/window.py:905
+#: pervius/ui/window.py:923
 msgid "Applying…"
 msgstr ""
 
-#: pervius/ui/window.py:908
+#: pervius/ui/window.py:926
 msgid ""
 "The system service reported an error. Disarm, then arm the kill switch again."
 msgstr ""
 
-#: pervius/ui/window.py:913
+#: pervius/ui/window.py:931
 #, python-brace-format
 msgid "Armed — {0} VPN endpoint allowed; all other traffic is blocked."
 msgid_plural "Armed — {0} VPN endpoints allowed; all other traffic is blocked."
 msgstr[0] ""
 msgstr[1] ""
 
-#: pervius/ui/window.py:918
+#: pervius/ui/window.py:936
 msgid "Armed — VPN not connected; internet traffic is blocked."
 msgstr ""
 
-#: pervius/ui/window.py:920
+#: pervius/ui/window.py:938
 msgid "Off — normal network traffic is allowed."
 msgstr ""
 
-#: pervius/ui/window.py:943 pervius/ui/window.py:964 pervius/ui/window.py:1083
-#: pervius/ui/window.py:3466
+#: pervius/ui/window.py:961 pervius/ui/window.py:982 pervius/ui/window.py:1101
+#: pervius/ui/window.py:3497
 msgid "A kill-switch operation is already in progress."
 msgstr ""
 
-#: pervius/ui/window.py:978
+#: pervius/ui/window.py:996
 msgid "Local network traffic will remain allowed."
 msgstr ""
 
-#: pervius/ui/window.py:980
+#: pervius/ui/window.py:998
 msgid "Local network traffic will also be blocked."
 msgstr ""
 
-#: pervius/ui/window.py:983
+#: pervius/ui/window.py:1001
 msgid "Enable the kill switch?"
 msgstr ""
 
-#: pervius/ui/window.py:986
+#: pervius/ui/window.py:1004
 #, python-brace-format
 msgid ""
 "All traffic outside the VPN will be blocked, including DNS and global IPv6. "
@@ -442,332 +443,332 @@ msgid ""
 "disarm it or connect. {0}"
 msgstr ""
 
-#: pervius/ui/window.py:992
+#: pervius/ui/window.py:1010
 msgid "Enable"
 msgstr ""
 
-#: pervius/ui/window.py:1006
+#: pervius/ui/window.py:1024
 msgid "Disable the kill switch?"
 msgstr ""
 
-#: pervius/ui/window.py:1008
+#: pervius/ui/window.py:1026
 msgid ""
 "The firewall rules will be removed and normal network traffic will be "
 "allowed again, even if the VPN is down."
 msgstr ""
 
-#: pervius/ui/window.py:1013
+#: pervius/ui/window.py:1031
 msgid "Disable"
 msgstr ""
 
 #. Translators: {0} explains why the kill-switch change failed.
-#: pervius/ui/window.py:1056
+#: pervius/ui/window.py:1074
 #, python-brace-format
 msgid "Kill-switch operation failed: {0}"
 msgstr ""
 
-#: pervius/ui/window.py:1069
+#: pervius/ui/window.py:1087
 msgid "Kill switch armed. Traffic outside the VPN is blocked."
 msgstr ""
 
-#: pervius/ui/window.py:1075
+#: pervius/ui/window.py:1093
 msgid "Kill switch disabled. Normal traffic is allowed."
 msgstr ""
 
-#: pervius/ui/window.py:1077
+#: pervius/ui/window.py:1095
 msgid "Kill-switch settings applied."
 msgstr ""
 
-#: pervius/ui/window.py:1289
+#: pervius/ui/window.py:1307
 msgid "Hide IP addresses"
 msgstr ""
 
-#: pervius/ui/window.py:1289
+#: pervius/ui/window.py:1307
 msgid "Show IP addresses"
 msgstr ""
 
-#: pervius/ui/window.py:1352
+#: pervius/ui/window.py:1370
 msgid "Not captured"
 msgstr ""
 
-#: pervius/ui/window.py:1354 pervius/ui/window.py:1363
-#: pervius/ui/window.py:2632
+#: pervius/ui/window.py:1372 pervius/ui/window.py:1381
+#: pervius/ui/window.py:2650
 msgid "Unavailable"
 msgstr ""
 
-#: pervius/ui/window.py:1356 pervius/ui/window.py:1363
+#: pervius/ui/window.py:1374 pervius/ui/window.py:1381
 msgid "Checking…"
 msgstr ""
 
 #. Translators: byte-count units; {0} is the number.
-#: pervius/ui/window.py:1438
+#: pervius/ui/window.py:1456
 #, python-brace-format
 msgctxt "bytes"
 msgid "{0} B"
 msgstr ""
 
-#: pervius/ui/window.py:1439
+#: pervius/ui/window.py:1457
 #, python-brace-format
 msgctxt "bytes"
 msgid "{0} KB"
 msgstr ""
 
-#: pervius/ui/window.py:1440
+#: pervius/ui/window.py:1458
 #, python-brace-format
 msgctxt "bytes"
 msgid "{0} MB"
 msgstr ""
 
-#: pervius/ui/window.py:1441
+#: pervius/ui/window.py:1459
 #, python-brace-format
 msgctxt "bytes"
 msgid "{0} GB"
 msgstr ""
 
-#: pervius/ui/window.py:1442
+#: pervius/ui/window.py:1460
 #, python-brace-format
 msgctxt "bytes"
 msgid "{0} TB"
 msgstr ""
 
 #. Translators: tray status; {0} is the location, {1} the time connected.
-#: pervius/ui/window.py:1489
+#: pervius/ui/window.py:1507
 #, python-brace-format
 msgid "Connected — {0} · {1}"
 msgstr ""
 
 #. Translators: tray status; {0} is the time connected.
-#: pervius/ui/window.py:1491
+#: pervius/ui/window.py:1509
 #, python-brace-format
 msgid "Connected · {0}"
 msgstr ""
 
-#: pervius/ui/window.py:1493 pervius/ui/window.py:2600
+#: pervius/ui/window.py:1511 pervius/ui/window.py:2618
 msgid "Reconnecting…"
 msgstr ""
 
-#: pervius/ui/window.py:1495 pervius/ui/window.py:2593
+#: pervius/ui/window.py:1513 pervius/ui/window.py:2611
 msgid "Connecting…"
 msgstr ""
 
-#: pervius/ui/window.py:1497 pervius/ui/window.py:1532
-#: pervius/ui/window.py:2613 pervius/ui/window.py:2615
+#: pervius/ui/window.py:1515 pervius/ui/window.py:1550
+#: pervius/ui/window.py:2631 pervius/ui/window.py:2633
 msgid "Disconnecting…"
 msgstr ""
 
-#: pervius/ui/window.py:1498 pervius/ui/window.py:2576
-#: pervius/ui/window.py:2619
+#: pervius/ui/window.py:1516 pervius/ui/window.py:2594
+#: pervius/ui/window.py:2637
 msgid "Not connected"
 msgstr ""
 
-#: pervius/ui/window.py:1516
+#: pervius/ui/window.py:1534
 msgid "No favorites yet"
 msgstr ""
 
-#: pervius/ui/window.py:1517
+#: pervius/ui/window.py:1535
 msgid "Manage Favorites…"
 msgstr ""
 
-#: pervius/ui/window.py:1525 pervius/ui/window.py:2608
+#: pervius/ui/window.py:1543 pervius/ui/window.py:2626
 msgid "Disconnect"
 msgstr ""
 
-#: pervius/ui/window.py:1528 pervius/ui/window.py:2602
+#: pervius/ui/window.py:1546 pervius/ui/window.py:2620
 msgid "Stop Retrying"
 msgstr ""
 
 #. Translators: tray menu item that stops a connection attempt.
-#: pervius/ui/window.py:1536
+#: pervius/ui/window.py:1554
 msgid "Cancel Connecting"
 msgstr ""
 
 #. Translators: tray menu; {0} is the location.
-#: pervius/ui/window.py:1540
+#: pervius/ui/window.py:1558
 #, python-brace-format
 msgid "Connect — {0}"
 msgstr ""
 
-#: pervius/ui/window.py:1540
+#: pervius/ui/window.py:1558
 msgid "Connect…"
 msgstr ""
 
-#: pervius/ui/window.py:1553
+#: pervius/ui/window.py:1571
 msgid "Favorites"
 msgstr ""
 
-#: pervius/ui/window.py:1559
+#: pervius/ui/window.py:1577
 msgid "Choose Location…"
 msgstr ""
 
 #. Translators: tray menu; {0} is the app name.
-#: pervius/ui/window.py:1572
+#: pervius/ui/window.py:1590
 #, python-brace-format
 msgid "Show {0}"
 msgstr ""
 
-#: pervius/ui/window.py:1601 pervius/ui/window.py:2052
-#: pervius/ui/window.py:2466
+#: pervius/ui/window.py:1619 pervius/ui/window.py:2070
+#: pervius/ui/window.py:2484
 msgid "Automatic reconnection stopped."
 msgstr ""
 
-#: pervius/ui/window.py:1605 pervius/ui/window.py:1622
+#: pervius/ui/window.py:1623 pervius/ui/window.py:1640
 msgid "Wait for the current connection operation to finish."
 msgstr ""
 
-#: pervius/ui/window.py:1610 pervius/ui/window.py:3005
+#: pervius/ui/window.py:1628 pervius/ui/window.py:3023
 msgid "The location list is not loaded yet."
 msgstr ""
 
-#: pervius/ui/window.py:1615
+#: pervius/ui/window.py:1633
 msgid "That favorite is no longer in the catalogue and was removed."
 msgstr ""
 
 #. Translators: {0} is the location.
-#: pervius/ui/window.py:1628
+#: pervius/ui/window.py:1646
 #, python-brace-format
 msgid "Already connected to {0}."
 msgstr ""
 
-#: pervius/ui/window.py:1631
+#: pervius/ui/window.py:1649
 msgid "Switch VPN location?"
 msgstr ""
 
 #. Translators: {0} is the location.
-#: pervius/ui/window.py:1633
+#: pervius/ui/window.py:1651
 #, python-brace-format
 msgid "Disconnect from the current VPN and connect to {0}?"
 msgstr ""
 
-#: pervius/ui/window.py:1638
+#: pervius/ui/window.py:1656
 msgid "Switch"
 msgstr ""
 
-#: pervius/ui/window.py:1668
+#: pervius/ui/window.py:1686
 msgid "General"
 msgstr ""
 
 #. Translators: the language option that follows the desktop's language.
-#: pervius/ui/window.py:1672
+#: pervius/ui/window.py:1690
 msgid "System default"
 msgstr ""
 
-#: pervius/ui/window.py:1676
+#: pervius/ui/window.py:1694
 msgid "Language"
 msgstr ""
 
-#: pervius/ui/window.py:1683 pervius/ui/window.py:1697
+#: pervius/ui/window.py:1701 pervius/ui/window.py:1715
 msgid "Restart Pervius to apply"
 msgstr ""
 
-#: pervius/ui/window.py:1704
+#: pervius/ui/window.py:1722
 msgid "Start at login"
 msgstr ""
 
-#: pervius/ui/window.py:1705
+#: pervius/ui/window.py:1723
 msgid "Start hidden in the tray when you log in."
 msgstr ""
 
-#: pervius/ui/window.py:1713
+#: pervius/ui/window.py:1731
 msgid "Could not change start at login."
 msgstr ""
 
-#: pervius/ui/window.py:1720
+#: pervius/ui/window.py:1738
 msgid "Desktop notifications"
 msgstr ""
 
-#: pervius/ui/window.py:1722
+#: pervius/ui/window.py:1740
 msgid ""
 "Show connection loss, recovery, and background status while the window is "
 "hidden."
 msgstr ""
 
-#: pervius/ui/window.py:1749
+#: pervius/ui/window.py:1767
 msgid "Privacy and security"
 msgstr ""
 
-#: pervius/ui/window.py:1751
+#: pervius/ui/window.py:1769
 msgid "Block IPv6 while connected"
 msgstr ""
 
-#: pervius/ui/window.py:1754
+#: pervius/ui/window.py:1772
 msgid ""
 "While the VPN is up, IPv6 traffic outside the tunnel is blocked, even when "
 "the kill switch is off. Applies from the next connection."
 msgstr ""
 
-#: pervius/ui/window.py:1768
+#: pervius/ui/window.py:1786
 msgid "Always allow these interfaces"
 msgstr ""
 
-#: pervius/ui/window.py:1773
+#: pervius/ui/window.py:1791
 msgid ""
 "Interface names separated by commas, for example wt0 for NetBird. They are "
 "allowed by the kill switch and the IPv6 guard. Editable while the kill "
 "switch is armed."
 msgstr ""
 
-#: pervius/ui/window.py:1788
+#: pervius/ui/window.py:1806
 msgid ""
 "Use interface names of up to 15 letters, digits, dots, dashes or "
 "underscores, at most 16 of them."
 msgstr ""
 
-#: pervius/ui/window.py:1806
+#: pervius/ui/window.py:1824
 msgid "Password storage"
 msgstr ""
 
-#: pervius/ui/window.py:1809
+#: pervius/ui/window.py:1827
 msgid ""
 "Saved only in the desktop keyring when you enable it in the Account dialog, "
 "which is also where you can forget it."
 msgstr ""
 
-#: pervius/ui/window.py:1848
+#: pervius/ui/window.py:1866
 #, python-brace-format
 msgid ""
 "A VPN connection uses the reserved Pervius UUID, but its ownership cannot be "
 "verified: {0}"
 msgstr ""
 
-#: pervius/ui/window.py:1856
+#: pervius/ui/window.py:1874
 msgid ""
 "A VPN connection uses the reserved Pervius UUID, but no owned profile was "
 "found; refusing to manage it."
 msgstr ""
 
 #. Translators: {0} is NetworkManager's technical reason.
-#: pervius/ui/window.py:1870
+#: pervius/ui/window.py:1888
 #, python-brace-format
 msgid "The VPN connection is in a failed state: {0}"
 msgstr ""
 
 #. Translators: {0} is a technical error message.
-#: pervius/ui/window.py:1920
+#: pervius/ui/window.py:1938
 #, python-brace-format
 msgid "Could not load the location list: {0}"
 msgstr ""
 
 #. Translators: {0} is a technical error message.
-#: pervius/ui/window.py:1941
+#: pervius/ui/window.py:1959
 #, python-brace-format
 msgid "Using the saved location list; refresh failed: {0}"
 msgstr ""
 
-#: pervius/ui/window.py:1946
+#: pervius/ui/window.py:1964
 #, python-brace-format
 msgid "{0} server profile failed validation and was left out: {1}"
 msgid_plural "{0} server profiles failed validation and were left out: {1}"
 msgstr[0] ""
 msgstr[1] ""
 
-#: pervius/ui/window.py:1953
+#: pervius/ui/window.py:1971
 #, python-brace-format
 msgid "{0} profile"
 msgid_plural "{0} profiles"
 msgstr[0] ""
 msgstr[1] ""
 
-#: pervius/ui/window.py:1956
+#: pervius/ui/window.py:1974
 #, python-brace-format
 msgid "{0} location"
 msgid_plural "{0} locations"
@@ -775,57 +776,57 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. Translators: {0} is "N profiles", {1} is "N locations".
-#: pervius/ui/window.py:1959
+#: pervius/ui/window.py:1977
 #, python-brace-format
 msgid "Loaded {0} in {1}."
 msgstr ""
 
-#: pervius/ui/window.py:2041
+#: pervius/ui/window.py:2059
 msgid "Automatic reconnection disabled."
 msgstr ""
 
-#: pervius/ui/window.py:2068
+#: pervius/ui/window.py:2086
 msgid "NetworkManager is unavailable."
 msgstr ""
 
-#: pervius/ui/window.py:2072
+#: pervius/ui/window.py:2090
 msgid ""
 "The NetworkManager secret agent is not registered; reconnect after "
 "restarting the app."
 msgstr ""
 
-#: pervius/ui/window.py:2076 pervius/ui/window.py:2109
-#: pervius/ui/window.py:2305
+#: pervius/ui/window.py:2094 pervius/ui/window.py:2127
+#: pervius/ui/window.py:2323
 msgid "Choose a location and protocol first."
 msgstr ""
 
-#: pervius/ui/window.py:2079
+#: pervius/ui/window.py:2097
 msgid "A VPN connection is already active. Disconnect it first."
 msgstr ""
 
 #. Translators: {0} is a technical error message.
-#: pervius/ui/window.py:2095
+#: pervius/ui/window.py:2113
 #, python-brace-format
 msgid "The managed VPN profile cannot be used safely: {0}"
 msgstr ""
 
-#: pervius/ui/window.py:2134
+#: pervius/ui/window.py:2152
 msgid "Importing and verifying the selected profile…"
 msgstr ""
 
 #. Translators: {0} is a technical error message.
-#: pervius/ui/window.py:2142
+#: pervius/ui/window.py:2160
 #, python-brace-format
 msgid "Could not prepare the VPN profile: {0}"
 msgstr ""
 
 #. Translators: {0} is a technical error message.
-#: pervius/ui/window.py:2185
+#: pervius/ui/window.py:2203
 #, python-brace-format
 msgid "Could not save the managed profile: {0}"
 msgstr ""
 
-#: pervius/ui/window.py:2208
+#: pervius/ui/window.py:2226
 #, python-brace-format
 msgid ""
 "The NetworkManager profile was created, but the ownership manifest could not "
@@ -833,231 +834,231 @@ msgid ""
 msgstr ""
 
 #. Translators: {0} is a technical error message.
-#: pervius/ui/window.py:2266
+#: pervius/ui/window.py:2284
 #, python-brace-format
 msgid "Could not update the managed profile: {0}"
 msgstr ""
 
-#: pervius/ui/window.py:2277
+#: pervius/ui/window.py:2295
 msgid "Looking up the VPN servers…"
 msgstr ""
 
-#: pervius/ui/window.py:2277
+#: pervius/ui/window.py:2295
 msgid "Updating the kill switch for this server…"
 msgstr ""
 
 #. Translators: {0} explains why the switch failed.
-#: pervius/ui/window.py:2340
+#: pervius/ui/window.py:2358
 #, python-brace-format
 msgid "Could not switch location: {0}"
 msgstr ""
 
-#: pervius/ui/window.py:2354
+#: pervius/ui/window.py:2372
 msgid "Preparing the new location…"
 msgstr ""
 
-#: pervius/ui/window.py:2384
+#: pervius/ui/window.py:2402
 msgid "Waiting for the previous tunnel to close…"
 msgstr ""
 
 #. Translators: {0} is a technical error message.
-#: pervius/ui/window.py:2413
+#: pervius/ui/window.py:2431
 #, python-brace-format
 msgid "Could not start the VPN: {0}"
 msgstr ""
 
 #. Translators: {0} is NetworkManager's technical reason.
-#: pervius/ui/window.py:2421 pervius/ui/window.py:2969
+#: pervius/ui/window.py:2439 pervius/ui/window.py:2987
 #, python-brace-format
 msgid "The VPN connection failed: {0}"
 msgstr ""
 
-#: pervius/ui/window.py:2453
+#: pervius/ui/window.py:2471
 msgid "Connection attempt cancelled."
 msgstr ""
 
 #. Translators: {0} is a technical error message.
-#: pervius/ui/window.py:2481
+#: pervius/ui/window.py:2499
 #, python-brace-format
 msgid "Could not stop the VPN: {0}"
 msgstr ""
 
-#: pervius/ui/window.py:2541
+#: pervius/ui/window.py:2559
 #, python-brace-format
 msgid "{0} The profile from the previous release could not be adopted: {1}."
 msgstr ""
 
-#: pervius/ui/window.py:2570
+#: pervius/ui/window.py:2588
 msgid "Loading locations…"
 msgstr ""
 
-#: pervius/ui/window.py:2571
+#: pervius/ui/window.py:2589
 msgid "Reading the public catalogue."
 msgstr ""
 
-#: pervius/ui/window.py:2587
+#: pervius/ui/window.py:2605
 msgid "Preparing VPN profile…"
 msgstr ""
 
-#: pervius/ui/window.py:2588
+#: pervius/ui/window.py:2606
 msgid "Importing and verifying the selected profile."
 msgstr ""
 
-#: pervius/ui/window.py:2594
+#: pervius/ui/window.py:2612
 msgid "Waiting for NetworkManager and the OpenVPN plugin."
 msgstr ""
 
-#: pervius/ui/window.py:2606
+#: pervius/ui/window.py:2624
 msgid "Connected"
 msgstr ""
 
-#: pervius/ui/window.py:2614
+#: pervius/ui/window.py:2632
 msgid "Telling NetworkManager to stop the tunnel."
 msgstr ""
 
-#: pervius/ui/window.py:2619
+#: pervius/ui/window.py:2637
 msgid "Connection failed"
 msgstr ""
 
-#: pervius/ui/window.py:2620
+#: pervius/ui/window.py:2638
 msgid "The last operation failed."
 msgstr ""
 
-#: pervius/ui/window.py:2621
+#: pervius/ui/window.py:2639
 msgid "Try Again"
 msgstr ""
 
-#: pervius/ui/window.py:2630
+#: pervius/ui/window.py:2648
 msgid "Setup problem"
 msgstr ""
 
-#: pervius/ui/window.py:2631
+#: pervius/ui/window.py:2649
 msgid "The app cannot safely continue."
 msgstr ""
 
-#: pervius/ui/window.py:2665
+#: pervius/ui/window.py:2683
 msgid "the selected server"
 msgstr ""
 
-#: pervius/ui/window.py:2667
+#: pervius/ui/window.py:2685
 msgid "VPN reconnected automatically."
 msgstr ""
 
-#: pervius/ui/window.py:2669
+#: pervius/ui/window.py:2687
 msgid "VPN reconnected"
 msgstr ""
 
 #. Translators: {0} is the location.
-#: pervius/ui/window.py:2671 pervius/ui/window.py:2680
+#: pervius/ui/window.py:2689 pervius/ui/window.py:2698
 #, python-brace-format
 msgid "Connected to {0}."
 msgstr ""
 
 #. Translators: {0} lists technical notes about the profile.
-#: pervius/ui/window.py:2675
+#: pervius/ui/window.py:2693
 #, python-brace-format
 msgid "Profile imported with notes: {0}"
 msgstr ""
 
-#: pervius/ui/window.py:2678
+#: pervius/ui/window.py:2696
 msgid "VPN connected"
 msgstr ""
 
-#: pervius/ui/window.py:2695
+#: pervius/ui/window.py:2713
 #, python-brace-format
 msgid ""
 "The VPN tunnel is not named {0}; the kill switch and the IPv6 guard may "
 "block it. Reconnect, or report this problem."
 msgstr ""
 
-#: pervius/ui/window.py:2712
+#: pervius/ui/window.py:2730
 msgid ""
 "IPv6 is not blocked outside the tunnel. Reconnect to apply the IPv6 guard."
 msgstr ""
 
-#: pervius/ui/window.py:2747
+#: pervius/ui/window.py:2765
 msgid "Choose a location to begin."
 msgstr ""
 
-#: pervius/ui/window.py:2759
+#: pervius/ui/window.py:2777
 msgid "the application is shutting down"
 msgstr ""
 
-#: pervius/ui/window.py:2761
+#: pervius/ui/window.py:2779
 msgid "NetworkManager is unavailable"
 msgstr ""
 
-#: pervius/ui/window.py:2763
+#: pervius/ui/window.py:2781
 msgid "the secret agent is not registered"
 msgstr ""
 
-#: pervius/ui/window.py:2766
+#: pervius/ui/window.py:2784
 msgid "the managed profile is missing"
 msgstr ""
 
-#: pervius/ui/window.py:2769
+#: pervius/ui/window.py:2787
 msgid "the selected location or protocol is no longer available"
 msgstr ""
 
-#: pervius/ui/window.py:2793 pervius/ui/window.py:2794
-#: pervius/ui/window.py:2948
+#: pervius/ui/window.py:2811 pervius/ui/window.py:2812
+#: pervius/ui/window.py:2966
 msgid "The VPN connection ended."
 msgstr ""
 
-#: pervius/ui/window.py:2794 pervius/ui/window.py:2801
+#: pervius/ui/window.py:2812 pervius/ui/window.py:2819
 msgid "VPN disconnected"
 msgstr ""
 
-#: pervius/ui/window.py:2799
+#: pervius/ui/window.py:2817
 msgid "The VPN connection ended. Automatic reconnect is off."
 msgstr ""
 
-#: pervius/ui/window.py:2801
+#: pervius/ui/window.py:2819
 msgid "The VPN connection ended; automatic reconnect is off."
 msgstr ""
 
-#: pervius/ui/window.py:2810
+#: pervius/ui/window.py:2828
 #, python-brace-format
 msgid ""
 "The VPN connection ended and cannot be safely reconnected: {0}. Press Try "
 "Again to rebuild it."
 msgstr ""
 
-#: pervius/ui/window.py:2815
+#: pervius/ui/window.py:2833
 msgid "VPN reconnection stopped"
 msgstr ""
 
-#: pervius/ui/window.py:2820
+#: pervius/ui/window.py:2838
 msgid "The VPN connection was lost. Reconnecting automatically…"
 msgstr ""
 
-#: pervius/ui/window.py:2822
+#: pervius/ui/window.py:2840
 msgid "Reconnecting automatically in a few seconds."
 msgstr ""
 
-#: pervius/ui/window.py:2822
+#: pervius/ui/window.py:2840
 msgid "VPN connection lost"
 msgstr ""
 
 #. Translators: {0} explains what is wrong.
-#: pervius/ui/window.py:2836
+#: pervius/ui/window.py:2854
 #, python-brace-format
 msgid "Automatic reconnection stopped: {0}."
 msgstr ""
 
-#: pervius/ui/window.py:2884
+#: pervius/ui/window.py:2902
 #, python-brace-format
 msgid "Connection lost. Retrying in {0} second"
 msgid_plural "Connection lost. Retrying in {0} seconds"
 msgstr[0] ""
 msgstr[1] ""
 
-#: pervius/ui/window.py:2889
+#: pervius/ui/window.py:2907
 #, python-brace-format
 msgid "{0} (attempt {1} of {2})."
 msgstr ""
 
-#: pervius/ui/window.py:2904
+#: pervius/ui/window.py:2922
 #, python-brace-format
 msgid ""
 "The VPN connection was lost and automatic reconnection stopped after {0} "
@@ -1068,41 +1069,41 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: pervius/ui/window.py:2910
+#: pervius/ui/window.py:2928
 msgid "Automatic reconnection stopped"
 msgstr ""
 
-#: pervius/ui/window.py:2957 pervius/ui/window.py:2959
+#: pervius/ui/window.py:2975 pervius/ui/window.py:2977
 msgid "The connection attempt timed out."
 msgstr ""
 
-#: pervius/ui/window.py:2978
+#: pervius/ui/window.py:2996
 msgid "NetworkManager reports the tunnel is gone."
 msgstr ""
 
-#: pervius/ui/window.py:2981
+#: pervius/ui/window.py:2999
 msgid "Waiting for the secret agent to supply credentials…"
 msgstr ""
 
-#: pervius/ui/window.py:3063
+#: pervius/ui/window.py:3081
 msgid "UDP or TCP"
 msgstr ""
 
-#: pervius/ui/window.py:3066
+#: pervius/ui/window.py:3084
 msgid ""
 "Both choices carry the same encrypted OpenVPN tunnel, with the same "
 "certificate checks and authentication. Neither is more private or more "
 "secure."
 msgstr ""
 
-#: pervius/ui/window.py:3070
+#: pervius/ui/window.py:3088
 msgid ""
 "UDP sends packets without a connection handshake or retransmission. That "
 "usually means lower overhead and lower latency, which is why it is the "
 "default for VPNs, games, and calls."
 msgstr ""
 
-#: pervius/ui/window.py:3075
+#: pervius/ui/window.py:3093
 msgid ""
 "TCP adds ordered delivery and retransmission. Use it when a network blocks "
 "UDP or only lets TCP through. Because OpenVPN over TCP carries TCP inside "
@@ -1110,27 +1111,27 @@ msgid ""
 "often slower and less responsive on unstable connections."
 msgstr ""
 
-#: pervius/ui/window.py:3081
+#: pervius/ui/window.py:3099
 msgid ""
 "Practical rule: use UDP first. Switch to TCP only if UDP cannot connect or "
 "is unstable because the local network filters it."
 msgstr ""
 
-#: pervius/ui/window.py:3092
+#: pervius/ui/window.py:3110
 msgid ""
 "While the kill switch is armed, only the VPN servers, the tunnel and the "
 "interfaces you always allow can be reached; everything else is blocked, "
 "including DNS outside the tunnel. A restart of the computer turns it off."
 msgstr ""
 
-#: pervius/ui/window.py:3098
+#: pervius/ui/window.py:3116
 #, python-brace-format
 msgid ""
 "If you are offline because the kill switch is still armed, run {0} in a "
 "terminal."
 msgstr ""
 
-#: pervius/ui/window.py:3121
+#: pervius/ui/window.py:3139
 msgid ""
 "It manages an existing FastVPN (OpenVPN) subscription through NetworkManager "
 "and its OpenVPN plugin. The application never runs as root; NetworkManager "
@@ -1139,19 +1140,19 @@ msgid ""
 msgstr ""
 
 #. Translators: put your names here, one per line, as shown in About.
-#: pervius/ui/window.py:3133
+#: pervius/ui/window.py:3151
 msgid "translator-credits"
 msgstr ""
 
-#: pervius/ui/window.py:3136
+#: pervius/ui/window.py:3154
 msgid "Trademarks"
 msgstr ""
 
-#: pervius/ui/window.py:3138
+#: pervius/ui/window.py:3156
 msgid "Third-party components"
 msgstr ""
 
-#: pervius/ui/window.py:3143
+#: pervius/ui/window.py:3161
 #, python-brace-format
 msgid ""
 "{0} is an independent front end. It uses the installed NetworkManager, "
@@ -1160,39 +1161,39 @@ msgid ""
 "distributed under their own licenses and are not bundled in this package."
 msgstr ""
 
-#: pervius/ui/window.py:3258 pervius/ui/window.py:3272
+#: pervius/ui/window.py:3289 pervius/ui/window.py:3303
 msgid "VPN is reconnecting"
 msgstr ""
 
-#: pervius/ui/window.py:3261
+#: pervius/ui/window.py:3292
 #, python-brace-format
 msgid ""
 "{0} is still retrying in the background. Open it from the app menu to see "
 "the status."
 msgstr ""
 
-#: pervius/ui/window.py:3274
+#: pervius/ui/window.py:3305
 msgid ""
 "The tunnel is currently down and the app is waiting to retry. Closing this "
 "window hides it and keeps retrying in the background. Quit stops automatic "
 "reconnection."
 msgstr ""
 
-#: pervius/ui/window.py:3278
+#: pervius/ui/window.py:3309
 msgid "Keep Retrying"
 msgstr ""
 
-#: pervius/ui/window.py:3294 pervius/ui/window.py:3306
+#: pervius/ui/window.py:3325 pervius/ui/window.py:3337
 msgid "Kill switch is armed"
 msgstr ""
 
 #. Translators: {0} is the app name.
-#: pervius/ui/window.py:3296
+#: pervius/ui/window.py:3327
 #, python-brace-format
 msgid "{0} is running in the background with firewall protection active."
 msgstr ""
 
-#: pervius/ui/window.py:3308
+#: pervius/ui/window.py:3339
 msgid ""
 "Closing hides the window and keeps the app and firewall rules running. "
 "Quitting can disarm first, or leave protection active; while armed, traffic "
@@ -1200,30 +1201,30 @@ msgid ""
 "access remains blocked."
 msgstr ""
 
-#: pervius/ui/window.py:3315
+#: pervius/ui/window.py:3346
 msgid "Hide Window"
 msgstr ""
 
-#: pervius/ui/window.py:3316 pervius/ui/window.py:3456
+#: pervius/ui/window.py:3347 pervius/ui/window.py:3487
 msgid "Disarm and Quit"
 msgstr ""
 
-#: pervius/ui/window.py:3317 pervius/ui/window.py:3457
+#: pervius/ui/window.py:3348 pervius/ui/window.py:3488
 msgid "Quit and Keep Protection"
 msgstr ""
 
-#: pervius/ui/window.py:3332 pervius/ui/window.py:3344
+#: pervius/ui/window.py:3363 pervius/ui/window.py:3375
 msgid "VPN is still connected"
 msgstr ""
 
-#: pervius/ui/window.py:3335
+#: pervius/ui/window.py:3366
 #, python-brace-format
 msgid ""
 "{0} is running in the background. Open it from the app menu to disconnect or "
 "quit."
 msgstr ""
 
-#: pervius/ui/window.py:3347
+#: pervius/ui/window.py:3378
 #, python-brace-format
 msgid ""
 "Closing this window hides it and leaves the app process running so it can "
@@ -1232,52 +1233,52 @@ msgid ""
 "agent."
 msgstr ""
 
-#: pervius/ui/window.py:3354
+#: pervius/ui/window.py:3385
 msgid "Keep VPN Connected"
 msgstr ""
 
-#: pervius/ui/window.py:3355 pervius/ui/window.py:3425
+#: pervius/ui/window.py:3386 pervius/ui/window.py:3456
 msgid "Disconnect and Quit"
 msgstr ""
 
-#: pervius/ui/window.py:3375
+#: pervius/ui/window.py:3406
 msgid "Quit while reconnecting?"
 msgstr ""
 
-#: pervius/ui/window.py:3377
+#: pervius/ui/window.py:3408
 msgid ""
 "Automatic reconnection will stop if the app exits. The VPN is not connected "
 "at this moment."
 msgstr ""
 
-#: pervius/ui/window.py:3416
+#: pervius/ui/window.py:3447
 msgid "Quit while connected?"
 msgstr ""
 
-#: pervius/ui/window.py:3418
+#: pervius/ui/window.py:3449
 msgid ""
 "The tunnel can stay up after the app exits, but the secret agent will also "
 "exit. If the VPN asks for credentials again, reauthentication cannot succeed "
 "until you reopen the app. Quit and disconnect if you want a clean stop."
 msgstr ""
 
-#: pervius/ui/window.py:3424
+#: pervius/ui/window.py:3455
 msgid "Quit and Leave Connected"
 msgstr ""
 
-#: pervius/ui/window.py:3435
+#: pervius/ui/window.py:3466
 msgid "The VPN is connected; quitting can leave the tunnel up."
 msgstr ""
 
-#: pervius/ui/window.py:3437
+#: pervius/ui/window.py:3468
 msgid "The VPN is not connected; normal internet access remains blocked."
 msgstr ""
 
-#: pervius/ui/window.py:3447
+#: pervius/ui/window.py:3478
 msgid "Quit with the kill switch armed?"
 msgstr ""
 
-#: pervius/ui/window.py:3450
+#: pervius/ui/window.py:3481
 #, python-brace-format
 msgid ""
 "The system firewall rules will stay active if you quit without disarming. "
@@ -1285,12 +1286,12 @@ msgid ""
 "killswitch command to disarm later. {0}"
 msgstr ""
 
-#: pervius/ui/window.py:3472
+#: pervius/ui/window.py:3503
 msgid "Disarming the kill switch before quitting…"
 msgstr ""
 
 #. Translators: {0} explains why disarming failed.
-#: pervius/ui/window.py:3482
+#: pervius/ui/window.py:3513
 #, python-brace-format
 msgid "Could not disarm the kill switch: {0}"
 msgstr ""
@@ -1342,12 +1343,18 @@ msgstr ""
 
 #: data/com.solvetus.Pervius.metainfo.xml.in:78
 msgid ""
+"The header shows only the app name, centred, and the footer is two short "
+"lines."
+msgstr ""
+
+#: data/com.solvetus.Pervius.metainfo.xml.in:84
+msgid ""
 "A calmer window: short confirmations appear as toasts that disappear by "
 "themselves, warnings stay in a banner you can dismiss, and the window and "
 "status card keep the same size in every state."
 msgstr ""
 
-#: data/com.solvetus.Pervius.metainfo.xml.in:88
+#: data/com.solvetus.Pervius.metainfo.xml.in:94
 msgid ""
 "A new logo, Portuguese, French, Spanish and Italian translations, and leak "
 "protection that works even with the kill switch off: while the VPN is "
@@ -1355,7 +1362,7 @@ msgid ""
 "blocked."
 msgstr ""
 
-#: data/com.solvetus.Pervius.metainfo.xml.in:94
+#: data/com.solvetus.Pervius.metainfo.xml.in:100
 msgid ""
 "The kill switch now allows only the Pervius tunnel and interfaces you "
 "choose, and lets you change location or protocol while it stays armed. A "
@@ -1364,7 +1371,7 @@ msgid ""
 "login, hidden in the tray."
 msgstr ""
 
-#: data/com.solvetus.Pervius.metainfo.xml.in:106
+#: data/com.solvetus.Pervius.metainfo.xml.in:112
 msgid ""
 "First public release under the name Pervius, licensed under the Apache "
 "License 2.0. Settings, favorites, a saved password and the managed "

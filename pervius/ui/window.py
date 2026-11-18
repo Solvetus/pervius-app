@@ -112,10 +112,8 @@ NAMES = object()
 
 
 _CSS = f"""
-/* A little more room in the header: a taller bar, and a few pixels between
-   the title and its subtitle. The font sizes stay GNOME's own. */
+/* A little more room in the header; the font size stays GNOME's own. */
 headerbar.pervius-header {{ min-height: {HEADER_HEIGHT}px; }}
-headerbar.pervius-header windowtitle label.subtitle {{ margin-top: 3px; }}
 """
 _css_installed = False
 
@@ -432,7 +430,7 @@ class MainWindow(Adw.ApplicationWindow):
         header = Adw.HeaderBar()
         header.add_css_class("pervius-header")
         header.set_centering_policy(Adw.CenteringPolicy.STRICT)
-        title = Adw.WindowTitle(title=APP_NAME, subtitle=_("Unofficial client for FastVPN"))
+        title = Adw.WindowTitle(title=APP_NAME)
         header.set_title_widget(title)
 
         menu = Gio.Menu()
@@ -764,13 +762,13 @@ class MainWindow(Adw.ApplicationWindow):
         label.set_size_request(-1, int(math.ceil(2 * line)) + 2)
 
     def _reset_footer(self):
-        # Translators: footer; {0} is the app name, {1} its version.
-        self.footer.set_label(
-            _(
-                "{0} {1} · independent project, not affiliated with the VPN provider · "
-                "catalogue source: vpn.ncapi.io"
-            ).format(APP_NAME, VERSION)
+        lines = (
+            # Translators: footer, first line; {0} is the app name, {1} its version.
+            _("{0} {1} · Unofficial client for FastVPN").format(APP_NAME, VERSION),
+            # Translators: footer, second line; {0} is the catalogue host name.
+            _("Not affiliated with Namecheap · Servers: {0}").format("vpn.ncapi.io"),
         )
+        self.footer.set_label("\n".join(lines))
 
     def _init_backend(self):
         try:
