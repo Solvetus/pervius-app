@@ -57,5 +57,30 @@ class TrayTests(unittest.TestCase):
         self.assertFalse(props["enabled"].unpack())
 
 
+
+
+class TrayItemUpdateTests(unittest.TestCase):
+    def test_update_item_emits_only_that_item(self):
+        emitted = []
+
+        class Connection:
+            def emit_signal(self, _dest, path, interface, name, params):
+                emitted.append((path, interface, name, params.unpack()))
+
+        tray = make_tray()
+        tray._menu_provider = lambda: (MenuItem(1, "Connected — Lisbon, Portugal · 00:12", enabled=False), MenuItem(2, "Disconnect"))
+        tray._registered = True
+        tray._connection = Connection()
+        tray.update_item(1)
+        self.assertEqual(len(emitted), 1)
+        path, interface, name, (updated, removed) = emitted[0]
+        self.assertEqual(name, "ItemsPropertiesUpdated")
+        self.assertEqual([item_id for item_id, _props in updated], [1])
+        self.assertEqual(updated[0][1]["label"], "Connected — Lisbon, Portugal · 00:12")
+        self.assertEqual(removed, [])
+        tray.update_item(99)
+        self.assertEqual(len(emitted), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

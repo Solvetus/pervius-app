@@ -310,6 +310,28 @@ class TrayIcon:
         except GLib.Error as exc:
             log.warning("could not refresh tray: %s", exc.message)
 
+    def update_item(self, item_id: int) -> None:
+        """Push one item's properties (e.g. a ticking status line) without a relayout."""
+        if not self._registered or self._connection is None:
+            return
+        self._rebuild_nodes()
+        item = self._nodes.get(item_id)
+        if item is None:
+            return
+        try:
+            self._connection.emit_signal(
+                None,
+                MENU_PATH,
+                MENU_INTERFACE,
+                "ItemsPropertiesUpdated",
+                GLib.Variant(
+                    "(a(ia{sv})a(ias))",
+                    ([(item_id, self._item_properties(item))], []),
+                ),
+            )
+        except GLib.Error as exc:
+            log.warning("could not update tray item: %s", exc.message)
+
     def _current_icon(self) -> str:
         if self._icon_provider is not None:
             try:

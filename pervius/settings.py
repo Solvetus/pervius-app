@@ -9,6 +9,7 @@ from pathlib import Path
 from .config import settings_path
 from .catalogue.store import atomic_write
 from .i18n import SUPPORTED_LANGUAGES
+from .killswitchd.rules import MAX_INTERFACES, RulesError, validate_ifname
 
 
 @dataclass
@@ -24,6 +25,12 @@ class Settings:
     last_version: str = ""
     # "" follows the system language; otherwise one of SUPPORTED_LANGUAGES.
     language: str = ""
+    # ISP and VPN exit IPs are masked until the user reveals them.
+    show_ip_addresses: bool = False
+    # IPv6 leak guard while the managed VPN is up.
+    block_ipv6: bool = True
+    # Interfaces the kill switch and the IPv6 guard always allow (e.g. wt0).
+    killswitch_interfaces: list[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, value: dict) -> "Settings":
@@ -57,6 +64,22 @@ class Settings:
                     favorites.append(key)
                 if len(favorites) >= 50:
                     break
+        def flag(name: str, default: bool) -> bool:
+            item = value.get(name, default)
+            return item if isinstance(item, bool) else default
+
+        interfaces: list[str] = []
+        raw_interfaces = value.get("killswitch_interfaces", [])
+        if isinstance(raw_interfaces, list):
+            for item in raw_interfaces:
+                try:
+                    name = validate_ifname(item)
+                except RulesError:
+                    continue
+                if name not in interfaces:
+                    interfaces.append(name)
+                if len(interfaces) >= MAX_INTERFACES:
+                    break
         language = value.get("language", "")
         if language not in SUPPORTED_LANGUAGES:
             language = ""
@@ -71,6 +94,9 @@ class Settings:
             killswitch_allow_lan=killswitch_allow_lan,
             last_version=str(value.get("last_version") or "")[:32],
             language=language,
+            show_ip_addresses=flag("show_ip_addresses", False),
+            block_ipv6=flag("block_ipv6", True),
+            killswitch_interfaces=interfaces,
         )
 
 

@@ -127,5 +127,31 @@ class SettingsTests(unittest.TestCase):
         self.assertTrue(value["save_password"])
 
 
+
+
+class NewSettingsTests(unittest.TestCase):
+    def test_defaults(self):
+        settings = Settings.from_dict({})
+        self.assertFalse(settings.show_ip_addresses)
+        self.assertTrue(settings.block_ipv6)
+        self.assertEqual(settings.killswitch_interfaces, [])
+
+    def test_flags_and_interfaces_are_validated(self):
+        settings = Settings.from_dict(
+            {
+                "show_ip_addresses": "yes",
+                "block_ipv6": 0,
+                "killswitch_interfaces": ["wt0", "wt0", "bad name", "x" * 16, 7, "eth1"],
+            }
+        )
+        self.assertFalse(settings.show_ip_addresses)
+        self.assertTrue(settings.block_ipv6)
+        self.assertEqual(settings.killswitch_interfaces, ["wt0", "eth1"])
+        self.assertEqual(
+            len(Settings.from_dict({"killswitch_interfaces": [f"if{i}" for i in range(40)]}).killswitch_interfaces),
+            16,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
