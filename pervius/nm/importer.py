@@ -27,20 +27,17 @@ from gi.repository import GLib, NM  # noqa: E402
 
 from ..config import (  # noqa: E402
     OPENVPN_SERVICE_TYPE,
-    USER_DATA_REMOTE_NAMES,
     certificate_dir,
     ensure_private_dir,
     runtime_dir,
 )
 from ..catalogue.models import ParsedProfile  # noqa: E402
 from .profile import (  # noqa: E402
-    GuardOptions,
     PreparedProfile,
     build_managed_connection,
     build_variant,
     low_risk_warnings,
     tunnel_settings_problem,
-    user_data,
 )
 
 log = logging.getLogger(__name__)
@@ -193,11 +190,9 @@ def _verify_vpn_fields(
     if not managed:
         require("remote", expected_remote)
     elif data.get("remote") != expected_remote:
-        # While the kill switch is armed the remote list is pinned to resolved
-        # IP literals; the original names must still be the profile's.
-        if user_data(connection, USER_DATA_REMOTE_NAMES) != expected_remote or not _pinned_remote_ok(
-            data.get("remote"), parsed
-        ):
+        # The managed profile normally holds resolved IP literals (pinned);
+        # they must be on the ports the catalogue profile uses.
+        if not _pinned_remote_ok(data.get("remote"), parsed):
             raise ImportVerificationError(
                 f"preservation check failed for 'remote': expected {expected_remote!r}, "
                 f"got {data.get('remote')!r}"
@@ -262,10 +257,6 @@ def verify_managed_profile(
     problem = tunnel_settings_problem(connection)
     if problem:
         raise ImportVerificationError(problem)
-    if user_data(connection, USER_DATA_REMOTE_NAMES) != ", ".join(
-        f"{host}:{port}" for host, port in parsed.remotes
-    ):
-        raise ImportVerificationError("the recorded server names do not match the profile")
     return warnings
 
 
@@ -340,7 +331,6 @@ def import_and_prepare(
     vpn_username: str,
     local_username: str,
     cert_dir: Path | None = None,
-    guard: GuardOptions | None = None,
 ) -> PreparedProfile:
     if hashlib.sha256(profile_bytes).hexdigest() != parsed.source_sha256:
         raise ImportError("source profile bytes do not match the validated profile hash")
@@ -386,7 +376,6 @@ def import_and_prepare(
             imported.connection,
             local_username=local_username,
             vpn_username=vpn_username,
-            guard=guard,
         )
         variant = build_variant(managed)
     except Exception:

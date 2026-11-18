@@ -17,8 +17,11 @@ from ..config import TUNNEL_INTERFACE
 
 TABLE_NAME = "pervius_ks"
 TABLE_SPEC = f"inet {TABLE_NAME}"
-# The IPv6 leak guard's table, owned by the NetworkManager dispatcher hook.
-GUARD_TABLE_SPEC = "inet pervius_v6"
+# The leak guard's table (DNS and IPv6 outside the tunnel while connected),
+# owned by the NetworkManager dispatcher hook.  The second name was used by
+# 0.3.0 development builds and is still removed.
+GUARD_TABLE_SPEC = "inet pervius_guard"
+LEGACY_GUARD_TABLE_SPEC = "inet pervius_v6"
 DEFAULT_OPENVPN_PORT = 1194
 MAX_ENDPOINTS = 256
 MAX_INTERFACES = 16
@@ -308,6 +311,11 @@ def build_ruleset(
     if window:
         lines.append(f"    {window} ip daddr @dns_window_v4 meta l4proto {{ udp, tcp }} th dport 53 accept")
         lines.append(f"    {window} ip6 daddr @dns_window_v6 meta l4proto {{ udp, tcp }} th dport 53 accept")
+    # No DNS outside the tunnel, not even to the LAN's resolver when the LAN
+    # is allowed: only loopback, the tunnel, allowed interfaces and the
+    # service's own DNS window may carry it.
+    lines.append("    meta l4proto { udp, tcp } th dport 53 drop")
+    lines.append("    tcp dport 853 drop")
     if allow_lan:
         lines.append(f"    ip daddr {{ {', '.join(_LAN_V4)} }} accept")
         lines.append(f"    ip6 daddr {{ {', '.join(_LAN_V6)} }} accept")

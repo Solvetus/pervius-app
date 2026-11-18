@@ -11,6 +11,7 @@ def scenario(window, checks, done):
     from pervius.ui import window as window_module
 
     window_module.verify_managed_profile = lambda *_args, **_kwargs: ()
+    window._verify_for = lambda *_args, **_kwargs: None
     window_module._RECONNECT = window_module.ReconnectPolicy((1, 1))
     notes = []
     window._start_poll = lambda: None

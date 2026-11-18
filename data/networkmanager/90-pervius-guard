@@ -1,0 +1,128 @@
+#!/bin/sh
+# Pervius leak guard, a NetworkManager dispatcher hook.
+#
+# While the Pervius-managed VPN is up, DNS and IPv6 must not leave outside
+# the (IPv4-only) tunnel. This hook installs the nftables table
+# "inet pervius_guard" when that VPN comes up (vpn-pre-up, which
+# NetworkManager waits for, and vpn-up) and deletes it when the VPN goes down.
+# It runs for every activation path (the app, nmcli, the desktop's VPN menu)
+# and needs no Pervius process.
+#
+# DNS (UDP/TCP 53, DNS over TLS 853) may only use loopback, the tunnel and
+# the interfaces the user always allows; queries to the physical link's
+# resolver are dropped, whatever systemd-resolved or another tool (for
+# example NetBird's search domain) would route there.
+#
+# IPv6 (unless turned off): allowed outside the tunnel are loopback,
+# link-local (fe80::/10, ff02::/16), ICMPv6 neighbour discovery, unique local
+# addresses (fc00::/7, not routable on the internet) and the always-allowed
+# interfaces. Everything else over IPv6 is dropped.
+#
+# Input is only NetworkManager's arguments and environment. The first
+# statement ignores every connection except the reserved Pervius profile;
+# every value used after that is validated.
+
+[ "${CONNECTION_UUID:-}" = "22d97462-fd9d-5bc6-9f0b-7110f7153e4f" ] || exit 0
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+LC_ALL=C
+export LC_ALL
+umask 077
+set -f
+
+NFT=/usr/sbin/nft
+OPTIONS=/var/lib/pervius/guard.conf
+OPTIONS_OWNER=0
+TUNNEL=pervius0
+MAX_INTERFACES=16
+
+case ${2:-} in
+    vpn-pre-up | vpn-up | vpn-down) action=$2 ;;
+    *) exit 0 ;;
+esac
+
+# Linux interface-name rules, stricter charset: 1-15 characters from
+# [A-Za-z0-9_.-], starting with a letter or digit, never "." or "..".
+valid_ifname() {
+    case $1 in
+        '' | . | .. | *[!A-Za-z0-9_.-]* | [!A-Za-z0-9]*) return 1 ;;
+    esac
+    [ "${#1}" -le 15 ]
+}
+
+remove_guard() {
+    "$NFT" delete table inet pervius_guard >/dev/null 2>&1 || true
+    # Name used by 0.3.0 development builds.
+    "$NFT" delete table inet pervius_v6 >/dev/null 2>&1 || true
+}
+
+if [ "$action" = vpn-down ]; then
+    remove_guard
+    exit 0
+fi
+
+# Options from the Pervius kill-switch service: a root-owned file, mode 0644,
+# never a symlink (NetworkManager does not keep profile user-data reliably).
+# Values are validated below; anything unexpected keeps the safe defaults.
+block=yes
+allowed=
+if [ -f "$OPTIONS" ] && [ ! -L "$OPTIONS" ] &&
+    [ "$(stat -c '%u %a' "$OPTIONS" 2>/dev/null)" = "$OPTIONS_OWNER 644" ]; then
+    while IFS='=' read -r key value; do
+        case $key in
+            block-ipv6) [ "$value" = no ] && block=no ;;
+            allowed-interfaces) allowed=$value ;;
+        esac
+    done <"$OPTIONS"
+fi
+
+tunnel=${VPN_IP_IFACE:-$TUNNEL}
+valid_ifname "$tunnel" || tunnel=$TUNNEL
+interfaces="\"$tunnel\""
+count=0
+saved_ifs=$IFS
+IFS=,
+for name in $allowed; do
+    valid_ifname "$name" || continue
+    [ "$name" = "$tunnel" ] && continue
+    count=$((count + 1))
+    [ "$count" -le "$MAX_INTERFACES" ] || break
+    interfaces="$interfaces, \"$name\""
+done
+IFS=$saved_ifs
+
+if [ "$block" = yes ]; then
+    ipv6_output='    ip6 daddr { fe80::/10, ff02::/16, fc00::/7 } accept
+    icmpv6 type { 133, 134, 135, 136 } accept
+    meta nfproto ipv6 drop'
+    ipv6_forward='    chain forward {
+    type filter hook forward priority -10; policy accept;
+    meta nfproto ipv4 accept
+    oifname { '"$interfaces"' } accept
+    ip6 daddr { fe80::/10, ff02::/16, fc00::/7 } accept
+    meta nfproto ipv6 drop
+  }'
+else
+    ipv6_output=
+    ipv6_forward=
+fi
+
+# One transaction: create if missing, delete, define again.
+"$NFT" -f - <<RULES
+table inet pervius_guard {}
+delete table inet pervius_guard
+table inet pervius_guard {
+  chain output {
+    type filter hook output priority -10; policy accept;
+    oifname "lo" accept
+    oifname { $interfaces } accept
+    meta l4proto { udp, tcp } th dport 53 drop
+    tcp dport 853 drop
+    meta nfproto ipv4 accept
+$ipv6_output
+  }
+$ipv6_forward
+}
+RULES
+"$NFT" delete table inet pervius_v6 >/dev/null 2>&1 || true

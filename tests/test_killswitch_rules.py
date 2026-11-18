@@ -199,6 +199,21 @@ class RulesetTests(unittest.TestCase):
             endpoints_from_state([])
 
 
+class DnsOutsideTheTunnelTests(unittest.TestCase):
+    """While armed, DNS may not reach the LAN's resolver, even with the LAN allowed."""
+
+    def test_dns_is_dropped_before_lan_access(self):
+        text = build_ruleset((Endpoint("192.0.2.10", 1194, "udp"),), allow_lan=True)
+        drop = text.index("meta l4proto { udp, tcp } th dport 53 drop")
+        self.assertLess(drop, text.index("ip daddr { 10.0.0.0/8"))
+        self.assertLess(text.index("oifname @allowed_ifaces accept"), drop)
+        self.assertIn("tcp dport 853 drop", text)
+
+    def test_window_rule_comes_before_the_dns_drop(self):
+        text = build_ruleset((Endpoint("192.0.2.10", 1194, "udp"),), service_cgroup="init.scope")
+        self.assertLess(text.index("@dns_window_v4"), text.index("th dport 53 drop"))
+
+
 class InterfaceNameTests(unittest.TestCase):
     def test_linux_names_are_accepted(self):
         for name in ("wt0", "eth0", "enp0s1", "wg-home", "br.10", "a" * 15, "tailscale0"):
@@ -255,7 +270,8 @@ class DnsWindowRuleTests(unittest.TestCase):
                 "ip6 daddr @dns_window_v6 meta l4proto { udp, tcp } th dport 53 accept",
             ],
         )
-        self.assertNotIn("853", text)
+        for line in rules:
+            self.assertNotIn("853", line)
         # No rule admits DNS to the window resolvers without the cgroup match.
         for line in text.splitlines():
             if "@dns_window" in line:

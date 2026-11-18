@@ -112,5 +112,42 @@ class PublicIPTests(unittest.TestCase):
                 )
 
 
+
+
+class TunnelLookupTests(unittest.TestCase):
+    """While connected, our own lookup resolves through the tunnel only."""
+
+    def test_resolution_is_asked_for_the_tunnel_interface(self):
+        from unittest import mock
+
+        from pervius import public_ip
+
+        asked = []
+
+        def resolver(host, interface):
+            asked.append((host, interface))
+            raise public_ip.PublicIPError("tunnel DNS unavailable")
+
+        with mock.patch("socket.getaddrinfo", side_effect=AssertionError("system resolver used")):
+            with self.assertRaises(public_ip.PublicIPError):
+                public_ip.fetch_public_ip_through("pervius0", resolver=resolver)
+        self.assertEqual(asked, [("api64.ipify.org", "pervius0")])
+
+    def test_resolved_query_disables_search_domains(self):
+        from pervius import public_ip
+
+        self.assertEqual(public_ip.SD_RESOLVED_NO_SEARCH, 256)
+        self.assertEqual(public_ip.SD_RESOLVED_DNS, 1)
+
+    def test_payload_parsing(self):
+        from pervius import public_ip
+
+        self.assertEqual(public_ip._parse_payload(b'{"ip": "198.51.100.7"}'), "198.51.100.7")
+        for bad in (b"", b"{}", b'{"ip": "nope"}', b"x" * 9000):
+            with self.assertRaises(public_ip.PublicIPError):
+                public_ip._parse_payload(bad)
+        self.assertEqual(public_ip._dechunk(b"10\r\n{\"ip\": \"1.2.3.4\"\r\n0\r\n\r\n"), b'{"ip": "1.2.3.4"')
+
+
 if __name__ == "__main__":
     unittest.main()

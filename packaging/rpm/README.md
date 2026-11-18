@@ -26,7 +26,7 @@ packaging/stage.sh %{buildroot} %{python3_sitelib}
 | `data/icons/hicolor/scalable/apps/com.solvetus.Pervius.svg` | `/usr/share/icons/hicolor/scalable/apps/` |
 | `data/icons/hicolor/scalable/status/com.solvetus.Pervius-{tray-off,tray-connected,tray-reconnecting,card-off}.svg` | `/usr/share/icons/hicolor/scalable/status/` |
 | `data/icons/hicolor/symbolic/apps/com.solvetus.Pervius-symbolic.svg` | `/usr/share/icons/hicolor/symbolic/apps/` |
-| `data/networkmanager/90-pervius-ipv6-guard` | `/usr/lib/NetworkManager/dispatcher.d/` (0755) plus a link `pre-up.d/90-pervius-ipv6-guard -> ../90-pervius-ipv6-guard` |
+| `data/networkmanager/90-pervius-guard` | `/usr/lib/NetworkManager/dispatcher.d/` (0755) plus a link `pre-up.d/90-pervius-guard -> ../90-pervius-guard` |
 | `data/systemd/pervius-killswitchd.service` | `/usr/lib/systemd/system/` (`%{_unitdir}`) |
 | `data/dbus/com.solvetus.Pervius.KillSwitch1.conf` | `/usr/share/dbus-1/system.d/` |
 | `data/dbus/com.solvetus.Pervius.KillSwitch1.service` | `/usr/share/dbus-1/system-services/` |

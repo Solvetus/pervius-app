@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import tempfile
 import socket
 import struct
 import subprocess
@@ -38,7 +39,7 @@ from pervius.killswitchd.rules import (
 )
 
 REPO = Path(__file__).resolve().parents[2]
-HOOK = REPO / "data" / "networkmanager" / "90-pervius-ipv6-guard"
+HOOK = REPO / "data" / "networkmanager" / "90-pervius-guard"
 NFT = shutil.which("nft", path="/usr/sbin:/usr/bin:/sbin:/bin")
 IP = shutil.which("ip", path="/usr/sbin:/usr/bin:/sbin:/bin")
 SO_BINDTODEVICE = getattr(socket, "SO_BINDTODEVICE", 25)
@@ -129,7 +130,7 @@ class NamespaceTestCase(unittest.TestCase):
         time.sleep(0.5)  # let link-local addresses appear
 
     def tearDown(self):
-        for table in ("inet pervius_ks", "inet pervius_v6"):
+        for table in ("inet pervius_ks", "inet pervius_guard", "inet pervius_v6"):
             run(NFT, "delete", "table", *table.split(), check=False)
 
     def assertAllowed(self, *args, **kwargs):
@@ -177,11 +178,11 @@ class KillSwitchTests(NamespaceTestCase):
     def test_lan_is_opt_in(self):
         self.arm()
         self.assertBlocked("10.99.0.1", 445, proto="tcp")
-        self.assertBlocked("fd99::1", 53)
+        self.assertBlocked("fd99::1", 445, proto="tcp")
         self.arm(allow_lan=True)
         self.assertAllowed("10.99.0.1", 445, proto="tcp")
-        self.assertAllowed("fd99::1", 53)
-        self.assertBlocked("198.51.100.1", 53)
+        self.assertAllowed("fd99::1", 445, proto="tcp")
+        self.assertBlocked("198.51.100.1", 443, proto="tcp")
 
     def test_endpoint_swap_is_atomic_and_exclusive(self):
         self.arm()
@@ -189,6 +190,23 @@ class KillSwitchTests(NamespaceTestCase):
         self.assertAllowed("192.0.2.20", 1194)
         self.assertBlocked("192.0.2.10", 1194)
         self.assertBlocked("2001:db8::10", 443, proto="tcp")
+
+    def test_allowed_interface_set_exists_while_armed(self):
+        self.arm(interfaces=["wt0"])
+        listing = run(NFT, "list", "set", "inet", "pervius_ks", "allowed_ifaces").stdout
+        self.assertIn('"pervius0"', listing)
+        self.assertIn('"wt0"', listing)
+        run(NFT, "delete", "table", "inet", "pervius_ks")
+        missing = run(NFT, "list", "set", "inet", "pervius_ks", "allowed_ifaces", check=False)
+        self.assertNotEqual(missing.returncode, 0)  # disarmed: the table and its sets are gone
+
+    def test_lan_access_never_includes_dns(self):
+        self.arm(allow_lan=True)
+        self.assertAllowed("10.99.0.1", 445, proto="tcp")
+        self.assertBlocked("10.99.0.1", 53)
+        self.assertBlocked("10.99.0.1", 53, proto="tcp")
+        self.assertBlocked("fd99::1", 53)
+        self.assertAllowed("10.8.0.1", 53, device="pervius0")
 
     def test_rejected_transaction_leaves_the_old_set_intact(self):
         self.arm()
@@ -229,48 +247,70 @@ class KillSwitchTests(NamespaceTestCase):
         self.assertBlocked("10.99.0.53", 53, proto="tcp")
 
 
-class Ipv6GuardTests(NamespaceTestCase):
-    def hook(self, action, **env):
+class GuardTests(NamespaceTestCase):
+    def hook(self, action, options: str | None = None, **env):
+        work = Path(tempfile.mkdtemp())
+        conf = work / "guard.conf"
+        if options is not None:
+            conf.write_text(options)
+            conf.chmod(0o644)
+        script = work / "hook"
+        script.write_text(
+            HOOK.read_text().replace("OPTIONS=/var/lib/pervius/guard.conf\n", f"OPTIONS={conf}\n")
+        )
         environment = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "CONNECTION_UUID": MANAGED_UUID}
         environment.update(env)
         result = subprocess.run(
-            ["sh", str(HOOK), "pervius0", action], env=environment, capture_output=True, text=True
+            ["sh", str(script), "pervius0", action], env=environment, capture_output=True, text=True
         )
+        shutil.rmtree(work)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_dns_leaves_only_through_the_tunnel(self):
+        self.hook("vpn-up", VPN_IP_IFACE="pervius0")
+        self.assertBlocked("10.99.0.1", 53)  # the router's resolver
+        self.assertBlocked("10.99.0.1", 53, proto="tcp")
+        self.assertBlocked("198.51.100.1", 853, proto="tcp")
+        self.assertAllowed("10.8.0.1", 53, device="pervius0")
+        self.assertAllowed("127.0.0.53", 53)
+        self.assertAllowed("198.51.100.1", 443, proto="tcp")  # other IPv4 untouched
+
+    def test_dns_guard_stays_with_ipv6_blocking_off(self):
+        self.hook("vpn-up", options="block-ipv6=no\n")
+        self.assertBlocked("10.99.0.1", 53)
+        self.assertAllowed("2001:db8:5::1", 443, proto="tcp")
 
     def test_guard_blocks_global_ipv6_outside_the_tunnel(self):
         self.hook("vpn-up", VPN_IP_IFACE="pervius0")
         self.assertBlocked("2001:db8:5::1", 53)
         self.assertBlocked("2001:db8:5::1", 443, proto="tcp")
         self.assertBlocked("ff0e::1", 53, device="eth9")
-        self.assertAllowed("fd99::1", 53)
+        self.assertAllowed("fd99::1", 445, proto="tcp")
         self.assertAllowed("ff02::1%eth9", 5353)
-        self.assertAllowed("fe80::1%eth9", 53)
+        self.assertAllowed("fe80::1%eth9", 5353)
         self.assertAllowed("::1", 9)
-        self.assertAllowed("198.51.100.1", 53)  # IPv4 untouched
+        self.assertAllowed("198.51.100.1", 443, proto="tcp")  # IPv4 untouched (except DNS)
 
     def test_guard_allows_listed_interfaces(self):
-        self.hook(
-            "vpn-up",
-            VPN_IP_IFACE="pervius0",
-            CONNECTION_USER_COM__SOLVETUS__PERVIUS__ALLOWED_055INTERFACES="wt0",
-        )
+        self.hook("vpn-up", options="allowed-interfaces=wt0\n", VPN_IP_IFACE="pervius0")
         self.assertAllowed("2001:db8:64::9", 53, device="wt0")
         self.assertBlocked("2001:db8:5::1", 53)
 
     def test_guard_follows_the_vpn_lifecycle(self):
         self.hook("vpn-pre-up", VPN_IP_IFACE="pervius0")
-        self.assertBlocked("2001:db8:5::1", 53)
+        self.assertBlocked("2001:db8:5::1", 443, proto="tcp")
         self.hook("vpn-down")
-        self.assertAllowed("2001:db8:5::1", 53)
+        self.assertAllowed("2001:db8:5::1", 443, proto="tcp")
+        self.assertAllowed("10.99.0.1", 53)
 
-    def test_guard_can_be_turned_off(self):
-        self.hook("vpn-up", CONNECTION_USER_COM__SOLVETUS__PERVIUS__BLOCK_055IPV6="no")
-        self.assertAllowed("2001:db8:5::1", 53)
+    def test_ipv6_blocking_can_be_turned_off(self):
+        self.hook("vpn-up", options="block-ipv6=no\n")
+        self.assertAllowed("2001:db8:5::1", 443, proto="tcp")
 
     def test_foreign_connection_is_ignored(self):
         self.hook("vpn-up", CONNECTION_UUID="11111111-1111-1111-1111-111111111111")
         self.assertAllowed("2001:db8:5::1", 53)
+        self.assertAllowed("10.99.0.1", 53)
 
     def test_guard_and_kill_switch_together(self):
         nft(build_ruleset((Endpoint("192.0.2.10", 1194, "udp"),)))

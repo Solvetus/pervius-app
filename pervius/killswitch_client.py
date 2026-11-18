@@ -95,6 +95,13 @@ class KillSwitchClient:
             GLib.Variant("(sb)", (MANAGED_UUID, bool(replace))),
         )
 
+    def set_guard_options(self, block_ipv6: bool, interfaces: list[str] | tuple[str, ...] = ()) -> dict:
+        """Options of the DNS/IPv6 leak guard; they apply when the VPN next comes up."""
+        return self._call(
+            "SetGuardOptions",
+            GLib.Variant("(bas)", (bool(block_ipv6), list(interfaces))),
+        )
+
     def disarm(self) -> dict:
         return self._call("Disarm", GLib.Variant("()", ()))
 

@@ -42,15 +42,12 @@ def remotes_from_profile_data(
     data: Mapping[str, str],
     permissions: Iterable[str] | None,
     local_username: str,
-    *,
-    remote_names: str | None = None,
 ) -> tuple[tuple[tuple[str, int], ...], str]:
     """Validate ownership and return the profile's ``(host, port)`` remotes and protocol.
 
-    While the kill switch is armed, the app pins the profile's ``remote``
-    field to resolved IP addresses and keeps the original server names in the
-    ``remote_names`` user-data value; those names are what must be resolved
-    again (new location, provider IP rotation).
+    The remotes are host names right after an import, or the IP addresses
+    the app pinned; the app writes the names back before asking for a new
+    resolution.
     """
     if not permissions_restricted_to_user(permissions, local_username):
         raise ProfileError("profile is not restricted to the current local user")
@@ -58,7 +55,7 @@ def remotes_from_profile_data(
         raise ProfileError("profile data is malformed")
     if data.get("password") is not None:
         raise ProfileError("profile contains a password in non-secret data")
-    remote = remote_names if isinstance(remote_names, str) and remote_names.strip() else data.get("remote")
+    remote = data.get("remote")
     if not isinstance(remote, str):
         raise ProfileError("profile has no remote servers")
     protocol = "tcp" if data.get("proto-tcp") == "yes" else "udp"
@@ -71,13 +68,10 @@ def endpoints_from_profile_data(
     permissions: Iterable[str] | None,
     local_username: str,
     *,
-    remote_names: str | None = None,
     resolver: Callable[[str, int, int, int], Iterable] | None = None,
 ) -> Resolution:
     """Validate ownership and turn the profile remotes into IP endpoints."""
-    remotes, protocol = remotes_from_profile_data(
-        data, permissions, local_username, remote_names=remote_names
-    )
+    remotes, protocol = remotes_from_profile_data(data, permissions, local_username)
     return resolve_remotes(
         ", ".join(_format_remote(host, port) for host, port in remotes),
         protocol,

@@ -50,11 +50,10 @@ MANAGED_CONNECTION_TYPE = "vpn"
 # The managed profile pins the OpenVPN tunnel device to this name, so the kill
 # switch and the IPv6 guard can allow exactly this interface instead of tun*.
 TUNNEL_INTERFACE = "pervius0"
-# NetworkManager connection user-data keys read by the IPv6 guard and the
-# kill-switch service.  The dispatcher receives them as CONNECTION_USER_* vars.
-USER_DATA_BLOCK_IPV6 = "com.solvetus.pervius.block-ipv6"
-USER_DATA_ALLOWED_INTERFACES = "com.solvetus.pervius.allowed-interfaces"
-USER_DATA_REMOTE_NAMES = "com.solvetus.pervius.remote-names"
+# Options of the leak guard (dispatcher hook), written by the kill-switch
+# service.  NetworkManager 1.58 does not keep connection user-data across a
+# reload, so nothing Pervius needs lives there.
+GUARD_OPTIONS_PATH = "/var/lib/pervius/guard.conf"
 OPENVPN_SERVICE_TYPE = "org.freedesktop.NetworkManager.openvpn"
 
 # Tray status icons: white glyph, with a green badge when the tunnel is up and

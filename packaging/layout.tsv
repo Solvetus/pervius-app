@@ -33,8 +33,8 @@ tree	build/i18n/locale	/usr/share/locale
 0644	data/systemd/pervius-killswitchd.service	/usr/lib/systemd/system/pervius-killswitchd.service
 0644	data/dbus/com.solvetus.Pervius.KillSwitch1.conf	/usr/share/dbus-1/system.d/com.solvetus.Pervius.KillSwitch1.conf
 0644	data/dbus/com.solvetus.Pervius.KillSwitch1.service	/usr/share/dbus-1/system-services/com.solvetus.Pervius.KillSwitch1.service
-0755	data/networkmanager/90-pervius-ipv6-guard	/usr/lib/NetworkManager/dispatcher.d/90-pervius-ipv6-guard
-link	../90-pervius-ipv6-guard	/usr/lib/NetworkManager/dispatcher.d/pre-up.d/90-pervius-ipv6-guard
+0755	data/networkmanager/90-pervius-guard	/usr/lib/NetworkManager/dispatcher.d/90-pervius-guard
+link	../90-pervius-guard	/usr/lib/NetworkManager/dispatcher.d/pre-up.d/90-pervius-guard
 0644	data/polkit/com.solvetus.pervius.killswitch.policy	/usr/share/polkit-1/actions/com.solvetus.pervius.killswitch.policy
 0644	data/man/man1/pervius.1	/usr/share/man/man1/pervius.1
 0644	data/man/man1/pervius-killswitch.1	/usr/share/man/man1/pervius-killswitch.1

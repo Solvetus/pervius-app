@@ -1,12 +1,14 @@
-"""The NetworkManager dispatcher hook that guards against IPv6 leaks.
+"""The NetworkManager dispatcher hook that guards against DNS and IPv6 leaks.
 
-The real script runs under sh with a crafted environment.  Its single
-``NFT=/usr/sbin/nft`` line is replaced in a temporary copy by a fake nft that
-records its arguments and input; the script has no environment override.
+The real script runs under sh with a crafted environment.  Two lines are
+substituted in a temporary copy: ``NFT=`` points at a fake nft that records
+its arguments and input, and ``OPTIONS=``/``OPTIONS_OWNER=`` point at a
+test-owned options file.  The script has no environment override.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import stat
@@ -15,43 +17,21 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pervius.config import (
-    MANAGED_UUID,
-    USER_DATA_ALLOWED_INTERFACES,
-    USER_DATA_BLOCK_IPV6,
-)
+from pervius.config import MANAGED_UUID
 
 REPO = Path(__file__).resolve().parents[1]
-HOOK = REPO / "data" / "networkmanager" / "90-pervius-ipv6-guard"
+HOOK = REPO / "data" / "networkmanager" / "90-pervius-guard"
 NFT_LINE = "NFT=/usr/sbin/nft\n"
+OPTIONS_LINE = "OPTIONS=/var/lib/pervius/guard.conf\n"
+OWNER_LINE = "OPTIONS_OWNER=0\n"
 HOSTILE = '"; flush ruleset; table ip x { chain y { type filter hook output priority 0; policy drop; } }'
-
-
-def nm_user_env_name(key: str) -> str:
-    """NetworkManager-dispatcher(8): encoding of user-data keys."""
-    out = []
-    for char in key:
-        if "a" <= char <= "z":
-            out.append(char.upper())
-        elif "A" <= char <= "Z":
-            out.append("_" + char)
-        elif "0" <= char <= "9":
-            out.append(char)
-        elif char == ".":
-            out.append("__")
-        else:
-            out.append("_%03o" % ord(char))
-    return "CONNECTION_USER_" + "".join(out)
-
-
-BLOCK_VAR = nm_user_env_name(USER_DATA_BLOCK_IPV6)
-IFACES_VAR = nm_user_env_name(USER_DATA_ALLOWED_INTERFACES)
 
 
 class HookTestCase(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         self.log = self.tmp / "nft.log"
+        self.options = self.tmp / "guard.conf"
         fake = self.tmp / "nft"
         fake.write_text(
             "#!/bin/sh\n"
@@ -61,13 +41,23 @@ class HookTestCase(unittest.TestCase):
         )
         fake.chmod(0o755)
         text = HOOK.read_text()
-        self.assertEqual(text.count(NFT_LINE), 1)
+        for line in (NFT_LINE, OPTIONS_LINE, OWNER_LINE):
+            self.assertEqual(text.count(line), 1, line)
+        text = (
+            text.replace(NFT_LINE, f"NFT={fake}\n")
+            .replace(OPTIONS_LINE, f"OPTIONS={self.options}\n")
+            .replace(OWNER_LINE, f"OPTIONS_OWNER={os.getuid()}\n")
+        )
         self.hook = self.tmp / "hook"
-        self.hook.write_text(text.replace(NFT_LINE, f"NFT={fake}\n"))
+        self.hook.write_text(text)
         self.hook.chmod(0o755)
 
     def tearDown(self):
         shutil.rmtree(self.tmp)
+
+    def write_options(self, text: str, mode: int = 0o644):
+        self.options.write_text(text)
+        self.options.chmod(mode)
 
     def run_hook(self, action, *, uuid=MANAGED_UUID, **env):
         environment = {"PATH": "/usr/bin:/bin"}
@@ -87,14 +77,10 @@ class HookTestCase(unittest.TestCase):
 
 class UuidGateTests(HookTestCase):
     def test_foreign_or_missing_uuid_exits_before_doing_anything(self):
-        hostile = {
-            "VPN_IP_IFACE": HOSTILE,
-            BLOCK_VAR: HOSTILE,
-            IFACES_VAR: HOSTILE,
-        }
+        self.write_options(f"block-ipv6=no\nallowed-interfaces={HOSTILE}\n")
         for uuid in (None, "", "11111111-1111-1111-1111-111111111111", MANAGED_UUID + "x", " " + MANAGED_UUID):
             for action in ("vpn-pre-up", "vpn-up", "vpn-down", "up", "down"):
-                self.assertEqual(self.run_hook(action, uuid=uuid, **hostile), "", (uuid, action))
+                self.assertEqual(self.run_hook(action, uuid=uuid, VPN_IP_IFACE=HOSTILE), "", (uuid, action))
 
     def test_gate_is_the_first_statement_and_matches_the_reserved_uuid(self):
         lines = HOOK.read_text().splitlines()
@@ -109,63 +95,73 @@ class ActionTests(HookTestCase):
             self.log.unlink(missing_ok=True)
             out = self.run_hook(action, VPN_IP_IFACE="pervius0")
             self.assertIn("ARGS -f -", out)
-            self.assertIn("table inet pervius_v6 {}\ndelete table inet pervius_v6\ntable inet pervius_v6 {", out)
+            self.assertIn(
+                "table inet pervius_guard {}\ndelete table inet pervius_guard\ntable inet pervius_guard {", out
+            )
             self.assertIn('oifname { "pervius0" } accept', out)
             self.assertIn("ip6 daddr { fe80::/10, ff02::/16, fc00::/7 } accept", out)
             self.assertIn("icmpv6 type { 133, 134, 135, 136 } accept", out)
-            self.assertIn("meta nfproto ipv4 accept", out)
             self.assertIn("meta nfproto ipv6 drop", out)
             self.assertNotIn("pervius_ks", out)
 
-    def test_down_removes_the_guard(self):
-        self.assertEqual(self.run_hook("vpn-down").strip(), "ARGS delete table inet pervius_v6")
+    def test_dns_outside_the_tunnel_is_dropped_before_ipv4_is_accepted(self):
+        out = self.run_hook("vpn-up", VPN_IP_IFACE="pervius0")
+        dns = out.index("meta l4proto { udp, tcp } th dport 53 drop")
+        self.assertLess(out.index('oifname { "pervius0" } accept'), dns)
+        self.assertLess(dns, out.index("meta nfproto ipv4 accept"))
+        self.assertIn("tcp dport 853 drop", out)
+
+    def test_dns_guard_stays_when_ipv6_blocking_is_off(self):
+        self.write_options("block-ipv6=no\n")
+        out = self.run_hook("vpn-up")
+        self.assertIn("th dport 53 drop", out)
+        self.assertNotIn("meta nfproto ipv6 drop", out)
+        self.assertNotIn("chain forward", out)
+
+    def test_down_removes_the_guard_and_the_legacy_table(self):
+        self.assertEqual(
+            self.run_hook("vpn-down").strip().splitlines(),
+            ["ARGS delete table inet pervius_guard", "ARGS delete table inet pervius_v6"],
+        )
 
     def test_other_actions_do_nothing(self):
         for action in ("up", "down", "pre-up", "vpn-pre-down", "connectivity-change", "hostname", "", "vpn-up;x"):
             self.assertEqual(self.run_hook(action), "", action)
 
-    def test_block_flag(self):
-        self.assertIn("ARGS -f -", self.run_hook("vpn-up"))  # absent means yes
-        self.log.unlink()
-        self.assertEqual(self.run_hook("vpn-up", **{BLOCK_VAR: "no"}).strip(), "ARGS delete table inet pervius_v6")
-        for value in ("yes", "No", "0", "false", HOSTILE):
-            self.log.unlink(missing_ok=True)
-            self.assertIn("ARGS -f -", self.run_hook("vpn-up", **{BLOCK_VAR: value}), value)
-
-    def test_allowed_interfaces_are_added(self):
-        out = self.run_hook("vpn-up", VPN_IP_IFACE="pervius0", **{IFACES_VAR: "wt0,eth1,pervius0"})
+    def test_allowed_interfaces_from_the_options_file(self):
+        self.write_options("allowed-interfaces=wt0,eth1,pervius0\n")
+        out = self.run_hook("vpn-up", VPN_IP_IFACE="pervius0")
         self.assertIn('oifname { "pervius0", "wt0", "eth1" } accept', out)
 
+    def test_options_file_must_be_owned_and_not_writable_by_others(self):
+        self.write_options("block-ipv6=no\nallowed-interfaces=wt0\n", mode=0o666)
+        out = self.run_hook("vpn-up")
+        self.assertIn("meta nfproto ipv6 drop", out)
+        self.assertNotIn('"wt0"', out)
+        self.options.unlink()
+        os.symlink(self.tmp / "elsewhere", self.options)
+        (self.tmp / "elsewhere").write_text("block-ipv6=no\n")
+        (self.tmp / "elsewhere").chmod(0o644)
+        self.log.unlink()
+        self.assertIn("meta nfproto ipv6 drop", self.run_hook("vpn-up"))
+
     def test_hostile_values_never_reach_nft(self):
-        bad = ["wt0; flush ruleset", "*", "..", ".", "a" * 16, "wt0\nflush ruleset", '"wt0"', "-x", "wt 0", "wt0}"]
-        out = self.run_hook(
-            "vpn-up",
-            VPN_IP_IFACE=HOSTILE,
-            **{IFACES_VAR: ",".join(bad + ["wt0"])},
-        )
+        bad = ["wt0; flush ruleset", "*", "..", ".", "a" * 16, '"wt0"', "-x", "wt 0", "wt0}"]
+        self.write_options("allowed-interfaces=" + ",".join(bad + ["wt0"]) + "\nblock-ipv6=" + HOSTILE + "\n")
+        out = self.run_hook("vpn-up", VPN_IP_IFACE=HOSTILE)
         self.assertIn('oifname { "pervius0", "wt0" } accept', out)
         self.assertNotIn("flush ruleset", out)
         self.assertNotIn("table ip x", out)
-        self.assertNotIn("*", out.replace("/*", ""))
+        self.assertIn("meta nfproto ipv6 drop", out)
 
     def test_interface_list_is_capped(self):
-        names = ",".join(f"if{index}" for index in range(30))
-        out = self.run_hook("vpn-up", **{IFACES_VAR: names})
+        self.write_options("allowed-interfaces=" + ",".join(f"if{index}" for index in range(30)) + "\n")
+        out = self.run_hook("vpn-up")
         listed = re.search(r"oifname \{ (.*?) \} accept", out).group(1).split(", ")
         self.assertEqual(len(listed), 1 + 16)
 
 
-class EncodingAndPackagingTests(unittest.TestCase):
-    def test_env_encoding_matches_the_man_page_example(self):
-        self.assertEqual(nm_user_env_name("test.foo-Bar2"), "CONNECTION_USER_TEST__FOO_055_BAR2")
-
-    def test_hook_uses_the_encoded_names(self):
-        text = HOOK.read_text()
-        self.assertEqual(BLOCK_VAR, "CONNECTION_USER_COM__SOLVETUS__PERVIUS__BLOCK_055IPV6")
-        self.assertEqual(IFACES_VAR, "CONNECTION_USER_COM__SOLVETUS__PERVIUS__ALLOWED_055INTERFACES")
-        self.assertIn(BLOCK_VAR, text)
-        self.assertIn(IFACES_VAR, text)
-
+class PackagingTests(unittest.TestCase):
     def test_hook_is_executable_and_installed_with_a_pre_up_link(self):
         self.assertTrue(HOOK.stat().st_mode & stat.S_IXUSR)
         rows = [
@@ -174,18 +170,18 @@ class EncodingAndPackagingTests(unittest.TestCase):
             if line and not line.startswith("#")
         ]
         self.assertIn(
-            ["0755", "data/networkmanager/90-pervius-ipv6-guard", "/usr/lib/NetworkManager/dispatcher.d/90-pervius-ipv6-guard"],
+            ["0755", "data/networkmanager/90-pervius-guard", "/usr/lib/NetworkManager/dispatcher.d/90-pervius-guard"],
             rows,
         )
         self.assertIn(
-            ["link", "../90-pervius-ipv6-guard", "/usr/lib/NetworkManager/dispatcher.d/pre-up.d/90-pervius-ipv6-guard"],
+            ["link", "../90-pervius-guard", "/usr/lib/NetworkManager/dispatcher.d/pre-up.d/90-pervius-guard"],
             rows,
         )
 
-    def test_hook_has_no_python_or_external_input(self):
+    def test_hook_has_no_python_or_user_input(self):
         text = HOOK.read_text()
         self.assertNotIn("python", text)
-        for forbidden in ("curl", "wget", "$HOME", "/home", "read ", "eval", "source ", ". /"):
+        for forbidden in ("curl", "wget", "$HOME", "/home", "eval", "source ", ". /", "CONNECTION_USER_"):
             self.assertNotIn(forbidden, text)
 
 

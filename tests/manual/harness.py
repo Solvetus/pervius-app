@@ -91,6 +91,7 @@ def install_stubs() -> None:
         "allow_lan": False,
     }
     window_module.fetch_public_ip = lambda: DOC_IP
+    window_module.fetch_public_ip_through = lambda _interface: DOC_IP
 
     # The upgrade migration must never see the real keyring or profile.
     from pervius import migration

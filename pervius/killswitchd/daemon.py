@@ -30,14 +30,15 @@ gi.require_version("NM", "1.0")
 from gi.repository import Gio, GLib, NM  # noqa: E402
 
 from ..config import (  # noqa: E402
+    GUARD_OPTIONS_PATH,
     MANAGED_UUID,
     OPENVPN_SERVICE_TYPE,
     TUNNEL_INTERFACE,
-    USER_DATA_REMOTE_NAMES,
 )
 from .profile import ProfileError, remotes_from_profile_data  # noqa: E402
 from .rules import (  # noqa: E402
     GUARD_TABLE_SPEC,
+    LEGACY_GUARD_TABLE_SPEC,
     MAX_ENDPOINTS,
     TABLE_SPEC,
     Endpoint,
@@ -91,6 +92,11 @@ _INTROSPECTION_XML = """
     <method name="UpdateEndpoints">
       <arg name="uuid" type="s" direction="in"/>
       <arg name="replace" type="b" direction="in"/>
+      <arg name="status" type="a{sv}" direction="out"/>
+    </method>
+    <method name="SetGuardOptions">
+      <arg name="block_ipv6" type="b" direction="in"/>
+      <arg name="interfaces" type="as" direction="in"/>
       <arg name="status" type="a{sv}" direction="out"/>
     </method>
     <method name="Disarm">
@@ -221,16 +227,7 @@ class SystemBackend:
             username = parts[1]
         else:
             username = local_username(uid)
-        remote_names = None
-        s_user = connection.get_setting_by_name("user")
-        if s_user is not None:
-            try:
-                remote_names = s_user.get_data(USER_DATA_REMOTE_NAMES)
-            except Exception:
-                remote_names = None
-        return remotes_from_profile_data(
-            dict(s_vpn.props.data), permissions, username, remote_names=remote_names
-        )
+        return remotes_from_profile_data(dict(s_vpn.props.data), permissions, username)
 
     def resolve_system(self, remotes, protocol: str) -> Resolution:
         text = ", ".join(f"[{h}]:{p}" if ":" in h else f"{h}:{p}" for h, p in remotes)
@@ -298,6 +295,63 @@ class SystemBackend:
             except Exception:
                 continue
         return False
+
+    def active_vpn_gateways(self) -> list[str]:
+        """Addresses of the server the managed VPN is connected to right now.
+
+        NetworkManager routes the VPN server through the physical link with a
+        host route (/32 or /128 with a next hop) while the VPN is up.  These
+        are added to the allowlist when arming, so arming never cuts the
+        tunnel that is already running, whatever the server names resolve to
+        at that moment.
+        """
+        if not self.managed_vpn_active():
+            return []
+        addresses: list[str] = []
+        try:
+            devices = self._client().get_devices()
+        except ServiceError:
+            return []
+        for device in devices:
+            try:
+                if device.get_iface() == TUNNEL_INTERFACE:
+                    continue
+                configs = (device.get_ip4_config(), device.get_ip6_config())
+            except Exception:
+                continue
+            for config in configs:
+                if config is None:
+                    continue
+                for route in config.get_routes() or []:
+                    try:
+                        full = route.get_prefix() == (32 if route.get_family() == 2 else 128)
+                        if full and route.get_next_hop():
+                            addresses.append(route.get_dest())
+                    except Exception:
+                        continue
+        return addresses
+
+    def write_guard_options(self, block_ipv6: bool, interfaces: tuple[str, ...]) -> None:
+        """Write the leak guard's options for the dispatcher hook (root-owned, 0644)."""
+        path = Path(GUARD_OPTIONS_PATH)
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
+        data = (
+            f"block-ipv6={'yes' if block_ipv6 else 'no'}\n"
+            f"allowed-interfaces={','.join(interfaces)}\n"
+        ).encode("ascii")
+        fd, temporary = tempfile.mkstemp(prefix=".guard-", dir=path.parent)
+        try:
+            os.fchmod(fd, 0o644)
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, path)
+        finally:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
 
     def clock(self) -> float:
         return time.monotonic()
@@ -373,7 +427,7 @@ class KillSwitchService:
             "interfaces": GLib.Variant("as", list(self._interfaces)),
             "endpoints": GLib.Variant("u", len(self._endpoints)),
             "resolved_at": GLib.Variant("s", self._resolved_at),
-            "ipv6_guard": GLib.Variant("b", self.backend.table_exists(GUARD_TABLE_SPEC)),
+            "guard": GLib.Variant("b", self.backend.table_exists(GUARD_TABLE_SPEC)),
             "backend": GLib.Variant("s", "nftables"),
             "table": GLib.Variant("s", TABLE_SPEC),
             "since": GLib.Variant("s", self._since),
@@ -438,7 +492,7 @@ class KillSwitchService:
     def handle(self, method_name: str, args: tuple, sender: str | None) -> GLib.Variant:
         if method_name == "GetStatus":
             return self._reply()
-        if method_name not in {"Arm", "Configure", "UpdateEndpoints", "Disarm"}:
+        if method_name not in {"Arm", "Configure", "UpdateEndpoints", "SetGuardOptions", "Disarm"}:
             raise ServiceError("unknown method")
         uid = self.caller_uid(sender)
         self.authorize(sender, uid)
@@ -452,6 +506,10 @@ class KillSwitchService:
         if method_name == "UpdateEndpoints":
             uuid, replace = args
             return self._reply(self.update_endpoints(str(uuid), bool(replace), uid))
+        if method_name == "SetGuardOptions":
+            block_ipv6, interfaces = args
+            self.set_guard_options(bool(block_ipv6), list(interfaces), uid)
+            return self._reply()
         self.disarm(uid)
         return self._reply()
 
@@ -574,10 +632,18 @@ class KillSwitchService:
 
         remotes, protocol = self._profile_remotes(uuid, uid)
         # No Pervius rules exist yet, so this uses the system resolver (through
-        # the tunnel's DNS when the VPN is up).
-        resolution = self.backend.resolve_system(remotes, protocol)
+        # the tunnel's DNS when the VPN is up).  The server of a live tunnel is
+        # always allowed, so arming never cuts it.
+        live = self._live_endpoints(remotes, protocol)
+        try:
+            resolution = self.backend.resolve_system(remotes, protocol)
+        except RulesError:
+            if not live:
+                raise
+            resolution = Resolution(live, ("server names did not resolve; using the live server",))
         self._log_warnings(resolution)
-        self._apply_rules(resolution.endpoints, allow_lan, validated)
+        endpoints = merge_endpoints(resolution.endpoints, live)
+        self._apply_rules(endpoints, allow_lan, validated)
         self._armed = True
         self._state = "armed"
         self._detail = "Rules installed; VPN may still be connecting"
@@ -587,10 +653,10 @@ class KillSwitchService:
         self._owner_uid = uid
         self._since = utc_now()
         self._resolved_at = self._since
-        self._endpoints = resolution.endpoints
+        self._endpoints = endpoints
         self._save_state()
         self._emit_status()
-        return resolution.endpoints
+        return endpoints
 
     def configure(self, allow_lan: bool, interfaces: list, uid: int):
         self._require_armed()
@@ -609,13 +675,20 @@ class KillSwitchService:
         if uuid != self._uuid:
             raise PermissionDenied("the kill switch protects a different profile")
         remotes, protocol = self._profile_remotes(uuid, uid)
-        if self.backend.tunnel_up():
-            try:
-                resolution = self.backend.resolve_system(remotes, protocol)
-            except RulesError as exc:
-                raise ResolveFailed(str(exc)) from exc
-        else:
-            resolution = self._resolve_through_window(remotes, protocol)
+        try:
+            resolution = None
+            if self.backend.tunnel_up():
+                try:
+                    resolution = self.backend.resolve_system(remotes, protocol)
+                except RulesError as exc:
+                    # The tunnel may be up but not carrying DNS (for example
+                    # after the server stopped answering): try the window.
+                    log.warning("resolving through the tunnel failed: %s", exc)
+            if resolution is None:
+                resolution = self._resolve_through_window(remotes, protocol)
+        except ResolveFailed as exc:
+            log.warning("could not update the VPN server addresses: %s", exc)
+            raise
         self._log_warnings(resolution)
         endpoints = (
             resolution.endpoints if replace else merge_endpoints(resolution.endpoints, self._endpoints)
@@ -629,6 +702,39 @@ class KillSwitchService:
         self._emit_status()
         log.info("endpoints updated: %d (%s)", len(endpoints), "replaced" if replace else "merged")
         return resolution.endpoints
+
+    def _live_endpoints(self, remotes, protocol: str) -> tuple[Endpoint, ...]:
+        """The live VPN server, on the profile's ports and protocol."""
+        ports = sorted({port for _host, port in remotes})
+        endpoints = []
+        try:
+            gateways = self.backend.active_vpn_gateways()
+        except Exception as exc:
+            log.warning("could not read the live VPN server: %s", exc)
+            gateways = []
+        for address in gateways:
+            for port in ports:
+                try:
+                    endpoints.append(Endpoint(address, port, protocol))
+                except RulesError:
+                    continue
+        if endpoints:
+            log.info("keeping the live VPN server allowed (%d endpoint(s))", len(endpoints))
+        return tuple(endpoints)
+
+    def set_guard_options(self, block_ipv6: bool, interfaces: list, uid: int):
+        """Options for the leak guard (NetworkManager dispatcher hook).
+
+        Only the owner of the managed profile may set them.  They take effect
+        when the VPN next comes up.
+        """
+        validated = validate_interfaces(interfaces)
+        self._profile_remotes(MANAGED_UUID, uid)  # ownership check
+        try:
+            self.backend.write_guard_options(block_ipv6, validated)
+        except OSError as exc:
+            raise ServiceError(f"could not save the leak guard options: {exc}") from exc
+        log.info("leak guard options saved: block_ipv6=%s, %d interface(s)", block_ipv6, len(validated))
 
     def _resolve_through_window(self, remotes, protocol: str) -> Resolution:
         """Resolve server names while the tunnel is down.
@@ -812,11 +918,12 @@ class KillSwitchService:
         VPN that went away without a vpn-down event.
         """
         try:
-            if self.backend.table_exists(GUARD_TABLE_SPEC) and not self.backend.managed_vpn_active():
-                self.backend.run_nft(["delete", "table", *GUARD_TABLE_SPEC.split()])
-                log.info("removed a stale IPv6 guard (the managed VPN is not active)")
+            for spec in (GUARD_TABLE_SPEC, LEGACY_GUARD_TABLE_SPEC):
+                if self.backend.table_exists(spec) and not self.backend.managed_vpn_active():
+                    self.backend.run_nft(["delete", "table", *spec.split()])
+                    log.info("removed a stale leak guard %s (the managed VPN is not active)", spec)
         except Exception as exc:
-            log.warning("could not check the IPv6 guard: %s", exc)
+            log.warning("could not check the leak guard: %s", exc)
 
 
 def main() -> int:

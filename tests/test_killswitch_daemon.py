@@ -35,6 +35,8 @@ class FakeBackend:
         self.vpn_active = False
         self.fail_next_nft = False
         self.profile_owner = "alice"
+        self.gateways: list[str] = []
+        self.guard_options = None
 
     def run_nft(self, args, *, input_text=None):
         if self.fail_next_nft:
@@ -77,6 +79,12 @@ class FakeBackend:
 
     def managed_vpn_active(self):
         return self.vpn_active
+
+    def active_vpn_gateways(self):
+        return list(self.gateways)
+
+    def write_guard_options(self, block_ipv6, interfaces):
+        self.guard_options = (block_ipv6, interfaces)
 
     def clock(self):
         return self.now
@@ -143,6 +151,54 @@ class ArmTests(ServiceTestCase):
         self.assertEqual(data["version"], 2)
         self.assertEqual(data["interfaces"], ["wt0"])
         self.assertEqual(self.service.state_file.stat().st_mode & 0o777, 0o600)
+
+
+class ArmWhileConnectedTests(ServiceTestCase):
+    """Arming must never cut a tunnel that is already running."""
+
+    def test_live_server_is_allowed_even_if_the_names_resolve_elsewhere(self):
+        self.backend.gateways = ["198.51.100.77"]
+        self.service.arm(MANAGED_UUID, False, [], OWNER)
+        script = self.last_script()
+        self.assertIn("198.51.100.77 . udp . 1194", script)
+        self.assertIn("192.0.2.10 . udp . 1194", script)
+        self.assertEqual(self.service.status()["endpoints"].unpack(), 2)
+
+    def test_live_server_alone_is_enough_when_names_fail(self):
+        self.backend.gateways = ["198.51.100.77"]
+        self.backend.system_error = RulesError("could not resolve any VPN server endpoint")
+        resolved = self.service.arm(MANAGED_UUID, False, [], OWNER)
+        self.assertEqual([e.address for e in resolved], ["198.51.100.77"])
+
+    def test_without_a_live_tunnel_resolution_errors_still_fail(self):
+        self.backend.system_error = RulesError("could not resolve any VPN server endpoint")
+        with self.assertRaises(RulesError):
+            self.service.arm(MANAGED_UUID, False, [], OWNER)
+        self.assertEqual(self.backend.nft_calls, [])
+
+
+class GuardOptionsTests(ServiceTestCase):
+    def test_owner_sets_guard_options(self):
+        self.service.set_guard_options(False, ["wt0"], OWNER)
+        self.assertEqual(self.backend.guard_options, (False, ("wt0",)))
+
+    def test_other_users_and_bad_names_are_refused(self):
+        self.backend.profile_owner = "alice"
+        with self.assertRaises(daemon.PermissionDenied):
+            self.service.set_guard_options(True, [], OTHER)
+        with self.assertRaises(RulesError):
+            self.service.set_guard_options(True, ["wt0; flush ruleset"], OWNER)
+        self.assertIsNone(self.backend.guard_options)
+
+    def test_guard_file_format(self):
+        import tempfile
+        from unittest import mock
+
+        tmp = Path(tempfile.mkdtemp()) / "pervius" / "guard.conf"
+        with mock.patch.object(daemon, "GUARD_OPTIONS_PATH", str(tmp)):
+            daemon.SystemBackend().write_guard_options(False, ("wt0", "eth1"))
+        self.assertEqual(tmp.read_text(), "block-ipv6=no\nallowed-interfaces=wt0,eth1\n")
+        self.assertEqual(tmp.stat().st_mode & 0o777, 0o644)
 
 
 class ConfigureTests(ServiceTestCase):
@@ -212,13 +268,23 @@ class UpdateEndpointsTests(ServiceTestCase):
         self.assertEqual(scripts[1], "flush set inet pervius_ks dns_window_v4\nflush set inet pervius_ks dns_window_v6\n")
         self.assertEqual(self.service._endpoints, OLD)
 
-    def test_failed_resolution_through_the_tunnel_changes_nothing(self):
+    def test_failed_resolution_through_the_tunnel_falls_back_to_the_window(self):
         self.armed()
         self.backend.tunnel = True
         self.backend.system_error = RulesError("could not resolve any VPN server endpoint")
-        with self.assertRaises(daemon.ResolveFailed):
-            self.service.update_endpoints(MANAGED_UUID, True, OWNER)
-        self.assertEqual(self.backend.nft_calls, [])
+        resolved = self.service.update_endpoints(MANAGED_UUID, True, OWNER)
+        self.assertEqual(resolved, NEW)
+        self.assertEqual(self.backend.direct_calls, [("192.168.1.1",)])
+
+    def test_failed_resolution_everywhere_changes_nothing(self):
+        self.armed()
+        self.backend.tunnel = True
+        self.backend.system_error = RulesError("could not resolve any VPN server endpoint")
+        self.backend.direct_error = RulesError("could not resolve any VPN server endpoint")
+        with self.assertLogs("pervius.killswitchd.daemon", level="WARNING") as logs:
+            with self.assertRaises(daemon.ResolveFailed):
+                self.service.update_endpoints(MANAGED_UUID, True, OWNER)
+        self.assertTrue(any("could not update the VPN server addresses" in line for line in logs.output))
         self.assertEqual(self.service._endpoints, OLD)
 
     def test_rejected_swap_keeps_the_old_endpoints(self):
@@ -360,20 +426,23 @@ class RecoveryTests(ServiceTestCase):
 
 class StaleGuardTests(ServiceTestCase):
     def test_stale_guard_is_removed_when_the_vpn_is_gone(self):
-        self.backend.tables.add("inet pervius_v6")
+        self.backend.tables.update({"inet pervius_guard", "inet pervius_v6"})
         self.service._clear_stale_guard()
-        self.assertEqual(self.backend.nft_calls[-1][0], ["delete", "table", "inet", "pervius_v6"])
+        self.assertEqual(
+            [call[0] for call in self.backend.nft_calls],
+            [["delete", "table", "inet", "pervius_guard"], ["delete", "table", "inet", "pervius_v6"]],
+        )
 
     def test_live_guard_is_kept(self):
-        self.backend.tables.add("inet pervius_v6")
+        self.backend.tables.add("inet pervius_guard")
         self.backend.vpn_active = True
         self.service._clear_stale_guard()
         self.assertEqual(self.backend.nft_calls, [])
 
     def test_status_reports_the_guard(self):
-        self.assertFalse(self.service.status()["ipv6_guard"].unpack())
-        self.backend.tables.add("inet pervius_v6")
-        self.assertTrue(self.service.status()["ipv6_guard"].unpack())
+        self.assertFalse(self.service.status()["guard"].unpack())
+        self.backend.tables.add("inet pervius_guard")
+        self.assertTrue(self.service.status()["guard"].unpack())
 
 
 class MergeTests(unittest.TestCase):

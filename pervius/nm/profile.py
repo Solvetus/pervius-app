@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import gi
 
@@ -15,9 +15,6 @@ from ..config import (  # noqa: E402
     MANAGED_UUID,
     OPENVPN_SERVICE_TYPE,
     TUNNEL_INTERFACE,
-    USER_DATA_ALLOWED_INTERFACES,
-    USER_DATA_BLOCK_IPV6,
-    USER_DATA_REMOTE_NAMES,
 )
 
 # Exclusive VPN DNS with NetworkManager: a negative priority excludes DNS
@@ -30,18 +27,6 @@ from ..catalogue.models import ParsedProfile  # noqa: E402
 
 class ProfileBuildError(RuntimeError):
     pass
-
-
-@dataclass(frozen=True)
-class GuardOptions:
-    """Settings the root components read from the profile's user-data.
-
-    The NetworkManager dispatcher hook (IPv6 guard) receives them as
-    CONNECTION_USER_* environment variables and validates them itself.
-    """
-
-    block_ipv6: bool = True
-    allowed_interfaces: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -66,7 +51,6 @@ def build_managed_connection(
     *,
     local_username: str,
     vpn_username: str,
-    guard: GuardOptions | None = None,
 ) -> NM.Connection:
     """Copy an imported profile into our reserved, user-restricted profile.
 
@@ -116,7 +100,7 @@ def build_managed_connection(
     if not remote:
         raise ProfileBuildError("imported profile has no remote servers")
     apply_tunnel_settings(connection)
-    sync_user_data(connection, guard or GuardOptions(), remote_names=remote)
+    strip_user_data(connection)
 
     if not connection.verify():
         raise ProfileBuildError("the generated NetworkManager profile is not valid")
@@ -165,59 +149,22 @@ def tunnel_settings_problem(connection: NM.Connection) -> str | None:
     return None
 
 
-def _user_setting(connection: NM.Connection) -> NM.SettingUser:
-    setting = connection.get_setting_by_name(NM.SETTING_USER_SETTING_NAME)
-    if setting is None:
-        setting = NM.SettingUser.new()
-        connection.add_setting(setting)
-    return setting
+def strip_user_data(connection: NM.Connection) -> bool:
+    """Drop connection user-data (written by an earlier 0.3.0 build).
 
-
-def user_data(connection: NM.Connection, key: str) -> str | None:
-    setting = connection.get_setting_by_name(NM.SETTING_USER_SETTING_NAME)
-    if setting is None:
-        return None
-    return setting.get_data(key)
-
-
-def sync_user_data(
-    connection: NM.Connection,
-    guard: GuardOptions,
-    *,
-    remote_names: str | None = None,
-) -> bool:
-    """Write the guard options (and, once, the original server names).
-
-    Returns True if anything changed.  The interface list is joined with
-    commas; every consumer validates each name again.
+    NetworkManager 1.58 loses it when it reads the profile back, so Pervius
+    keeps nothing there.  Returns True if anything was removed.
     """
-    setting = _user_setting(connection)
-    wanted = {
-        USER_DATA_BLOCK_IPV6: "yes" if guard.block_ipv6 else "no",
-        USER_DATA_ALLOWED_INTERFACES: ",".join(guard.allowed_interfaces),
-    }
-    if remote_names is not None:
-        wanted[USER_DATA_REMOTE_NAMES] = remote_names
-    changed = False
-    for key, value in wanted.items():
-        current = setting.get_data(key)
-        if value == "" and key == USER_DATA_ALLOWED_INTERFACES:
-            if current is not None:
-                setting.set_data(key, None)
-                changed = True
-            continue
-        if current != value:
-            setting.set_data(key, value)
-            changed = True
-    return changed
+    setting = connection.get_setting_by_name(NM.SETTING_USER_SETTING_NAME)
+    if setting is None:
+        return False
+    connection.remove_setting(type(setting))
+    return True
 
 
-def guard_options_match(connection: NM.Connection, guard: GuardOptions) -> bool:
-    return (
-        user_data(connection, USER_DATA_BLOCK_IPV6) == ("yes" if guard.block_ipv6 else "no")
-        and (user_data(connection, USER_DATA_ALLOWED_INTERFACES) or "")
-        == ",".join(guard.allowed_interfaces)
-    )
+def remote_names(parsed_remotes) -> str:
+    """The provider's server names for the profile's remote list."""
+    return ", ".join(format_remote(host, port) for host, port in parsed_remotes)
 
 
 def format_remote(host: str, port: int) -> str:
@@ -237,10 +184,44 @@ def pinned_remote_value(endpoints) -> str:
     return ", ".join(values)
 
 
-def is_pinned(connection: NM.Connection) -> bool:
+def remote_entries(connection: NM.Connection) -> list[str]:
     s_vpn = connection.get_setting_vpn()
-    names = user_data(connection, USER_DATA_REMOTE_NAMES)
-    return bool(isinstance(s_vpn, NM.SettingVpn) and names and s_vpn.get_data_item("remote") != names)
+    value = s_vpn.get_data_item("remote") if isinstance(s_vpn, NM.SettingVpn) else None
+    return [part.strip() for part in (value or "").split(",") if part.strip()]
+
+
+def _host_of(entry: str) -> str:
+    if entry.startswith("["):
+        return entry[1:].partition("]")[0]
+    return entry.rpartition(":")[0] if entry.count(":") == 1 else entry
+
+
+def is_pinned(connection: NM.Connection) -> bool:
+    """True when every remote is an IP literal (resolved and pinned)."""
+    entries = remote_entries(connection)
+    if not entries:
+        return False
+    for entry in entries:
+        try:
+            ipaddress.ip_address(_host_of(entry))
+        except ValueError:
+            return False
+    return True
+
+
+def pinned_endpoints(connection: NM.Connection, protocol: str):
+    """The endpoints of a pinned profile (to keep them if a refresh fails)."""
+    from ..killswitchd.rules import Endpoint, RulesError
+
+    endpoints = []
+    for entry in remote_entries(connection) if is_pinned(connection) else []:
+        host = _host_of(entry)
+        try:
+            port = int(entry.rsplit(":", 1)[1])
+            endpoints.append(Endpoint(host, port, protocol))
+        except (IndexError, ValueError, RulesError):
+            continue
+    return tuple(endpoints)
 
 
 def clone(connection: NM.Connection) -> NM.SimpleConnection:
@@ -251,31 +232,30 @@ def clone(connection: NM.Connection) -> NM.SimpleConnection:
 
 
 def pin_remote(connection: NM.Connection, endpoints, protocol: str) -> NM.SimpleConnection:
-    """A copy whose remote list holds the resolved IPs (kill switch armed).
+    """A copy whose remote list holds resolved IP addresses.
 
-    OpenVPN then needs no DNS while the tunnel is down.  The CA and
-    verify-x509-name checks still decide whether a server is genuine.
+    OpenVPN then needs no DNS to (re)connect, which the kill switch and the
+    leak guard would block.  The CA and verify-x509-name checks still decide
+    whether a server is genuine.
     """
     copy = clone(connection)
     s_vpn = copy.get_setting_vpn()
     if not isinstance(s_vpn, NM.SettingVpn):
         raise ProfileBuildError("profile has no VPN setting")
-    names = user_data(copy, USER_DATA_REMOTE_NAMES)
-    if not names:
-        raise ProfileBuildError("profile has no recorded server names")
     selected = [e for e in endpoints if e.protocol == protocol]
     s_vpn.add_data_item("remote", pinned_remote_value(selected))
+    strip_user_data(copy)
     return copy
 
 
-def unpin_remote(connection: NM.Connection) -> NM.SimpleConnection:
-    """A copy whose remote list is the provider's server names again."""
+def unpin_remote(connection: NM.Connection, names: str) -> NM.SimpleConnection:
+    """A copy whose remote list is the provider's server names (from the catalogue)."""
     copy = clone(connection)
     s_vpn = copy.get_setting_vpn()
-    names = user_data(copy, USER_DATA_REMOTE_NAMES)
     if not isinstance(s_vpn, NM.SettingVpn) or not names:
-        raise ProfileBuildError("profile has no recorded server names")
+        raise ProfileBuildError("no server names to restore")
     s_vpn.add_data_item("remote", names)
+    strip_user_data(copy)
     return copy
 
 

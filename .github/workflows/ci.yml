@@ -41,7 +41,7 @@ jobs:
           shellcheck packaging/stage.sh packaging/build-i18n.sh scripts/update-pot.sh \
             packaging/debian/build.sh packaging/debian/preinst \
             packaging/debian/postinst packaging/debian/prerm packaging/debian/postrm \
-            tests/manual/run.sh data/networkmanager/90-pervius-ipv6-guard
+            tests/manual/run.sh data/networkmanager/90-pervius-guard
       - name: Translations (complete, no fuzzy entries)
         run: |
           for po in po/*.po; do

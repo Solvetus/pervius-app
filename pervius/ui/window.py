@@ -59,6 +59,7 @@ from ..nm.client import (  # noqa: E402
     active_vpn_for_uuid,
     add_connection_async,
     deactivate_async,
+    fetch_settings_async,
     new_client,
     prepare_managed_profile_async,
     update_connection_async,
@@ -67,15 +68,15 @@ from ..nm.client import (  # noqa: E402
 )
 from ..nm.importer import ImportVerificationError, verify_managed_profile  # noqa: E402
 from ..nm.profile import (  # noqa: E402
-    GuardOptions,
-    ProfileBuildError,
     build_variant,
     clone,
-    is_pinned,
     pin_remote,
-    sync_user_data,
+    pinned_endpoints,
+    remote_names,
+    strip_user_data,
     unpin_remote,
 )
+from ..resolve import resolve_endpoints_async  # noqa: E402
 from ..ownership import (
     ManagedLookup,
     OwnershipError,
@@ -84,7 +85,7 @@ from ..ownership import (
     check_create_collision,
     find_managed_connection,
 )
-from ..public_ip import fetch_public_ip  # noqa: E402
+from ..public_ip import fetch_public_ip, fetch_public_ip_through  # noqa: E402
 from ..reconnect import ReconnectPolicy  # noqa: E402
 from ..settings import Settings, SettingsStore  # noqa: E402
 from .account import CredentialsWindow  # noqa: E402
@@ -99,6 +100,7 @@ _ACTIVE_STATES = {"preparing", "reconnecting", "connecting", "connected", "disco
 _PINS_FRESH_SECONDS = 60
 _HIDDEN_IP = "•••.•••.•••.•••"
 KEEP_PINS = object()
+NAMES = object()
 
 
 def format_duration(seconds: int) -> str:
@@ -324,6 +326,7 @@ class MainWindow(Adw.ApplicationWindow):
         # (location key, protocol, endpoints, monotonic time) from the service.
         self._pins: tuple | None = None
         self._guard_warned = False
+        self._guard_sent: tuple | None = None
         self._isp_ip = ""
         self._vpn_exit_ip = ""
         self._ip_fetching = ""
@@ -1038,24 +1041,25 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             self._confirm_enable_killswitch()
 
-    # ------------------------------------------------- endpoint pinning (armed)
+    # ------------------------------------------------------ endpoint pinning
+
+    def _remember_endpoints(self, endpoints) -> bool:
+        endpoints = tuple(endpoints or ())
+        if not endpoints:
+            return False
+        self._pins = (self.settings.location_key, self.settings.protocol, endpoints, time.monotonic())
+        return True
 
     def _remember_resolved(self, status: dict | None) -> bool:
         """Keep the endpoints the service resolved for us, to pin the profile."""
-        resolved = (status or {}).get("resolved")
-        if not resolved:
-            return False
         endpoints = []
-        for item in resolved:
+        for item in (status or {}).get("resolved") or ():
             try:
                 address, port, protocol = item
                 endpoints.append(Endpoint(str(address), int(port), str(protocol)))
             except (RulesError, TypeError, ValueError):
                 continue
-        if not endpoints:
-            return False
-        self._pins = (self.settings.location_key, self.settings.protocol, tuple(endpoints), time.monotonic())
-        return True
+        return self._remember_endpoints(endpoints)
 
     def _fresh_pins(self) -> tuple[Endpoint, ...] | None:
         if not self._pins:
@@ -1067,49 +1071,55 @@ class MainWindow(Adw.ApplicationWindow):
             return None
         return endpoints
 
-    def _guard_options(self) -> GuardOptions:
-        return GuardOptions(
-            block_ipv6=bool(self.settings.block_ipv6),
-            allowed_interfaces=tuple(self.settings.killswitch_interfaces),
-        )
+    def _current_names(self) -> str:
+        ref = self._selected_ref()
+        return remote_names(ref.profile.remotes) if ref is not None else ""
 
     def _write_profile(self, connection, *, pins, then, on_error):
-        """Bring the stored profile in line: pins or names, and the guard options.
+        """Set the stored profile's remotes, starting from NetworkManager's current settings.
 
-        ``pins`` is a tuple of endpoints (kill switch armed), KEEP_PINS to leave
-        the remotes as they are, or None to use the provider's server names.  Calls ``then(connection)`` when the profile is
-        as wanted, ``on_error(message)`` if NetworkManager refused the update.
+        ``pins`` is a tuple of endpoints (pin them), NAMES (the provider's server
+        names from the catalogue, so the kill-switch service resolves them) or
+        KEEP_PINS (leave the remotes, only drop stale user-data).  The current
+        settings are read from NetworkManager first: libnm's cached copy can lag
+        behind our own last write, and writing it back would undo that write.
         """
-        try:
-            if pins is KEEP_PINS:
-                copy = clone(connection)
-            elif pins:
-                copy = pin_remote(connection, pins, self.settings.protocol)
-            elif is_pinned(connection):
-                copy = unpin_remote(connection)
-            else:
-                copy = clone(connection)
-            sync_user_data(copy, self._guard_options())
-            changed = not copy.compare(connection, NM.SettingCompareFlags.EXACT)
-        except (ProfileBuildError, Exception) as exc:
-            on_error(str(exc))
-            return
-        if not changed:
-            then(connection)
-            return
-
-        def done(_connection, error):
+        def with_fresh(fresh, error):
             if self._disposed:
                 return
             if error is not None:
                 on_error(str(error))
                 return
-            then(connection)
+            try:
+                if pins is KEEP_PINS:
+                    copy = clone(fresh)
+                    strip_user_data(copy)
+                elif pins is NAMES:
+                    copy = unpin_remote(fresh, self._current_names())
+                else:
+                    copy = pin_remote(fresh, pins, self.settings.protocol)
+                changed = not copy.compare(fresh, NM.SettingCompareFlags.EXACT)
+            except Exception as exc:
+                on_error(str(exc))
+                return
+            if not changed:
+                then(connection)
+                return
 
-        update_connection_async(connection, build_variant(copy), done)
+            def done(_connection, update_error):
+                if self._disposed:
+                    return
+                if update_error is not None:
+                    on_error(str(update_error))
+                else:
+                    then(connection)
+
+            update_connection_async(connection, build_variant(copy), done)
+
+        fetch_settings_async(connection, with_fresh)
 
     def _pin_now(self):
-        """After arming: pin the stored profile to the resolved endpoints."""
+        """After arming: pin the stored profile to the endpoints the service allows."""
         pins = self._fresh_pins()
         connection = self._existing_connection
         if not pins or connection is None:
@@ -1135,6 +1145,61 @@ class MainWindow(Adw.ApplicationWindow):
             then()
 
         call_async(lambda: self.killswitch.update_endpoints(replace), done)
+
+    def _resolve_for_kill_switch(self, connection, *, replace: bool, then, on_error):
+        """Write the server names, let the service resolve and allow them, keep the result."""
+        self._write_profile(
+            connection,
+            pins=NAMES,
+            then=lambda _c: self._refresh_endpoints(replace=replace, then=then, on_error=on_error),
+            on_error=lambda message: on_error(RuntimeError(message)),
+        )
+
+    def _refresh_after_connect(self, connection):
+        """Track provider IP rotation while connected (kill switch armed).
+
+        The server names are resolved through the tunnel's DNS and allowed too;
+        the profile ends up pinned either way (to the fresh addresses, or back
+        to the ones it had), so it never stays on bare names.
+        """
+        def with_previous(fresh, error):
+            if error is not None or self._disposed:
+                return
+            previous = pinned_endpoints(fresh, self.settings.protocol)
+
+            def restore(reason):
+                log.info("endpoint refresh after connect failed: %s", reason)
+                if previous:
+                    self._write_profile(
+                        connection,
+                        pins=previous,
+                        then=lambda _c: None,
+                        on_error=lambda message: log.warning("could not re-pin the profile: %s", message),
+                    )
+
+            self._resolve_for_kill_switch(
+                connection, replace=False, then=self._pin_now, on_error=restore
+            )
+
+        fetch_settings_async(connection, with_previous)
+
+    def _send_guard_options(self, then=None):
+        """Give the leak guard (dispatcher hook) the current options, then continue."""
+        wanted = (bool(self.settings.block_ipv6), tuple(self.settings.killswitch_interfaces))
+        if self._killswitch_status is None or wanted == self._guard_sent:
+            if then:
+                then()
+            return
+
+        def done(_status, error):
+            if error is None:
+                self._guard_sent = wanted
+            else:
+                log.warning("could not save the leak guard options: %s", error)
+            if then and not self._disposed:
+                then()
+
+        call_async(lambda: self.killswitch.set_guard_options(*wanted), done)
 
     # ------------------------------------------------------- connection details
 
@@ -1203,7 +1268,10 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _fetch_ip_worker(self, role: str):
         try:
-            ip = fetch_public_ip()
+            # While connected, our own lookup must resolve through the tunnel
+            # only; the ISP address is looked up the normal way while
+            # disconnected (it is the point of that lookup).
+            ip = fetch_public_ip_through(TUNNEL_INTERFACE) if role == "vpn" else fetch_public_ip()
         except Exception as exc:
             GLib.idle_add(lambda exc=exc: self._on_ip_fetched(role, None, exc))
         else:
@@ -1711,33 +1779,12 @@ class MainWindow(Adw.ApplicationWindow):
         dialog.present(self)
 
     def _save_guard_settings(self):
-        """Persist the IPv6-guard options and write them into the profile."""
+        """Persist the leak-guard options and hand them to the service."""
         try:
             self.settings_store.save(self.settings)
         except Exception as exc:
-            log.warning("could not save the IPv6 guard settings: %s", exc)
-        connection = self._existing_connection
-        if connection is None and self.client is not None:
-            try:
-                lookup = find_managed_connection(
-                    self.client.get_connections(), OwnershipStore.load(), self.local_username
-                )
-                connection = lookup.connection
-            except OwnershipError:
-                connection = None
-        if connection is None:
-            return  # written when the profile is next imported
-        if self._killswitch_armed:
-            # Armed: keep whatever remotes are pinned; only the options change.
-            pins = self._fresh_pins() or KEEP_PINS
-        else:
-            pins = None
-        self._write_profile(
-            connection,
-            pins=pins,
-            then=lambda _c: None,
-            on_error=lambda message: log.warning("could not update the profile: %s", message),
-        )
+            log.warning("could not save the leak guard settings: %s", exc)
+        self._send_guard_options()
 
     def _reconcile_active(self):
         if self.client is None:
@@ -2036,7 +2083,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         if lookup.connection is not None:
             try:
-                verify_managed_profile(lookup.connection, ref.profile, certificate_dir())
+                self._verify_for(lookup.connection, lookup.entry, ref)
             except (ImportVerificationError, OSError) as exc:
                 log.info("existing profile will be re-imported: %s", exc)
             else:
@@ -2063,8 +2110,19 @@ class MainWindow(Adw.ApplicationWindow):
             self.settings.username.strip(),
             self.local_username,
             prepared_done,
-            guard=self._guard_options(),
         )
+
+    @staticmethod
+    def _verify_for(connection, entry, ref):
+        """The stored profile is the selected catalogue profile, unchanged.
+
+        A pinned profile lists IP addresses, so the remote list alone cannot
+        tell locations apart; the ownership manifest records which catalogue
+        profile was imported.
+        """
+        if entry is None or entry.source_sha256 != ref.profile.source_sha256:
+            raise ImportVerificationError("the stored profile is for another location or protocol")
+        verify_managed_profile(connection, ref.profile, certificate_dir())
 
     def _apply_prepared(self, prepared, *, then, on_error, on_blocked):
         try:
@@ -2115,6 +2173,7 @@ class MainWindow(Adw.ApplicationWindow):
                 return
             if lookup.entry and lookup.entry.ca_path and lookup.entry.ca_path != prepared.ca_path:
                 self._cleanup_old_ca(lookup.entry.ca_path, prepared.ca_path)
+            self._old_entry = entry
             self._existing_connection = connection
             self._warning = " ".join(prepared.warnings)
             then(connection)
@@ -2131,57 +2190,102 @@ class MainWindow(Adw.ApplicationWindow):
             add_connection_async(self.client, prepared.variant, done)
 
     def _finalize_and_activate(self, connection, *, reconnecting: bool = False):
-        """Pin (kill switch armed) or unpin the remotes, sync the guard options, activate.
+        """Pin the profile to resolved server addresses, then activate.
 
-        While the kill switch is armed, DNS outside the tunnel is blocked, so
-        OpenVPN connects to the IP addresses the kill-switch service resolved;
-        the certificate checks still decide whether a server is genuine.
+        The profile is always pinned: while connected the leak guard blocks
+        DNS outside the tunnel (and the kill switch blocks it while armed), so
+        OpenVPN must never need DNS to (re)connect.  With the kill switch armed
+        the service resolves and allows the servers; otherwise the app resolves
+        them.  The certificate checks still decide whether a server is genuine.
         """
         attempt = self._attempt
 
+        def current() -> bool:
+            return attempt == self._attempt and self._intent_connected and not self._disposed
+
         def activate(conn):
-            if attempt == self._attempt and self._intent_connected:
+            if current():
                 self._activate(conn, reconnecting=reconnecting)
 
         def failed(message: str):
+            if not current():
+                return
             if reconnecting and self._should_retry_after_failure():
                 self._reconnect_in_flight = False
                 self._schedule_next_reconnect(message)
             else:
-                # Translators: {0} is a technical error message.
-                self._fail(_("Could not update the managed profile: {0}").format(message))
+                self._fail(message)
 
-        if not self._killswitch_armed or self._killswitch_status is None:
-            self._write_profile(connection, pins=None, then=activate, on_error=failed)
-            return
+        def pin_and_activate(endpoints):
+            if not current():
+                return
+            self._write_profile(
+                connection,
+                pins=endpoints,
+                then=lambda conn: self._send_guard_options(lambda: activate(conn)),
+                # Translators: {0} is a technical error message.
+                on_error=lambda message: failed(_("Could not update the managed profile: {0}").format(message)),
+            )
+
         pins = self._fresh_pins()
         if pins:
-            self._write_profile(connection, pins=pins, then=activate, on_error=failed)
+            pin_and_activate(pins)
             return
 
         self._set_state("connecting")
-        self.status_subtitle.set_label(_("Updating the kill switch for this server…"))
+        armed = self._killswitch_armed and self._killswitch_status is not None
+        self.status_subtitle.set_label(
+            _("Updating the kill switch for this server…") if armed else _("Looking up the VPN servers…")
+        )
 
-        def resolved():
-            self._write_profile(connection, pins=self._fresh_pins(), then=activate, on_error=failed)
-
-        def resolve_failed(error):
-            if is_pinned(connection):
-                # Keep the addresses pinned earlier; they usually still work.
-                log.info("endpoint refresh failed, using the pinned addresses: %s", error)
-                self._write_profile(connection, pins=KEEP_PINS, then=activate, on_error=failed)
+        def with_previous(fresh, error):
+            if not current():
                 return
-            failed(killswitch_error_text(error))
+            previous = pinned_endpoints(fresh, self.settings.protocol) if fresh is not None else ()
 
-        self._refresh_endpoints(replace=not reconnecting, then=resolved, on_error=resolve_failed)
+            def fall_back(reason: str):
+                if previous:
+                    # Keep the addresses pinned earlier; they usually still work.
+                    log.info("server lookup failed, using the pinned addresses: %s", reason)
+                    pin_and_activate(previous)
+                else:
+                    failed(reason)
+
+            if armed:
+                self._resolve_for_kill_switch(
+                    connection,
+                    replace=not reconnecting,
+                    then=lambda: pin_and_activate(self._fresh_pins()) if self._fresh_pins() else fall_back(
+                        _("The VPN server addresses could not be resolved.")
+                    ),
+                    on_error=lambda error: fall_back(killswitch_error_text(error)),
+                )
+                return
+            ref = self._selected_ref()
+            if ref is None:
+                failed(_("Choose a location and protocol first."))
+                return
+
+            def resolved(endpoints, warnings):
+                for warning in warnings:
+                    log.info("server lookup: %s", warning)
+                if self._remember_endpoints(endpoints):
+                    pin_and_activate(endpoints)
+                else:
+                    fall_back(_("The VPN server addresses could not be resolved."))
+
+            resolve_endpoints_async(ref.profile.remotes, self.settings.protocol, resolved)
+
+        fetch_settings_async(connection, with_previous)
 
     def _switch_connected_to(self, location: Location):
         """Switch a connected tunnel to another location.
 
-        Without the kill switch: disconnect, then connect.  With it armed, the
-        new profile is prepared and its servers resolved and allowed first,
-        while the current tunnel still carries DNS, so the switch needs no
-        DNS outside the tunnel and protection never lapses.
+        Without the kill switch: disconnect, then connect (the new servers
+        are looked up before connecting).  With it armed, the new profile is
+        prepared and its servers resolved, allowed and pinned first, while the
+        current tunnel still carries DNS, so the switch needs no DNS outside
+        the tunnel and protection never lapses.
         """
         previous = self.settings.location_key
         self._select_location(location)
@@ -2197,15 +2301,21 @@ class MainWindow(Adw.ApplicationWindow):
             self._show_banner(_("Could not switch location: {0}").format(message))
 
         def ready(connection):
+            pins = self._fresh_pins()
+            if not pins:
+                failed(_("The VPN server addresses could not be resolved."))
+                return
+
             def switch(_conn):
                 self._pending_switch_key = location.key
                 self._disconnect()
 
-            self._write_profile(connection, pins=self._fresh_pins(), then=switch, on_error=failed)
+            self._write_profile(connection, pins=pins, then=switch, on_error=failed)
 
         self._show_banner(_("Preparing the new location…"))
         self._ensure_profile(
-            then=lambda connection: self._refresh_endpoints(
+            then=lambda connection: self._resolve_for_kill_switch(
+                connection,
                 replace=True,
                 then=lambda: ready(connection),
                 on_error=lambda error: failed(killswitch_error_text(error)),
@@ -2508,14 +2618,8 @@ class MainWindow(Adw.ApplicationWindow):
                     _("Connected to {0}.").format(where),
                 )
             GLib.timeout_add_seconds(3, self._check_tunnel_and_guard)
-            if self._killswitch_armed:
-                # Track provider IP rotation: refresh the allowed endpoints
-                # through the tunnel's DNS and keep the profile pinned to them.
-                self._refresh_endpoints(
-                    replace=False,
-                    then=self._pin_now,
-                    on_error=lambda error: log.info("endpoint refresh after connect failed: %s", error),
-                )
+            if self._killswitch_armed and self._existing_connection is not None:
+                self._refresh_after_connect(self._existing_connection)
         self._start_poll()
 
     def _check_tunnel_and_guard(self):
@@ -2535,7 +2639,7 @@ class MainWindow(Adw.ApplicationWindow):
         if (
             self.settings.block_ipv6
             and status is not None
-            and not bool(status.get("ipv6_guard", True))
+            and not bool(status.get("guard", True))
             and not self._guard_warned
         ):
             self._guard_warned = True
@@ -2597,7 +2701,7 @@ class MainWindow(Adw.ApplicationWindow):
         if ref is None:
             return _("the selected location or protocol is no longer available")
         try:
-            verify_managed_profile(connection, ref.profile, certificate_dir())
+            self._verify_for(connection, self._old_entry, ref)
         except Exception as exc:
             return str(exc)
         return None

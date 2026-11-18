@@ -19,11 +19,10 @@ from pervius.nm.importer import (  # noqa: E402
     verify_managed_profile,
 )
 from pervius.nm.profile import (  # noqa: E402
-    GuardOptions,
     apply_tunnel_settings,
     is_pinned,
     pin_remote,
-    sync_user_data,
+    remote_names,
     unpin_remote,
 )
 
@@ -59,11 +58,6 @@ def make_connection(parsed, ca_path: Path) -> NM.SimpleConnection:
 def make_managed(parsed, ca_path: Path) -> NM.SimpleConnection:
     connection = make_connection(parsed, ca_path)
     apply_tunnel_settings(connection)
-    sync_user_data(
-        connection,
-        GuardOptions(),
-        remote_names=", ".join(f"{h}:{p}" for h, p in parsed.remotes),
-    )
     return connection
 
 
@@ -125,7 +119,7 @@ class ImportVerificationTests(unittest.TestCase):
         )
         self.assertTrue(is_pinned(pinned))
         verify_managed_profile(pinned, self.parsed, self.cert_dir)
-        restored = unpin_remote(pinned)
+        restored = unpin_remote(pinned, remote_names(self.parsed.remotes))
         self.assertFalse(is_pinned(restored))
         verify_managed_profile(restored, self.parsed, self.cert_dir)
 
@@ -136,20 +130,14 @@ class ImportVerificationTests(unittest.TestCase):
             with self.assertRaises(ImportVerificationError, msg=bad):
                 verify_managed_profile(connection, self.parsed, self.cert_dir)
 
-    def test_pinning_requires_the_original_names_to_match(self):
-        connection = make_managed(self.parsed, self.ca_path)
-        sync_user_data(connection, GuardOptions(), remote_names="evil.example.com:1194")
-        connection.get_setting_vpn().add_data_item("remote", "192.0.2.10:1194")
-        with self.assertRaises(ImportVerificationError):
-            verify_managed_profile(connection, self.parsed, self.cert_dir)
-
-    def test_tampered_remote_is_rejected(self):
-        connection = make_connection(self.parsed, self.ca_path)
-        s_vpn = connection.get_setting_vpn()
-        assert s_vpn is not None
-        s_vpn.add_data_item("remote", "evil.example.com:1194")
-        with self.assertRaisesRegex(ImportVerificationError, "preservation check failed for 'remote'"):
-            verify_imported_profile(connection, self.parsed, self.cert_dir)
+    def test_profile_without_user_data_still_verifies(self):
+        # The 0.2.0-migrated and NetworkManager-reloaded profiles have no user-data.
+        managed = make_managed(self.parsed, self.ca_path)
+        self.assertIsNone(managed.get_setting_by_name("user"))
+        verify_managed_profile(managed, self.parsed, self.cert_dir)
+        port = self.parsed.remotes[0][1]
+        pinned = pin_remote(managed, (Endpoint("192.0.2.10", port, self.parsed.protocol),), self.parsed.protocol)
+        verify_managed_profile(pinned, self.parsed, self.cert_dir)
 
     def test_wrong_proto_is_rejected(self):
         connection = make_connection(self.parsed, self.ca_path)

@@ -9,16 +9,19 @@ from gi.repository import NM  # noqa: E402
 
 from pervius.config import MANAGED_CONNECTION_ID, MANAGED_UUID, OPENVPN_SERVICE_TYPE  # noqa: E402
 from pervius.nm.profile import (  # noqa: E402
-    GuardOptions,
     ProfileBuildError,
     build_managed_connection,
     build_variant,
-    guard_options_match,
+    is_pinned,
     low_risk_warnings,
-    sync_user_data,
+    pin_remote,
+    pinned_endpoints,
+    remote_names,
+    strip_user_data,
     tunnel_settings_problem,
-    user_data,
+    unpin_remote,
 )
+from pervius.killswitchd.rules import Endpoint  # noqa: E402
 from pervius.catalogue.parser import parse_profile  # noqa: E402
 
 from .fixtures import profile_text
@@ -83,27 +86,36 @@ class ProfileTests(unittest.TestCase):
         self.assertIn("~.", list(s_ip4.props.dns_search))
         self.assertIsNone(tunnel_settings_problem(managed))
 
-    def test_user_data_carries_guard_options_and_server_names(self):
-        managed = build_managed_connection(
-            imported_connection(),
-            local_username=USER,
-            vpn_username=VPN_USER,
-            guard=GuardOptions(block_ipv6=False, allowed_interfaces=("wt0", "eth1")),
-        )
-        self.assertEqual(user_data(managed, "com.solvetus.pervius.block-ipv6"), "no")
-        self.assertEqual(user_data(managed, "com.solvetus.pervius.allowed-interfaces"), "wt0,eth1")
-        self.assertEqual(user_data(managed, "com.solvetus.pervius.remote-names"), "vpn.example.com:1194")
-        self.assertTrue(guard_options_match(managed, GuardOptions(False, ("wt0", "eth1"))))
-        self.assertFalse(guard_options_match(managed, GuardOptions(True, ("wt0", "eth1"))))
+    def test_no_user_data_is_written(self):
+        # NetworkManager 1.58 drops connection user-data when it reads the
+        # profile back, so nothing Pervius relies on may live there.
+        imported = imported_connection()
+        user = NM.SettingUser.new()
+        user.set_data("com.solvetus.pervius.remote-names", "stale")
+        imported.add_setting(user)
+        managed = make_managed(imported)
+        self.assertIsNone(managed.get_setting_by_name("user"))
+        self.assertNotIn("'user'", build_variant(managed).print_(False))
 
-    def test_default_guard_blocks_ipv6_without_extra_interfaces(self):
+    def test_pinning_needs_no_recorded_names(self):
         managed = make_managed(imported_connection())
-        self.assertEqual(user_data(managed, "com.solvetus.pervius.block-ipv6"), "yes")
-        self.assertIsNone(user_data(managed, "com.solvetus.pervius.allowed-interfaces"))
-        self.assertTrue(sync_user_data(managed, GuardOptions(True, ("wt0",))))
-        self.assertFalse(sync_user_data(managed, GuardOptions(True, ("wt0",))))
-        self.assertTrue(sync_user_data(managed, GuardOptions(True, ())))
-        self.assertIsNone(user_data(managed, "com.solvetus.pervius.allowed-interfaces"))
+        self.assertFalse(is_pinned(managed))
+        endpoints = (Endpoint("192.0.2.10", 1194, "udp"), Endpoint("2001:db8::10", 1194, "udp"), Endpoint("192.0.2.11", 443, "tcp"))
+        pinned = pin_remote(managed, endpoints, "udp")
+        self.assertEqual(pinned.get_setting_vpn().get_data_item("remote"), "192.0.2.10:1194, [2001:db8::10]:1194")
+        self.assertTrue(is_pinned(pinned))
+        self.assertEqual([e.address for e in pinned_endpoints(pinned, "udp")], ["192.0.2.10", "2001:db8::10"])
+        names = remote_names((("vpn.example.com", 1194),))
+        restored = unpin_remote(pinned, names)
+        self.assertEqual(restored.get_setting_vpn().get_data_item("remote"), "vpn.example.com:1194")
+        self.assertFalse(is_pinned(restored))
+
+    def test_strip_user_data(self):
+        connection = imported_connection()
+        self.assertFalse(strip_user_data(connection))
+        connection.add_setting(NM.SettingUser.new())
+        self.assertTrue(strip_user_data(connection))
+        self.assertIsNone(connection.get_setting_by_name("user"))
 
     def test_vpn_username_is_not_used_for_ownership(self):
         managed = make_managed(imported_connection())

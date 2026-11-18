@@ -14,7 +14,7 @@ from gi.repository import Gio, GLib, NM  # noqa: E402
 from ..config import MANAGED_UUID  # noqa: E402
 from ..catalogue.models import ProfileRef  # noqa: E402
 from .importer import import_and_prepare  # noqa: E402
-from .profile import GuardOptions, PreparedProfile  # noqa: E402
+from .profile import PreparedProfile  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -101,7 +101,6 @@ def prepare_managed_profile(
     ref: ProfileRef,
     vpn_username: str,
     local_username: str,
-    guard: GuardOptions | None = None,
 ) -> PreparedProfile:
     """Import + verify in a worker thread; does not mutate the managed profile."""
     profile = ref.profile
@@ -112,7 +111,6 @@ def prepare_managed_profile(
         profile,
         vpn_username=vpn_username,
         local_username=local_username,
-        guard=guard,
     )
 
 
@@ -121,7 +119,6 @@ def prepare_managed_profile_async(
     vpn_username: str,
     local_username: str,
     callback: Callable[[PreparedProfile | None, Exception | None], None],
-    guard: GuardOptions | None = None,
 ) -> threading.Thread:
     """Run prepare_managed_profile in a worker and deliver on the GLib loop."""
 
@@ -131,7 +128,7 @@ def prepare_managed_profile_async(
 
     def worker() -> None:
         try:
-            result = prepare_managed_profile(ref, vpn_username, local_username, guard)
+            result = prepare_managed_profile(ref, vpn_username, local_username)
         except Exception as exc:  # surfaced to the UI with a clear message
             log.warning("profile preparation failed: %s", exc)
             GLib.idle_add(deliver, None, exc)
@@ -174,6 +171,48 @@ class _Once:
             GLib.source_remove(self._timer)
             self._timer = None
         self._callback(value, error)
+
+
+def fetch_settings_async(
+    connection: NM.RemoteConnection,
+    callback: Callable[[NM.SimpleConnection | None, Exception | None], None],
+) -> None:
+    """Read a profile's current settings from NetworkManager (not libnm's cache).
+
+    libnm refreshes its cached copy asynchronously after an update, so a copy
+    taken right after our own write can be stale; writing it back would undo
+    that write.  Every profile change starts from this fresh read.
+    """
+    once = _Once(callback, NM_CALL_TIMEOUT, "reading the managed profile")
+    try:
+        bus = connection.get_client().get_dbus_connection()
+    except Exception as exc:
+        once.deliver(None, exc)
+        return
+
+    def done(source, result, _user_data=None):
+        try:
+            reply = source.call_finish(result)
+            fresh = NM.SimpleConnection.new_from_dbus(reply.get_child_value(0))
+        except GLib.Error as exc:
+            once.deliver(None, NetworkManagerError(f"could not read the managed profile: {exc.message}"))
+        except Exception as exc:
+            once.deliver(None, exc)
+        else:
+            once.deliver(fresh, None)
+
+    bus.call(
+        "org.freedesktop.NetworkManager",
+        connection.get_path(),
+        "org.freedesktop.NetworkManager.Settings.Connection",
+        "GetSettings",
+        None,
+        GLib.VariantType("(a{sa{sv}})"),
+        Gio.DBusCallFlags.NONE,
+        NM_CALL_TIMEOUT * 1000,
+        once.cancellable,
+        done,
+    )
 
 
 def add_connection_async(

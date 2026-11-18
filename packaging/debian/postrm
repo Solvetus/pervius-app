@@ -4,11 +4,15 @@ case "$1" in
     remove|purge)
         if command -v nft >/dev/null 2>&1; then
             nft delete table inet pervius_ks >/dev/null 2>&1 || true
+            nft delete table inet pervius_guard >/dev/null 2>&1 || true
             nft delete table inet pervius_v6 >/dev/null 2>&1 || true
         fi
         rm -rf /run/pervius
         ;;
 esac
+if [ "$1" = purge ]; then
+    rm -rf /var/lib/pervius
+fi
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload >/dev/null 2>&1 || true
 fi

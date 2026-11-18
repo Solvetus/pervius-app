@@ -36,7 +36,7 @@ class IdentityTests(unittest.TestCase):
         self.assertEqual(interface.name, daemon.INTERFACE)
         self.assertEqual(
             sorted(method.name for method in interface.methods),
-            ["Arm", "Configure", "Disarm", "GetStatus", "UpdateEndpoints"],
+            ["Arm", "Configure", "Disarm", "GetStatus", "SetGuardOptions", "UpdateEndpoints"],
         )
 
     def test_disclaimer_text(self):

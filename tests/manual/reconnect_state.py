@@ -18,6 +18,7 @@ def scenario(window, checks, done):
 
     window_module._RECONNECT = ReconnectPolicy((1, 1))
     window_module.verify_managed_profile = lambda *_args, **_kwargs: ()
+    window._verify_for = lambda *_args, **_kwargs: None
     window._start_poll = lambda: None
     calls = []
 
