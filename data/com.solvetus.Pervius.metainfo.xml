@@ -39,6 +39,11 @@
   <url type="bugtracker">https://github.com/Solvetus/pervius-app/issues</url>
   <url type="vcs-browser">https://github.com/Solvetus/pervius-app</url>
   <url type="contribute">https://github.com/Solvetus/pervius-app/blob/main/CONTRIBUTING.md</url>
+  <icon type="stock">com.solvetus.Pervius</icon>
+  <branding>
+    <color type="primary" scheme_preference="light">#BEE63B</color>
+    <color type="primary" scheme_preference="dark">#1B2127</color>
+  </branding>
   <categories>
     <category>Network</category>
   </categories>

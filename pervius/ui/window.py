@@ -35,8 +35,11 @@ from ..config import (  # noqa: E402
     MANAGED_UUID,
     NOTIFICATION_ID,
     OPENVPN_SERVICE_TYPE,
+    STATUS_ICON_CONNECTED,
+    STATUS_ICON_OFF,
     TRAY_ICON_CONNECTED,
-    TRAY_ICON_DISCONNECTED,
+    TRAY_ICON_OFF,
+    TRAY_ICON_RECONNECTING,
     VERSION,
     certificate_dir,
     local_username,
@@ -486,9 +489,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.status_stack.set_margin_top(20)
         self.status_stack.set_margin_start(18)
         self.status_stack.set_margin_end(18)
-        self.status_icon = Gtk.Image.new_from_icon_name("network-vpn-symbolic")
+        self.status_icon = Gtk.Image.new_from_icon_name(STATUS_ICON_OFF)
         self.status_icon.set_pixel_size(72)
-        self.status_icon.set_opacity(0.55)
         self.status_spinner = Gtk.Spinner()
         self.status_spinner.set_size_request(48, 48)
         self.status_stack.add_named(self.status_icon, "icon")
@@ -768,7 +770,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.tray = TrayIcon(
                 app_id=APP_ID,
                 title=APP_NAME,
-                icon_name=APP_ID,
+                icon_name=TRAY_ICON_OFF,
                 menu_provider=self._tray_menu,
                 tooltip_provider=self._tray_tooltip,
                 action_handler=self._tray_action,
@@ -1228,11 +1230,13 @@ class MainWindow(Adw.ApplicationWindow):
             app.withdraw_notification(NOTIFICATION_ID)
 
     def _tray_icon_name(self) -> str:
-        return (
-            TRAY_ICON_CONNECTED
-            if self._state == "connected"
-            else TRAY_ICON_DISCONNECTED
-        )
+        if self._state == "connected":
+            return TRAY_ICON_CONNECTED
+        if self._state == "reconnecting" or (
+            self._state == "connecting" and self._reconnect_in_flight
+        ):
+            return TRAY_ICON_RECONNECTING
+        return TRAY_ICON_OFF
 
     def _tray_tooltip(self) -> tuple[str, str]:
         location = self._selected_location()
@@ -2062,7 +2066,9 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             self.status_spinner.stop()
             self.status_stack.set_visible_child_name("icon")
-        self.status_icon.set_opacity(1.0 if state == "connected" else 0.55)
+        self.status_icon.set_from_icon_name(
+            STATUS_ICON_CONNECTED if state == "connected" else STATUS_ICON_OFF
+        )
 
         if state == "loading":
             self.status_title.set_label("Loading locations…")

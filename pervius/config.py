@@ -47,10 +47,16 @@ MANAGED_UUID = "22d97462-fd9d-5bc6-9f0b-7110f7153e4f"
 MANAGED_CONNECTION_TYPE = "vpn"
 OPENVPN_SERVICE_TYPE = "org.freedesktop.NetworkManager.openvpn"
 
-# Tray status icons: red when down, green with a check when the tunnel is up.
+# Tray status icons: white glyph, with a green badge when the tunnel is up and
+# an amber badge while reconnecting.  The status card shows the app icon when
+# connected and a grey tile otherwise.
 NOTIFICATION_ID = "pervius-state"
-TRAY_ICON_CONNECTED = f"{APP_ID}-connected"
-TRAY_ICON_DISCONNECTED = f"{APP_ID}-disconnected"
+TRAY_ICON_OFF = f"{APP_ID}-tray-off"
+TRAY_ICON_CONNECTED = f"{APP_ID}-tray-connected"
+TRAY_ICON_RECONNECTING = f"{APP_ID}-tray-reconnecting"
+STATUS_ICON_CONNECTED = APP_ID
+STATUS_ICON_OFF = f"{APP_ID}-card-off"
+SYMBOLIC_ICON = f"{APP_ID}-symbolic"
 
 
 def local_username() -> str:

@@ -19,8 +19,11 @@ tree	pervius	{pythondir}/pervius
 0644	data/com.solvetus.Pervius.desktop	/usr/share/applications/com.solvetus.Pervius.desktop
 0644	data/com.solvetus.Pervius.metainfo.xml	/usr/share/metainfo/com.solvetus.Pervius.metainfo.xml
 0644	data/icons/hicolor/scalable/apps/com.solvetus.Pervius.svg	/usr/share/icons/hicolor/scalable/apps/com.solvetus.Pervius.svg
-0644	data/icons/hicolor/scalable/apps/com.solvetus.Pervius-connected.svg	/usr/share/icons/hicolor/scalable/apps/com.solvetus.Pervius-connected.svg
-0644	data/icons/hicolor/scalable/apps/com.solvetus.Pervius-disconnected.svg	/usr/share/icons/hicolor/scalable/apps/com.solvetus.Pervius-disconnected.svg
+0644	data/icons/hicolor/scalable/status/com.solvetus.Pervius-tray-off.svg	/usr/share/icons/hicolor/scalable/status/com.solvetus.Pervius-tray-off.svg
+0644	data/icons/hicolor/scalable/status/com.solvetus.Pervius-tray-connected.svg	/usr/share/icons/hicolor/scalable/status/com.solvetus.Pervius-tray-connected.svg
+0644	data/icons/hicolor/scalable/status/com.solvetus.Pervius-tray-reconnecting.svg	/usr/share/icons/hicolor/scalable/status/com.solvetus.Pervius-tray-reconnecting.svg
+0644	data/icons/hicolor/scalable/status/com.solvetus.Pervius-card-off.svg	/usr/share/icons/hicolor/scalable/status/com.solvetus.Pervius-card-off.svg
+0644	data/icons/hicolor/symbolic/apps/com.solvetus.Pervius-symbolic.svg	/usr/share/icons/hicolor/symbolic/apps/com.solvetus.Pervius-symbolic.svg
 0644	data/systemd/pervius-killswitchd.service	/usr/lib/systemd/system/pervius-killswitchd.service
 0644	data/dbus/com.solvetus.Pervius.KillSwitch1.conf	/usr/share/dbus-1/system.d/com.solvetus.Pervius.KillSwitch1.conf
 0644	data/dbus/com.solvetus.Pervius.KillSwitch1.service	/usr/share/dbus-1/system-services/com.solvetus.Pervius.KillSwitch1.service

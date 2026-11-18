@@ -22,8 +22,8 @@ def make_tray(icon_provider=None):
 
 class TrayTests(unittest.TestCase):
     def test_icon_provider_is_used(self):
-        tray = make_tray(lambda: "com.solvetus.Pervius-connected")
-        self.assertEqual(tray._current_icon(), "com.solvetus.Pervius-connected")
+        tray = make_tray(lambda: "com.solvetus.Pervius-tray-connected")
+        self.assertEqual(tray._current_icon(), "com.solvetus.Pervius-tray-connected")
 
     def test_icon_provider_failure_falls_back(self):
         def broken():
