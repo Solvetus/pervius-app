@@ -1,4 +1,4 @@
-"""Settings, legal and component dialogs open without errors."""
+"""Settings, Help and About dialogs open without errors; the settings work."""
 
 from gi.repository import GLib
 
@@ -6,16 +6,23 @@ from harness import run_window_harness
 
 
 def scenario(window, checks, done):
+    from pervius import autostart
+
     window._show_settings()
     checks.true("settings dialog", True)
-    window._show_legal("license")
-    checks.true("license dialog", True)
-    window._show_legal("components")
-    checks.true("components dialog", True)
+    row = window._interfaces_row
+    checks.true("interfaces row exists", row is not None)
+    checks.equal("interfaces insensitive while off", row.get_sensitive(), False)
+    checks.equal("start at login off", autostart.is_enabled(), False)
+    autostart.set_enabled(True)
+    checks.equal("start at login file", autostart.autostart_path().exists(), True)
+    autostart.set_enabled(False)
+    checks.equal("start at login removed", autostart.autostart_path().exists(), False)
+    window._show_help()
+    checks.true("help dialog", True)
     window._show_about()
     checks.true("about dialog", True)
-    window._show_protocol_help()
-    checks.true("protocol guide", True)
+    checks.equal("no legal dialog left", hasattr(window, "_show_legal"), False)
     GLib.timeout_add(1000, lambda: done() or False)
 
 

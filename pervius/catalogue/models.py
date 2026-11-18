@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Mapping
 
+from .. import i18n
 from .countries import country_flag, country_name, country_search_text, fold_text
 
 
@@ -74,7 +75,8 @@ class Location:
 
     @property
     def display_country(self) -> str:
-        return country_name(self.country_code)
+        """Country name in the UI language (iso-codes), else English."""
+        return i18n.country_name(self.country_code, country_name(self.country_code))
 
     @property
     def country_name(self) -> str:
@@ -95,6 +97,7 @@ class Location:
                     self.city,
                     self.country_code,
                     country_search_text(self.country_code),
+                    self.display_country,
                 )
             )
         )

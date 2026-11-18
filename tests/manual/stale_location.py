@@ -5,9 +5,9 @@ from harness import run_window_harness
 
 def scenario(window, checks, done):
     for key, label in (
-        ("PT/Lisbon", "🇵🇹 Lisbon, Portugal · UDP"),
-        ("US/Ashburn", "🇺🇸 Ashburn, United States · UDP"),
-        ("AD/Andorra la Vella", "🇦🇩 Andorra la Vella, Andorra · UDP"),
+        ("PT/Lisbon", "🇵🇹 Lisbon, Portugal"),
+        ("US/Ashburn", "🇺🇸 Ashburn, United States"),
+        ("AD/Andorra la Vella", "🇦🇩 Andorra la Vella, Andorra"),
     ):
         window._select_location(window.catalogue.location_by_key(key))
         checks.equal(f"{key} row", window.location_row.get_subtitle(), label)

@@ -45,7 +45,7 @@ def scenario(window, checks, done):
     window._activate = success
     window._connection_lost("simulated drop")
     checks.equal("drop: reconnecting", window._state, "reconnecting")
-    checks.equal("drop: countdown", window.status_subtitle.get_label(), "Connection lost. Retrying in 1s (attempt 1 of 2).")
+    checks.equal("drop: countdown", window.status_subtitle.get_label(), "Connection lost. Retrying in 1 second (attempt 1 of 2).")
 
     def after_success():
         checks.equal("reconnected", (window._state, calls), ("connected", [("success", True)]))

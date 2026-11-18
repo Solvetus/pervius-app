@@ -14,11 +14,17 @@ def scenario(window, checks, done):
     checks.equal(
         "subtitle",
         window.killswitch_row.get_subtitle(),
-        "Armed — VPN not connected; internet traffic is blocked. Disarm before changing location or protocol.",
+        "Armed — VPN not connected; internet traffic is blocked.",
     )
-    checks.equal("allow LAN locked", (window.allow_lan_row.get_active(), window.allow_lan_row.get_sensitive()), (False, False))
-    checks.equal("location locked", window.location_button.get_sensitive(), False)
-    checks.equal("protocol locked", window.protocol_switch.get_sensitive(), False)
+    checks.equal("allow LAN editable while armed", (window.allow_lan_row.get_active(), window.allow_lan_row.get_sensitive()), (False, True))
+    checks.equal("blocked card shown while armed", window.killswitch_note.get_visible(), True)
+    checks.equal("location allowed while armed", window.location_button.get_sensitive(), True)
+    checks.equal("protocol allowed while armed", window.protocol_switch.get_sensitive(), True)
+    configured = []
+    window._configure_killswitch = lambda: configured.append(window.settings.killswitch_allow_lan)
+    window.allow_lan_row.set_active(True)
+    checks.equal("LAN change applied live", configured, [True])
+    window.settings.killswitch_allow_lan = False
     item = next(item for item in window._tray_menu() if item.action == "killswitch")
     checks.equal("tray toggle", (item.toggle_state, item.enabled), (1, True))
 
@@ -34,6 +40,8 @@ def scenario(window, checks, done):
         (window._killswitch_armed, window.killswitch_row.get_active(), window.location_button.get_sensitive()),
         (False, False, True),
     )
+    checks.equal("allow LAN insensitive while off", window.allow_lan_row.get_sensitive(), False)
+    checks.equal("blocked card hidden while off", window.killswitch_note.get_visible(), False)
     done()
 
 

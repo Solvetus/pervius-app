@@ -10,15 +10,17 @@ import pwd
 from pathlib import Path
 
 from . import __version__ as VERSION
+from .i18n import N_
 
 APP_ID = "com.solvetus.Pervius"
 APP_NAME = "Pervius"
 APP_SLUG = "pervius"
-APP_TAGLINE = "Unofficial Linux client for FastVPN."
+# Marked for translation; translated where shown.
+APP_TAGLINE = N_("Unofficial Linux client for FastVPN.")
 DEVELOPER_NAME = "Solvetus Labs"
 HOMEPAGE_URL = "https://github.com/Solvetus/pervius-app"
 ISSUES_URL = f"{HOMEPAGE_URL}/issues"
-DISCLAIMER = (
+DISCLAIMER = N_(
     "Pervius is an independent open-source project by Solvetus Labs. It is not "
     "affiliated with, endorsed by, or sponsored by Namecheap, Inc. FastVPN is a "
     "trademark of Namecheap, Inc."

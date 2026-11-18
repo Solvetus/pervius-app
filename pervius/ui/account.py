@@ -24,6 +24,7 @@ from ..credentials import (  # noqa: E402
     CredentialError,
     CredentialStore,
 )
+from ..i18n import _  # noqa: E402
 from ..settings import Settings, SettingsStore  # noqa: E402
 
 
@@ -57,16 +58,16 @@ class CredentialsWindow(Adw.Window):
         self._settings = settings
         self._on_saved = on_saved
         self._replacing = False
-        self.set_title("Account")
+        self.set_title(_("Account"))
         self.set_transient_for(parent)
         self.set_modal(True)
         self.set_default_size(460, 460)
 
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
-        cancel = Gtk.Button(label="Cancel")
+        cancel = Gtk.Button(label=_("Cancel"))
         cancel.connect("clicked", lambda *_: self.close())
-        save = Gtk.Button(label="Save")
+        save = Gtk.Button(label=_("Save"))
         save.add_css_class("suggested-action")
         save.connect("clicked", self._save)
         header.pack_start(cancel)
@@ -81,31 +82,33 @@ class CredentialsWindow(Adw.Window):
 
         page = Adw.PreferencesPage()
         group = Adw.PreferencesGroup()
-        group.set_title("FastVPN account")
+        group.set_title(_("FastVPN account"))
         group.set_description(
-            "The password is sent to NetworkManager only when the VPN is activated. "
-            "It is never written to the NetworkManager profile."
+            _(
+                "The password is sent to NetworkManager only when the VPN is activated. "
+                "It is never written to the NetworkManager profile."
+            )
         )
         self.username_row = Adw.EntryRow()
-        self.username_row.set_title("Username")
+        self.username_row.set_title(_("Username"))
         self.username_row.set_text(settings.username)
         self.username_row.connect("changed", lambda *_: self._refresh())
 
         # Shown instead of an entry when a password is already kept.  It holds
         # no secret: only the fact that one exists.
         self.kept_row = Adw.ActionRow()
-        self.kept_row.set_title("Password")
-        replace = Gtk.Button(label="Replace")
+        self.kept_row.set_title(_("Password"))
+        replace = Gtk.Button(label=_("Replace"))
         replace.set_valign(Gtk.Align.CENTER)
         replace.connect("clicked", self._on_replace)
         self.kept_row.add_suffix(replace)
 
         # Always starts empty; the reveal toggle applies only to typed text.
         self.password_row = Adw.PasswordEntryRow()
-        self.password_row.set_title("Password")
+        self.password_row.set_title(_("Password"))
 
         self.save_row = Adw.SwitchRow()
-        self.save_row.set_title("Save password in the desktop keyring")
+        self.save_row.set_title(_("Save password in the desktop keyring"))
         self.save_row.set_active(bool(settings.save_password and store.persistence_available))
         group.add(self.username_row)
         group.add(self.kept_row)
@@ -114,7 +117,7 @@ class CredentialsWindow(Adw.Window):
         page.add(group)
 
         self.forget_group = Adw.PreferencesGroup()
-        forget = Gtk.Button(label="Forget Saved Password…")
+        forget = Gtk.Button(label=_("Forget Saved Password…"))
         forget.add_css_class("destructive-action")
         forget.set_halign(Gtk.Align.START)
         forget.connect("clicked", self._confirm_forget)
@@ -134,8 +137,10 @@ class CredentialsWindow(Adw.Window):
         note.set_xalign(0.0)
         note.add_css_class("dim-label")
         note.set_label(
-            "Credentials are not verified until a connection succeeds. "
-            "Nothing is sent to Solvetus Labs; Pervius has no servers of its own."
+            _(
+                "Credentials are not verified until a connection succeeds. "
+                "Nothing is sent to Solvetus Labs; Pervius has no servers of its own."
+            )
         )
         box.append(note)
 
@@ -162,23 +167,23 @@ class CredentialsWindow(Adw.Window):
     def _refresh(self) -> None:
         view = self._view()
         if view.kept == SAVED_IN_KEYRING:
-            self.kept_row.set_subtitle("Saved in the keyring")
+            self.kept_row.set_subtitle(_("Saved in the keyring"))
         elif view.kept == SESSION_ONLY:
-            self.kept_row.set_subtitle("Kept for this session only")
+            self.kept_row.set_subtitle(_("Kept for this session only"))
         self.kept_row.set_visible(not view.show_entry)
         self.password_row.set_visible(view.show_entry)
         self.forget_group.set_visible(view.can_forget)
         available = self._store.persistence_available
         if not available:
             self.save_row.set_subtitle(
-                "The desktop keyring is unavailable; the password will be session-only."
+                _("The desktop keyring is unavailable; the password will be session-only.")
             )
         elif view.show_entry:
             self.save_row.set_subtitle(
-                "If unavailable, the password is kept only for this session."
+                _("If unavailable, the password is kept only for this session.")
             )
         else:
-            self.save_row.set_subtitle("Replace the password to change where it is kept.")
+            self.save_row.set_subtitle(_("Replace the password to change where it is kept."))
         self.save_row.set_sensitive(available and view.show_entry)
         if not view.show_entry:
             self.save_row.set_active(view.kept == SAVED_IN_KEYRING)
@@ -200,13 +205,16 @@ class CredentialsWindow(Adw.Window):
         if not username:
             return
         dialog = Adw.AlertDialog.new(
-            "Forget saved password?",
-            "This removes the desktop-keyring entry and the in-memory copy for "
-            f"{username}. An already-connected VPN stays up, but reauthentication "
-            "may fail until you enter the password again.",
+            _("Forget saved password?"),
+            # Translators: {0} is the VPN account name.
+            _(
+                "This removes the desktop-keyring entry and the in-memory copy for "
+                "{0}. An already-connected VPN stays up, but reauthentication "
+                "may fail until you enter the password again."
+            ).format(username),
         )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("forget", "Forget Password")
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("forget", _("Forget Password"))
         dialog.set_close_response("cancel")
         dialog.set_default_response("cancel")
         dialog.set_response_appearance("forget", Adw.ResponseAppearance.DESTRUCTIVE)
@@ -222,7 +230,8 @@ class CredentialsWindow(Adw.Window):
         try:
             self._store.forget(username)
         except CredentialError as exc:
-            self._show_error(f"Could not remove the saved password: {exc}")
+            # Translators: {0} is a technical error message.
+            self._show_error(_("Could not remove the saved password: {0}").format(exc))
             return
         self._replacing = False
         self.password_row.set_text("")
@@ -235,7 +244,7 @@ class CredentialsWindow(Adw.Window):
     def _save(self, *_args) -> None:
         username = self.username_row.get_text().strip()
         if not username:
-            self._show_error("Enter your VPN username.")
+            self._show_error(_("Enter your VPN username."))
             return
         view = self._view()
         if not view.show_entry:
@@ -244,14 +253,15 @@ class CredentialsWindow(Adw.Window):
             return
         password = self.password_row.get_text()
         if not password:
-            self._show_error("Enter your VPN password.")
+            self._show_error(_("Enter your VPN password."))
             return
         persist = bool(self.save_row.get_active()) and self._store.persistence_available
         try:
             self._store.store(username, password, persist=persist)
         except CredentialError as exc:
             self._show_error(
-                f"The password is in memory for this session, but could not be saved: {exc}"
+                # Translators: {0} is a technical error message.
+                _("The password is in memory for this session, but could not be saved: {0}").format(exc)
             )
             self.save_row.set_active(False)
             return

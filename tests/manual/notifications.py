@@ -36,7 +36,7 @@ def scenario(window, checks, done):
         checks.equal(
             "after reconnect",
             notes[1:],
-            [("VPN reconnected", "Connected to Andorra la Vella, Andorra over UDP.")],
+            [("VPN reconnected", "Connected to Andorra la Vella, Andorra.")],
         )
         done()
         return False
