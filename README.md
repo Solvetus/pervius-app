@@ -16,8 +16,8 @@ your own FastVPN account.
 
 <p align="center">
   <img src="docs/screenshots/connected.png" width="32%" alt="Connected to Lisbon, with the IP addresses hidden and the traffic, protocol and connected time below">
-  <img src="docs/screenshots/locations.png" width="32%" alt="The location chooser with search, flags and favorites">
   <img src="docs/screenshots/killswitch.png" width="32%" alt="Connection and security settings, including the kill switch and Allow local network">
+  <img src="docs/screenshots/locations.png" width="32%" alt="The location chooser with search, flags and favorites">
 </p>
 
 ## Features
