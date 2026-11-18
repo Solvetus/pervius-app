@@ -94,7 +94,7 @@ for name in $allowed; do
 done
 IFS=$saved_ifs
 
-tunnel_rule="    oifname \"$tunnel\" oifkind { \"tun\", \"ovpn\", \"ovpn-dco\" } accept"
+tunnel_rule="    oifname \"$tunnel\" meta oifkind { \"tun\", \"ovpn\", \"ovpn-dco\" } accept"
 if [ -n "$extra" ]; then
     extra_rule="    oifname { $extra } accept"
 else

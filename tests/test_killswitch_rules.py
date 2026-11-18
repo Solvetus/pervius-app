@@ -152,7 +152,7 @@ class RulesetTests(unittest.TestCase):
     def test_tunnel_is_pinned_by_name_and_kind_instead_of_tun_wildcard(self):
         text = build_ruleset(self.endpoints)
         self.assertNotIn("tun*", text)
-        self.assertIn('oifname "pervius0" oifkind { "tun", "ovpn", "ovpn-dco" } accept', text)
+        self.assertIn('oifname "pervius0" meta oifkind { "tun", "ovpn", "ovpn-dco" } accept', text)
         self.assertIn("oifname @allowed_ifaces accept", text)
         allowed = text[text.index("set allowed_ifaces"):text.index("set endpoints_v4")]
         self.assertNotIn("elements", allowed)  # no extras: the set is empty

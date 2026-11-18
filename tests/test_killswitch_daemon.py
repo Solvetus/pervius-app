@@ -140,7 +140,7 @@ class ArmTests(ServiceTestCase):
         self.assertEqual(resolved, OLD)
         script = self.last_script()
         self.assertIn('elements = { "wt0" }', script)
-        self.assertIn('oifname "pervius0" oifkind { "tun", "ovpn", "ovpn-dco" } accept', script)
+        self.assertIn('oifname "pervius0" meta oifkind { "tun", "ovpn", "ovpn-dco" } accept', script)
         self.assertIn('socket cgroupv2 level 2 "system.slice/pervius-killswitchd.service"', script)
         status = self.service.status()
         self.assertTrue(status["armed"].unpack())

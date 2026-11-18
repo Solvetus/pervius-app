@@ -24,7 +24,7 @@ HOOK = REPO / "data" / "networkmanager" / "90-pervius-guard"
 NFT_LINE = "NFT=/usr/sbin/nft\n"
 OPTIONS_LINE = "OPTIONS=/var/lib/pervius/guard.conf\n"
 OWNER_LINE = "OPTIONS_OWNER=0\n"
-TUNNEL_RULE = 'oifname "pervius0" oifkind { "tun", "ovpn", "ovpn-dco" } accept'
+TUNNEL_RULE = 'oifname "pervius0" meta oifkind { "tun", "ovpn", "ovpn-dco" } accept'
 HOSTILE = '"; flush ruleset; table ip x { chain y { type filter hook output priority 0; policy drop; } }'
 
 

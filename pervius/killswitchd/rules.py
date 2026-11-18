@@ -407,7 +407,7 @@ def build_ruleset(
 def tunnel_match() -> str:
     """The nft match for the pinned tunnel device: its name and its kind."""
     kinds = ", ".join(f'"{kind}"' for kind in TUNNEL_KINDS)
-    return f'oifname "{TUNNEL_INTERFACE}" oifkind {{ {kinds} }}'
+    return f'oifname "{TUNNEL_INTERFACE}" meta oifkind {{ {kinds} }}'
 
 
 def build_endpoint_swap(endpoints: Iterable[Endpoint]) -> str:

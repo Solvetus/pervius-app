@@ -230,7 +230,7 @@ messages.
   (`addr . inet_proto . inet_service`), `dns_window_v4` / `dns_window_v6`
   (addresses with `flags timeout`).
 - Output base chain at priority `-10`: accept loopback; the tunnel, matched
-  by name **and** device kind (`oifname "pervius0" oifkind { "tun", "ovpn",
+  by name **and** device kind (`oifname "pervius0" meta oifkind { "tun", "ovpn",
   "ovpn-dco" }`: OpenVPN's tun device or its in-kernel data channel offload
   device, so a VLAN, macvlan or dummy that takes the name is not trusted);
   `oifname @allowed_ifaces` (the interfaces the user always allows, for
