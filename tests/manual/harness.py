@@ -7,6 +7,7 @@ service:
 * the NetworkManager secret agent is not registered (register() is stubbed);
 * the kill-switch client always reports a disarmed service;
 * the public-IP lookup returns a documentation address (RFC 5737);
+* the upgrade migration is disabled (no keyring access, no profile changes);
 * a synthetic catalogue (example.com hosts) is seeded into a sandboxed
   XDG_DATA_HOME, which must be a temporary directory (run.sh creates one).
 
@@ -90,6 +91,16 @@ def install_stubs() -> None:
         "allow_lan": False,
     }
     window_module.fetch_public_ip = lambda: DOC_IP
+
+    # The upgrade migration must never see the real keyring or profile.
+    from pervius import migration
+
+    class NoKeyring:
+        def __init__(self, *_args, **_kwargs):
+            raise RuntimeError("keyring access is disabled in UI harnesses")
+
+    migration.LibsecretBackend = NoKeyring
+    window_module.migrate_profile = lambda *_args, **_kwargs: migration.StepResult(migration.SKIPPED)
 
 
 def prepare(*, catalogue: bool = True) -> None:

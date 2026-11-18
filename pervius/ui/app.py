@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 
@@ -12,6 +13,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, Gtk  # noqa: E402
 
 from ..config import APP_ID, APP_NAME, NOTIFICATION_ID  # noqa: E402
+from ..migration import migrate_user_data  # noqa: E402
 from .window import MainWindow  # noqa: E402
 
 
@@ -45,6 +47,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
     argv = list(sys.argv if argv is None else argv)
+    logging.basicConfig(level=logging.INFO, format="%(name)s: %(levelname)s %(message)s")
+    # Adopt settings and saved passwords from a 0.1.x installation before the
+    # window loads anything.  A no-op on fresh installs.
+    migrate_user_data()
     Gtk.init()
     Adw.init()
     app = PerviusApplication()

@@ -50,6 +50,7 @@ from pervius.ownership import (  # noqa: E402
     check_create_collision,
     find_managed_connection,
 )
+from pervius.migration import REFUSED, migrate_profile, migrate_user_data  # noqa: E402
 from pervius.settings import SettingsStore  # noqa: E402
 
 
@@ -98,6 +99,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    migrate_user_data()
     store = CatalogueStore()
     try:
         catalogue = None if args.refresh else store.load()
@@ -139,6 +141,10 @@ def main(argv: list[str] | None = None) -> int:
     except NetworkManagerError as exc:
         print(f"NetworkManager unavailable: {exc}", file=sys.stderr)
         return 1
+
+    migrated = migrate_profile(client.get_connections(), local_user)
+    if migrated.status == REFUSED:
+        print(f"Could not adopt the previous release's profile: {migrated.detail}", file=sys.stderr)
 
     agent = None
     managed = None

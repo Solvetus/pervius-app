@@ -26,6 +26,7 @@ directory (`run.sh` creates a fresh sandbox per harness). Inside the sandbox:
 - the kill-switch client always reports a disarmed service, so the root
   service is never contacted;
 - the public-IP lookup returns a documentation address (198.51.100.7);
+- the upgrade migration is disabled, so the keyring and profile are never touched;
 - the catalogue is synthetic: real city names, `example.com` hosts.
 
 NetworkManager is used read-only (the window lists connections). No

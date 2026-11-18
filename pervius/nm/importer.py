@@ -127,6 +127,11 @@ def _check_ca_path(path_value: str | None, cert_dir: Path, expected_hash: str) -
     return path
 
 
+def check_ca_file(path_value: str | None, cert_dir: Path, expected_hash: str) -> Path:
+    """Verify an app-owned CA file: location, type, mode 0600 and hash."""
+    return _check_ca_path(path_value, cert_dir, expected_hash)
+
+
 def _verify_vpn_fields(
     connection: NM.Connection,
     parsed: ParsedProfile,
