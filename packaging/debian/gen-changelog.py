@@ -63,7 +63,14 @@ def render(package: str, maintainer: str) -> str:
     for release, date in zip(items, _dates(items), strict=True):
         out.append(f"{package} ({release.version}) unstable; urgency=medium\n")
         for item in _items(release.body):
-            out.append(textwrap.fill(item, width=78, initial_indent="  * ", subsequent_indent="    "))
+            out.append(textwrap.fill(
+                item,
+                width=78,
+                initial_indent="  * ",
+                subsequent_indent="    ",
+                break_on_hyphens=False,
+                break_long_words=False,
+            ))
         out.append(f"\n -- {maintainer}  {format_datetime(date)}\n")
     return "\n".join(out)
 
