@@ -1,0 +1,195 @@
+solvetus-vpn (0.1.19) unstable; urgency=low
+
+  * Add a local-network icon to the Allow local network row for alignment.
+  * Remove the test-build notice group; its information is covered by the
+    Security note and About dialog.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.18) unstable; urgency=low
+
+  * Remove the top banner after Switch IP; the exit-IP field updates silently.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.17) unstable; urgency=low
+
+  * Keep the connection-details panel visible while disconnected.
+  * Show the ISP IP and protocol when idle; show — for VPN exit IP, download,
+    upload, and Switch IP.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.16) unstable; urgency=low
+
+  * Show the ISP public IP and VPN exit IP on the connected screen.
+  * Add Switch IP, which reconnects the VPN and reports the new exit IP.
+  * Show live download/upload totals from the tunnel interface and the actual
+    OpenVPN transport protocol (UDP/TCP).
+  * Fetch public IPs only over HTTPS; skip ISP lookup while the kill switch is
+    armed and disconnected.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.15) unstable; urgency=low
+
+  * Replace the protocol dropdown with a compact linked UDP/TCP switch.
+  * Keep exactly one protocol selected; clicking the active side does not leave
+    both off, and the kill-switch lock reverts changes while armed.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.14) unstable; urgency=low
+
+  * Add padding inside the status card around the Connect button and text.
+  * Replace the stale "No kill switch" notice with the actual auto-protect
+    limitation now that the security section exists.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.13) unstable; urgency=low
+
+  * Add a real kill-switch control to the GUI: service-backed status,
+    confirmation prompts, Allow LAN, and controls locked while armed.
+  * Add safe quit/close prompts when protection is armed.
+  * Add a Kill switch item to the tray menu.
+  * Live test passed with the VPN down: DNS, physical-interface traffic, and
+    direct TCP were blocked; disarm restored IPv4 connectivity; UFW stayed
+    active.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.12) unstable; urgency=low
+
+  * Fix the polkit reply type: CheckAuthorization returns one struct
+    out-argument, so the GDBus reply type is ((bba{ss})) and authorization is
+    read from the first tuple member.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.11) unstable; urgency=low
+
+  * Build one combined package containing the desktop app and the optional
+    kill-switch service assets. The GUI remains unprivileged; the root service
+    is idle until explicitly armed.
+  * Combined package supersedes solvetus-vpn-killswitch and includes the
+    corrected polkit authorization call.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.10) unstable; urgency=low
+
+  * Fix the optional kill-switch service's polkit CheckAuthorization call:
+    polkit details use a{ss}, not a{sv}. No firewall rules were applied in
+    the failed test; this is the corrected service code.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.9) unstable; urgency=low
+
+  * Add the optional kill-switch service groundwork: pure nftables rule
+    generation, profile ownership validation, D-Bus API, polkit policy, and
+    a diagnostic CLI. The base GUI remains unprivileged and no kill-switch
+    toggle is enabled until the optional package is tested.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.8) unstable; urgency=low
+
+  * Add favorite locations: star/unstar in the location window, filter to
+    favorites only, and persist up to 50 favorites.
+  * Add a Favorites submenu to the tray with direct connection actions and a
+    confirmation before switching away from an active tunnel.
+  * Keep one reusable NetworkManager profile; favorites change the selected
+    location and do not duplicate profiles or certificates.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.7) unstable; urgency=low
+
+  * Tray icon now shows a red dot when no managed tunnel is active and a
+    green check when it is connected; the tooltip follows the same state.
+  * Install both status icon assets alongside the application icon.
+  * Document that GNOME's own VPN indicator is shell-owned and is not hidden
+    or replaced by the application.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.6) unstable; urgency=low
+
+  * Add a real StatusNotifierItem/DBusMenu tray icon for Ubuntu's GNOME
+    AppIndicator support, with no extra Python dependency.
+  * Tray actions: Show, Connect/Disconnect (state-aware), Choose Location,
+    Settings, Notifications toggle, Help, Legal Information, Forget Saved
+    Password, and Quit.
+  * Add a Settings dialog and a persisted desktop-notifications preference.
+  * Keep NetworkManager's own VPN indicator as the system source of truth.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.5) unstable; urgency=low
+
+  * Send desktop notifications for hidden-window events: connection lost,
+    reconnected, reconnection stopped, and closing to the background.
+  * Clicking a notification brings the existing window back.
+  * Add Forget Saved Password, which clears the keyring entry and the
+    in-memory copy after confirmation.
+  * Verify keyring store, lookup, and clear on the test VM with a temporary
+    entry that was removed immediately.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.4) unstable; urgency=low
+
+  * Add bounded automatic reconnection after an established tunnel drops:
+    retries at 2, 5, 10, 20, 30, and 60 seconds, with a visible countdown
+    and a Stop Retrying button.
+  * Never retry a manual disconnect, a quit, a failed first connection, or a
+    rejected password; verify the managed profile and CA before each retry.
+  * Add a Reconnect automatically switch, enabled by default.
+  * Keep the app retrying when the window is closed during reconnection, and
+    cancel retries when quitting.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.3) unstable; urgency=low
+
+  * Show country flags and full country names in the location list, the
+    selected-location row, and connection status.
+  * Search by country as well as city, including codes and common aliases;
+    search is accent-insensitive.
+  * Fix the selected-location line staying stale after choosing a new
+    location while disconnected.
+  * Add an in-app TCP vs UDP guide.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.2) unstable; urgency=low
+
+  * Separate the VPN account name from the local Ubuntu login. The VPN
+    username is sent to the server; profile ownership and secret-agent
+    authorization now always use the local account.
+  * Look up saved passwords by the VPN username in both the GUI and proof tool.
+  * Add regression tests proving the VPN username never becomes the profile
+    owner.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.1) unstable; urgency=low
+
+  * Fix catalogue download on the installed libsoup 3 runtime: read request
+    headers through Soup.Message.get_request_headers().
+  * Add a contract test against the real libsoup header API.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000
+
+solvetus-vpn (0.1.0) unstable; urgency=low
+
+  * First test build.
+  * Strictly validates the provider catalogue and OpenVPN profiles.
+  * Imports profiles through NetworkManager's OpenVPN plugin.
+  * Registers an agent-owned password secret agent on the system bus.
+  * Provides a GTK4/libadwaita interface for one managed VPN profile.
+  * Includes the solvetus-vpn-proof live-test diagnostic.
+
+ -- Solvetus project <noreply@example.invalid>  Tue, 17 Nov 2026 00:00:00 +0000

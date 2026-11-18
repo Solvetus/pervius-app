@@ -1,0 +1,20 @@
+# Build output: packages are published as GitHub Release assets, never committed.
+dist/
+build/
+*.deb
+*.rpm
+*.changes
+*.buildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Tooling caches
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.coverage

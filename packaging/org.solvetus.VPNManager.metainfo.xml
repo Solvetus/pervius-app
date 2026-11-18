@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.solvetus.VPNManager</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <name>Solvetus VPN Manager</name>
+  <summary>Manage an existing OpenVPN subscription through NetworkManager</summary>
+  <description>
+    <p>
+      Solvetus VPN Manager is an independent GTK4/libadwaita front end for an
+      existing FastVPN/OpenVPN subscription. It downloads the provider's public
+      server catalogue, validates every profile strictly, and imports the
+      selected profile through NetworkManager and its OpenVPN plugin.
+    </p>
+    <p>
+      The application runs as an ordinary user. NetworkManager performs all
+      privileged network operations. Passwords are handled by the NetworkManager
+      secret agent and are never written into the VPN profile.
+    </p>
+    <p>
+      This is an early test build. It manages one reusable NetworkManager
+      profile. It does not provide a kill switch, auto-protect, DNS filtering, or
+      background reconnection.
+    </p>
+  </description>
+  <launchable type="desktop-id">org.solvetus.VPNManager.desktop</launchable>
+  <developer id="org.solvetus">
+    <name>Solvetus project</name>
+  </developer>
+  <categories>
+    <category>Network</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.19" date="2026-11-17">
+      <description>
+        <p>Align the local-network row and remove the test-build notice group.</p>
+      </description>
+    </release>
+    <release version="0.1.18" date="2026-11-17">
+      <description>
+        <p>Remove the Switch IP banner.</p>
+      </description>
+    </release>
+    <release version="0.1.17" date="2026-11-17">
+      <description>
+        <p>Show ISP IP and protocol while disconnected, with — for the rest.</p>
+      </description>
+    </release>
+    <release version="0.1.16" date="2026-11-17">
+      <description>
+        <p>Show ISP/VPN exit IPs, Switch IP, traffic totals, and protocol.</p>
+      </description>
+    </release>
+    <release version="0.1.15" date="2026-11-17">
+      <description>
+        <p>Replace the protocol dropdown with a compact UDP/TCP switch.</p>
+      </description>
+    </release>
+    <release version="0.1.14" date="2026-11-17">
+      <description>
+        <p>Improve status-card spacing and update the security notice.</p>
+      </description>
+    </release>
+    <release version="0.1.13" date="2026-11-17">
+      <description>
+        <p>Add the service-backed kill-switch control to the GUI and tray.</p>
+      </description>
+    </release>
+    <release version="0.1.12" date="2026-11-17">
+      <description>
+        <p>Fix the polkit authorization reply type in the kill-switch service.</p>
+      </description>
+    </release>
+    <release version="0.1.11" date="2026-11-17">
+      <description>
+        <p>Ship the app and kill-switch service in one package.</p>
+      </description>
+    </release>
+    <release version="0.1.10" date="2026-11-17">
+      <description>
+        <p>Fix the kill-switch service polkit authorization signature.</p>
+      </description>
+    </release>
+    <release version="0.1.9" date="2026-11-17">
+      <description>
+        <p>Add the optional kill-switch service groundwork and diagnostic CLI.</p>
+      </description>
+    </release>
+    <release version="0.1.8" date="2026-11-17">
+      <description>
+        <p>Add favorite locations and a tray Favorites menu for quick switching.</p>
+      </description>
+    </release>
+    <release version="0.1.7" date="2026-11-17">
+      <description>
+        <p>Add red/green tray status icons for disconnected and connected states.</p>
+      </description>
+    </release>
+    <release version="0.1.6" date="2026-11-17">
+      <description>
+        <p>Add a native tray icon with connection, location, settings, and quit actions.</p>
+      </description>
+    </release>
+    <release version="0.1.5" date="2026-11-17">
+      <description>
+        <p>Add background notifications, bring-back behavior, and password removal.</p>
+      </description>
+    </release>
+    <release version="0.1.4" date="2026-11-17">
+      <description>
+        <p>Add bounded automatic reconnection after an unexpected VPN drop.</p>
+      </description>
+    </release>
+    <release version="0.1.3" date="2026-11-17">
+      <description>
+        <p>Add country flags, country-name search, a stale-location fix, and a TCP/UDP guide.</p>
+      </description>
+    </release>
+    <release version="0.1.2" date="2026-11-17">
+      <description>
+        <p>Separate the VPN account name from the local profile owner.</p>
+      </description>
+    </release>
+    <release version="0.1.1" date="2026-11-17">
+      <description>
+        <p>Fix the location list download on the installed libsoup runtime.</p>
+      </description>
+    </release>
+    <release version="0.1.0" date="2026-11-17">
+      <description>
+        <p>First test build for a single Ubuntu virtual machine.</p>
+      </description>
+    </release>
+  </releases>
+</component>

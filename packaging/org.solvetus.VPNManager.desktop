@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Solvetus VPN Manager
+GenericName=VPN Manager
+Comment=Manage an existing OpenVPN subscription through NetworkManager
+Exec=solvetus-vpn
+Icon=org.solvetus.VPNManager
+Terminal=false
+Type=Application
+Categories=Network;
+Keywords=VPN;OpenVPN;NetworkManager;FastVPN;
+StartupNotify=true
+StartupWMClass=org.solvetus.VPNManager

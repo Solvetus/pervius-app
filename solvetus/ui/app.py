@@ -1,0 +1,55 @@
+"""libadwaita application shell."""
+
+from __future__ import annotations
+
+import os
+import sys
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gio, Gtk  # noqa: E402
+
+from ..config import APP_ID, VERSION  # noqa: E402
+from .window import MainWindow  # noqa: E402
+
+
+class SolvetusApplication(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID, flags=0)
+        self.window: MainWindow | None = None
+
+        present = Gio.SimpleAction.new("present", None)
+        present.connect("activate", lambda *_args: self.do_activate())
+        self.add_action(present)
+
+    def do_activate(self):
+        if self.window is None:
+            self.window = MainWindow(application=self)
+        self.withdraw_notification("solvetus-vpn-state")
+        self.window.present()
+
+    def do_shutdown(self):
+        self.withdraw_notification("solvetus-vpn-state")
+        if self.window is not None:
+            self.window.cleanup()
+        Adw.Application.do_shutdown(self)
+
+
+def main(argv: list[str] | None = None) -> int:
+    if os.geteuid() == 0:
+        sys.stderr.write(
+            "Refusing to run as root. Start Solvetus VPN Manager as your desktop user;\n"
+            "NetworkManager performs privileged network operations.\n"
+        )
+        return 1
+    argv = list(sys.argv if argv is None else argv)
+    Gtk.init()
+    Adw.init()
+    app = SolvetusApplication()
+    return app.run(argv)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

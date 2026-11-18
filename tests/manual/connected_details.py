@@ -1,0 +1,34 @@
+"""Connection details panel while connected: exit IP, traffic, Switch IP."""
+
+from gi.repository import GLib
+
+from harness import DOC_IP, run_window_harness
+
+
+def scenario(window, checks, done):
+    window._set_state("connected")
+    window._read_tunnel_counters = lambda: (1000, 500, "tun9")
+    window._update_stats()
+    window._read_tunnel_counters = lambda: (2536, 909, "tun9")
+    window._update_stats()
+
+    def report():
+        checks.true("details visible", window.connection_details.get_visible())
+        checks.equal("ISP IP", window.isp_ip_value.get_text(), DOC_IP)
+        checks.equal("VPN exit IP", window.vpn_ip_value.get_text(), DOC_IP)
+        checks.equal("protocol", window.protocol_value.get_text(), "OpenVPN · UDP")
+        checks.equal("download", window.download_value.get_text(), "1.5 KB")
+        checks.equal("upload", window.upload_value.get_text(), "409 B")
+        calls = []
+        window._disconnect = lambda: calls.append("disconnect")
+        window._switch_ip()
+        checks.equal("Switch IP reconnect pending", window._reconnect_after_disconnect, True)
+        checks.equal("Switch IP disconnects", calls, ["disconnect"])
+        checks.equal("no banner after Switch IP", window.banner.get_revealed(), False)
+        done()
+        return False
+
+    GLib.timeout_add(1200, report)
+
+
+raise SystemExit(run_window_harness("connected_details", scenario))
