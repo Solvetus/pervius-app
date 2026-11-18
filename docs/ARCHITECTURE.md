@@ -310,9 +310,13 @@ the pinned tunnel versus other tunnels, always-allowed interfaces, LAN
 access, atomic endpoint swaps, a rejected transaction keeping the old set,
 the DNS window admitting only its cgroup and expiring, and the leak guard.
 
-Not yet tested live with 0.3.0: the checks in the release checklist (DNS
-only through the tunnel, the leak guard on a real link, a
-location switch while armed, an always-allowed NetBird interface).
+Verified live with 0.3.0 (Ubuntu 26.10, home LAN): no DNS on the physical
+link while connected (tcpdump, including a catalogue refresh and with
+NetBird installed), the leak guard present on the first connection after
+install, arming while connected without dropping the tunnel, traffic
+through `pervius0` while armed, a location switch while armed, connecting
+while armed from disconnected, Cancel/Quit while connecting, and the tray.
+Not yet tested live: reaching a NetBird peer through an always-allowed `wt0`.
 
 ## 6. Leak guard (DNS and IPv6)
 

@@ -195,13 +195,6 @@ removes it.
 
 ## Known limitations
 
-- **IPv6 and DNS can leak when the kill switch is off.** Without it you get
-  ordinary NetworkManager OpenVPN behaviour: the current profiles are
-  IPv4-only, so IPv6 traffic and DNS queries can bypass the tunnel. Arm the
-  kill switch if that matters to you.
-- **Live verification of the 0.3.0 leak fixes is pending.** The leak guard
-  and DNS-through-the-tunnel are tested in CI; until they are verified on a
-  real connection, treat the caveat above as current.
 - **No auto-protect.** The kill switch never arms automatically at login or on
   a network change, and a reboot turns it off.
 - **No DNS filtering** (no resolver, blocklists or DoH/DoT handling).
