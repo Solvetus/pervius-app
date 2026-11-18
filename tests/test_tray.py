@@ -82,5 +82,41 @@ class TrayItemUpdateTests(unittest.TestCase):
         self.assertEqual(len(emitted), 1)
 
 
+
+
+class ActivationTokenTests(unittest.TestCase):
+    def test_host_can_provide_an_activation_token(self):
+        from gi.repository import GLib
+
+        from pervius.ui.tray import _SNI_XML
+
+        self.assertIn('<method name="ProvideXdgActivationToken">', _SNI_XML)
+
+        class Invocation:
+            returned = []
+
+            def return_value(self, value):
+                Invocation.returned.append(value)
+
+        tray = make_tray()
+        tray._on_sni_method(None, ":1.9", "/StatusNotifierItem", "org.kde.StatusNotifierItem",
+                            "ProvideXdgActivationToken", GLib.Variant("(s)", ("token-123",)), Invocation())
+        self.assertEqual(Invocation.returned, [None])
+        self.assertEqual(tray.take_activation_token(), "token-123")
+        self.assertIsNone(tray.take_activation_token())  # usable once
+
+    def test_unprintable_token_is_ignored(self):
+        from gi.repository import GLib
+
+        class Invocation:
+            def return_value(self, value):
+                pass
+
+        tray = make_tray()
+        tray._on_sni_method(None, ":1.9", "/", "", "ProvideXdgActivationToken",
+                            GLib.Variant("(s)", ("bad\ntoken",)), Invocation())
+        self.assertIsNone(tray.take_activation_token())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1334,6 +1334,18 @@ class MainWindow(Adw.ApplicationWindow):
         return units[-1].format(locale.format_string("%.1f", size))
 
     def _present_from_tray(self):
+        """Show, unminimise and focus the window from the tray.
+
+        The tray host's XDG activation token (if it sent one) lets the
+        compositor raise the window; without it GNOME only says
+        "Pervius is ready".
+        """
+        token = self.tray.take_activation_token() if getattr(self, "tray", None) is not None else None
+        if token:
+            self.set_startup_id(token)
+        if not self.get_visible():
+            self.set_visible(True)
+        self.unminimize()
         self.present()
         app = self.get_application()
         if app is not None:

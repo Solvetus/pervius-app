@@ -63,6 +63,9 @@ _SNI_XML = """
       <arg name="delta" type="i" direction="in"/>
       <arg name="orientation" type="s" direction="in"/>
     </method>
+    <method name="ProvideXdgActivationToken">
+      <arg name="token" type="s" direction="in"/>
+    </method>
     <signal name="NewTitle"/>
     <signal name="NewIcon"/>
     <signal name="NewAttentionIcon"/>
@@ -187,6 +190,11 @@ class TrayIcon:
         self._revision = 1
         self._registered = False
         self._nodes: dict[int, MenuItem] = {}
+        # XDG activation token from the tray host (GNOME's AppIndicator
+        # extension sends one before Activate and menu events); presenting the
+        # window with it lets the compositor focus it instead of showing
+        # "<app> is ready".
+        self._activation_token: str | None = None
 
     @property
     def registered(self) -> bool:
@@ -310,6 +318,11 @@ class TrayIcon:
         except GLib.Error as exc:
             log.warning("could not refresh tray: %s", exc.message)
 
+    def take_activation_token(self) -> str | None:
+        """The last token from the tray host, usable once."""
+        token, self._activation_token = self._activation_token, None
+        return token
+
     def update_item(self, item_id: int) -> None:
         """Push one item's properties (e.g. a ticking status line) without a relayout."""
         if not self._registered or self._connection is None:
@@ -349,10 +362,16 @@ class TrayIcon:
         _path,
         _interface,
         method_name,
-        _parameters,
+        parameters,
         invocation,
     ):
         try:
+            if method_name == "ProvideXdgActivationToken":
+                (token,) = parameters.unpack()
+                if isinstance(token, str) and 0 < len(token) <= 4096 and token.isprintable():
+                    self._activation_token = token
+                invocation.return_value(None)
+                return None
             if method_name == "Activate":
                 self._activate_handler()
             elif method_name == "SecondaryActivate":
