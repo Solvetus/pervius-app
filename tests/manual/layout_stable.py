@@ -73,7 +73,7 @@ def scenario(window, checks, done):
         win = {(ww, wh) for _s, _w, _h, ww, wh in sizes}
         checks.equal("card size is identical in every state", len(card), 1)
         checks.equal("window size is identical in every state", len(win), 1)
-        checks.equal("default window is 444 wide and keeps the 0.3.0 height", sorted(win), [(444, 760)])
+        checks.equal("default window is 470 wide and keeps the 0.3.0 height", sorted(win), [(470, 760)])
         lan = next(
             w for w in walk(window)
             if isinstance(w, Gtk.Label) and (w.get_label() or "").startswith("Permit RFC")
@@ -146,6 +146,7 @@ def scenario(window, checks, done):
         top = t_rect.get_y()
         gap = s_rect.get_y() - (t_rect.get_y() + t_rect.get_height())
         bottom = header.get_height() - (s_rect.get_y() + s_rect.get_height())
+        checks.equal("title centred on the whole window", header.get_centering_policy(), Adw.CenteringPolicy.STRICT)
         print(f"header: height={header.get_height()} top={top:.1f} gap={gap:.1f} bottom={bottom:.1f}", flush=True)
         checks.true("header is taller", header.get_height() >= 56)
         checks.true("room above the title", top >= 6)
@@ -153,14 +154,14 @@ def scenario(window, checks, done):
         checks.true("room below the subtitle", bottom >= 6)
         window.queue_resize()
 
-        waited = {"n": 0, "last": None}
+        waited = {"n": 0}
 
         def finish_checks():
-            # Wait for the layout to settle after the long values were set.
-            now = (window.download_column.get_width(), window.upload_column.get_width())
+            # Wait for the layout to catch up with the long values just set.
+            labels = [w for w in walk(window.connection_details) if isinstance(w, Gtk.Label) and w.get_mapped()]
+            fits = all(w.get_width() >= w.measure(Gtk.Orientation.HORIZONTAL, -1)[1] for w in labels)
             waited["n"] += 1
-            if now != waited["last"] and waited["n"] < 25:
-                waited["last"] = now
+            if not fits and waited["n"] < 25:
                 window.queue_resize()
                 return True
             for later in state_checks:

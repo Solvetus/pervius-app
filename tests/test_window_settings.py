@@ -22,6 +22,18 @@ class WindowSettingsTests(unittest.TestCase):
             s = Settings.from_dict({"window_width": bad, "window_height": 700})
             self.assertEqual((s.window_width, s.window_height), (0, 0), bad)
 
+    def test_epoch_round_trip_and_validation(self):
+        self.assertEqual(Settings.from_dict({}).window_size_epoch, 0)
+        self.assertEqual(Settings.from_dict({"window_size_epoch": 1}).window_size_epoch, 1)
+        for bad in ("1", True, -1, 10**6):
+            self.assertEqual(Settings.from_dict({"window_size_epoch": bad}).window_size_epoch, 0, bad)
+
+    def test_old_saved_size_is_cleared_once(self):
+        text = WINDOW.read_text()
+        start = text.split("self.settings: Settings = self.settings_store.load()")[1][:600]
+        self.assertIn("window_size_epoch < WINDOW_SIZE_EPOCH", start)
+        self.assertIn("self.settings.window_width = self.settings.window_height = 0", start)
+
     def test_size_is_saved_on_close_and_quit_and_restored_at_start(self):
         text = WINDOW.read_text()
         self.assertIn("self._save_window_size()", text.split("def _on_close_request")[1].split("def ")[0])

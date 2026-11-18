@@ -100,9 +100,10 @@ _ACTIVE_STATES = {"preparing", "reconnecting", "connecting", "connected", "disco
 _PINS_FRESH_SECONDS = 60
 TOAST_SECONDS = 3
 # One content column: the banner, the status card and every group share it.
-# Narrowest width at which the English "Allow local network" subtitle fits on one
-# line: the row's natural width (408) plus the 2 x 18 px page margins.
-DEFAULT_WIDTH = 444
+DEFAULT_WIDTH = 470
+# Bumped when the default size changes so a size saved by an older build is
+# dropped once; the size is remembered again from then on.
+WINDOW_SIZE_EPOCH = 1
 CONTENT_WIDTH = 620
 HEADER_HEIGHT = 58
 _HIDDEN_IP = "•••.•••.•••.•••"
@@ -328,6 +329,14 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.settings_store = SettingsStore()
         self.settings: Settings = self.settings_store.load()
+        if self.settings.window_size_epoch < WINDOW_SIZE_EPOCH:
+            self.settings.window_width = self.settings.window_height = 0
+            self.settings.window_maximized = False
+            self.settings.window_size_epoch = WINDOW_SIZE_EPOCH
+            try:
+                self.settings_store.save(self.settings)
+            except OSError:
+                pass
         if self.settings.window_width:
             self.set_default_size(self.settings.window_width, self.settings.window_height)
         if self.settings.window_maximized:
@@ -422,6 +431,7 @@ class MainWindow(Adw.ApplicationWindow):
         _install_css()
         header = Adw.HeaderBar()
         header.add_css_class("pervius-header")
+        header.set_centering_policy(Adw.CenteringPolicy.STRICT)
         title = Adw.WindowTitle(title=APP_NAME, subtitle=_("Unofficial client for FastVPN"))
         header.set_title_widget(title)
 

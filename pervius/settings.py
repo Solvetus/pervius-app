@@ -35,6 +35,7 @@ class Settings:
     window_width: int = 0
     window_height: int = 0
     window_maximized: bool = False
+    window_size_epoch: int = 0
 
     @classmethod
     def from_dict(cls, value: dict) -> "Settings":
@@ -93,6 +94,9 @@ class Settings:
         window_width, window_height = dimension("window_width"), dimension("window_height")
         if not (window_width and window_height):
             window_width = window_height = 0
+        epoch = value.get("window_size_epoch", 0)
+        if isinstance(epoch, bool) or not isinstance(epoch, int) or not 0 <= epoch <= 1000:
+            epoch = 0
         language = value.get("language", "")
         if language not in SUPPORTED_LANGUAGES:
             language = ""
@@ -113,6 +117,7 @@ class Settings:
             window_width=window_width,
             window_height=window_height,
             window_maximized=flag("window_maximized", False),
+            window_size_epoch=epoch,
         )
 
 
