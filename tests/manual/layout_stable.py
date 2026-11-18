@@ -72,7 +72,15 @@ def scenario(window, checks, done):
         win = {(ww, wh) for _s, _w, _h, ww, wh in sizes}
         checks.equal("card size is identical in every state", len(card), 1)
         checks.equal("window size is identical in every state", len(win), 1)
-        checks.equal("default window size is the 0.3.0 one", sorted(win), [(520, 760)])
+        checks.equal("default window is 444 wide and keeps the 0.3.0 height", sorted(win), [(444, 760)])
+        lan = next(
+            w for w in walk(window)
+            if isinstance(w, Gtk.Label) and (w.get_label() or "").startswith("Permit RFC")
+        )
+        checks.equal("local-network subtitle is one line at the default size", lan.get_layout().get_line_count(), 1)
+        footer = window.footer
+        checks.equal("footer is centred", (footer.get_xalign(), footer.get_justify()), (0.5, Gtk.Justification.CENTER))
+        checks.true("footer wraps inside the column", footer.get_width() <= window.get_width())
         print("sizes:", sorted(card), sorted(win), flush=True)
 
         # One column: banner, status card and every group share left edge and width.

@@ -100,6 +100,9 @@ _ACTIVE_STATES = {"preparing", "reconnecting", "connecting", "connected", "disco
 _PINS_FRESH_SECONDS = 60
 TOAST_SECONDS = 3
 # One content column: the banner, the status card and every group share it.
+# Narrowest width at which the English "Allow local network" subtitle fits on one
+# line: the row's natural width (408) plus the 2 x 18 px page margins.
+DEFAULT_WIDTH = 444
 CONTENT_WIDTH = 620
 HEADER_HEIGHT = 58
 _HIDDEN_IP = "•••.•••.•••.•••"
@@ -321,7 +324,7 @@ class MainWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.set_title(APP_NAME)
-        self.set_default_size(520, 760)
+        self.set_default_size(DEFAULT_WIDTH, 760)
 
         self.settings_store = SettingsStore()
         self.settings: Settings = self.settings_store.load()
@@ -717,7 +720,10 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.footer = Gtk.Label()
         self.footer.set_wrap(True)
+        self.footer.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
         self.footer.set_justify(Gtk.Justification.CENTER)
+        self.footer.set_xalign(0.5)
+        self.footer.set_hexpand(True)
         self.footer.add_css_class("caption")
         self.footer.add_css_class("dim-label")
         self._reset_footer()
