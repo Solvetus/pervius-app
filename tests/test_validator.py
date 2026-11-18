@@ -68,21 +68,64 @@ class ValidatorTests(unittest.TestCase):
         with self.assertRaisesRegex(ArchiveError, "too large"):
             validate_archive(blob)
 
-    def test_bad_directory_layout_rejected(self):
-        blob = zip_with({"other/NCVPN-TS-A-UDP.ovpn": profile_text().encode()})
-        with self.assertRaisesRegex(CatalogueError, "unexpected directory layout"):
-            parse_catalogue(blob, source_url="fixture")
+    def test_bad_directory_layout_is_skipped(self):
+        blob = zip_with(
+            {
+                "other/NCVPN-TS-A-UDP.ovpn": profile_text().encode(),
+                "udp/NCVPN-TS-B-UDP.ovpn": profile_text().encode(),
+            }
+        )
+        catalogue = parse_catalogue(blob, source_url="fixture")
+        self.assertEqual([name for name, _reason in catalogue.skipped], ["other/NCVPN-TS-A-UDP.ovpn"])
+        self.assertIn("unexpected directory layout", catalogue.skipped[0][1])
 
-    def test_protocol_mismatch_rejected(self):
-        blob = zip_with({"tcp/NCVPN-TS-A-UDP.ovpn": profile_text(protocol="tcp").encode()})
-        with self.assertRaisesRegex(CatalogueError, "protocol directory does not match"):
-            parse_catalogue(blob, source_url="fixture")
+    def test_protocol_mismatch_is_skipped(self):
+        blob = zip_with(
+            {
+                "tcp/NCVPN-TS-A-UDP.ovpn": profile_text(protocol="tcp").encode(),
+                "udp/NCVPN-TS-B-UDP.ovpn": profile_text().encode(),
+            }
+        )
+        catalogue = parse_catalogue(blob, source_url="fixture")
+        self.assertEqual(len(catalogue.skipped), 1)
+        self.assertIn("protocol directory does not match", catalogue.skipped[0][1])
 
-    def test_invalid_profile_rejected(self):
+    def test_one_invalid_profile_does_not_fail_the_catalogue(self):
+        good = profile_text().encode()
+        bad = profile_text(protocol="tcp").replace(
+            "verify-x509-name example name-prefix", "verify-x509-name example bogus-type"
+        )
+        blob = zip_with(
+            {
+                "udp/NCVPN-TS-A-UDP.ovpn": good,
+                "tcp/NCVPN-PK-Islamabad-TCP.ovpn": bad.encode(),
+                "udp/NCVPN-OT-B-UDP.ovpn": (profile_text() + "plugin /tmp/x\n").encode(),
+            }
+        )
+        catalogue = parse_catalogue(blob, source_url="fixture")
+        self.assertEqual(catalogue.profile_count, 1)
+        self.assertEqual(
+            sorted(name for name, _reason in catalogue.skipped),
+            ["tcp/NCVPN-PK-Islamabad-TCP.ovpn", "udp/NCVPN-OT-B-UDP.ovpn"],
+        )
+        self.assertTrue(any(":38" in r or "verify-x509-name" in r for _n, r in catalogue.skipped))
+
+    def test_one_argument_verify_x509_profile_is_accepted(self):
+        blob = zip_with(
+            {
+                "tcp/NCVPN-PK-Islamabad-TCP.ovpn": profile_text(protocol="tcp")
+                .replace("verify-x509-name example name-prefix", "verify-x509-name example")
+                .encode(),
+            }
+        )
+        catalogue = parse_catalogue(blob, source_url="fixture")
+        self.assertEqual((catalogue.profile_count, catalogue.skipped), (1, ()))
+
+    def test_catalogue_with_only_invalid_profiles_is_rejected(self):
         blob = zip_with(
             {"udp/NCVPN-TS-A-UDP.ovpn": (profile_text() + "plugin /tmp/x\n").encode()}
         )
-        with self.assertRaises(CatalogueError):
+        with self.assertRaisesRegex(CatalogueError, "no locations"):
             parse_catalogue(blob, source_url="fixture")
 
     def test_real_catalogue_snapshot(self):

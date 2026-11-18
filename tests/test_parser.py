@@ -77,10 +77,27 @@ class ParserTests(unittest.TestCase):
         with self.assertRaisesRegex(ProfileError, "'tls-auth' rejected"):
             parse_profile(text.encode(), "test.ovpn")
 
-    def test_ambiguous_verify_x509_rejected(self):
+    def test_one_argument_verify_x509_uses_the_default_subject_type(self):
+        # tcp/NCVPN-PK-Islamabad-TCP.ovpn:38 once used this form; it is valid OpenVPN.
         text = profile_text().replace("verify-x509-name example name-prefix", "verify-x509-name example")
-        with self.assertRaises(ProfileError):
-            parse_profile(text.encode(), "test.ovpn")
+        self.assertEqual(parse_profile(text.encode(), "test.ovpn").verify_x509_name, "subject:example")
+        quoted = profile_text().replace(
+            "verify-x509-name example name-prefix", 'verify-x509-name "C=US, O=Example, CN=vpn"'
+        )
+        self.assertEqual(
+            parse_profile(quoted.encode(), "test.ovpn").verify_x509_name, "subject:C=US, O=Example, CN=vpn"
+        )
+
+    def test_bad_verify_x509_forms_are_rejected(self):
+        for replacement in (
+            "verify-x509-name example something",
+            "verify-x509-name example name extra",
+            "verify-x509-name",
+            'verify-x509-name "has space" name',
+        ):
+            text = profile_text().replace("verify-x509-name example name-prefix", replacement)
+            with self.assertRaises(ProfileError, msg=replacement):
+                parse_profile(text.encode(), "test.ovpn")
 
     def test_inline_comment_rejected(self):
         text = profile_text().replace("verb 3", "verb 3 # hidden")

@@ -119,6 +119,8 @@ _DENIED = {
     "dhcp-release": "platform-specific directives are not supported",
 }
 
+VERIFY_X509_TYPES = {"subject", "name", "name-prefix"}
+
 _REQUIRED_ARG_COUNTS = {
     "dev": 1,
     "proto": 1,
@@ -128,7 +130,7 @@ _REQUIRED_ARG_COUNTS = {
     "tls-cipher": 1,
     "resolv-retry": 1,
     "verb": 1,
-    "verify-x509-name": 2,  # value + explicit type
+    "verify-x509-name": 1,  # value, optionally followed by a type (see below)
     "remote-cert-tls": 1,
     "remote": None,
 }
@@ -276,6 +278,8 @@ def _validate_directive(directive: _Directive, profile: str) -> None:
         minimum = _REQUIRED_ARG_COUNTS[name]
         if name == "remote":
             _check_count(directive, profile, 2, 2)
+        elif name == "verify-x509-name":
+            _check_count(directive, profile, 1, 2)
         else:
             _check_count(directive, profile, minimum, minimum)
 
@@ -341,12 +345,18 @@ def _validate_directive(directive: _Directive, profile: str) -> None:
 
     if name == "verify-x509-name":
         value = args[0]
-        if not value or len(value) > 255 or any(char.isspace() for char in value):
+        # OpenVPN: "verify-x509-name name [type]"; without a type the value
+        # is matched against the whole certificate subject ("subject").
+        verify_type = args[1] if len(args) == 2 else "subject"
+        if verify_type not in VERIFY_X509_TYPES:
+            raise ProfileError(f"unsupported verify-x509-name type '{verify_type}'", profile, directive.line)
+        if (
+            not value
+            or len(value) > 255
+            or any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
+            or (verify_type != "subject" and any(char.isspace() for char in value))
+        ):
             raise ProfileError("invalid verify-x509-name value", profile, directive.line)
-        # A missing type would mean "subject" in the importer; require an
-        # explicit name/name-prefix type instead.
-        if args[1] not in {"name", "name-prefix"}:
-            raise ProfileError(f"unsupported verify-x509-name type '{args[1]}'", profile, directive.line)
         return
 
     if name == "remote-cert-tls":
@@ -520,7 +530,7 @@ def parse_profile(data: bytes, profile_name: str = "<profile>") -> ParsedProfile
 
     verify_values = [directive for directive in directives if directive.name == "verify-x509-name"]
     verify = verify_values[0]
-    verify_type = verify.args[1]
+    verify_type = verify.args[1] if len(verify.args) == 2 else "subject"
     verify_name = f"{verify_type}:{verify.args[0]}"
 
     auth = next(d.args[0] for d in directives if d.name == "auth")

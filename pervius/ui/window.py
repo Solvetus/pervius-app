@@ -1820,9 +1820,20 @@ class MainWindow(Adw.ApplicationWindow):
             self._set_state("blocked", self._blocked_reason)
         else:
             self._set_state("idle")
+        for name, reason in catalogue.skipped:
+            log.warning("skipped catalogue profile %s: %s", name, reason)
         if error is not None:
             # Translators: {0} is a technical error message.
             self._show_banner(_("Using the saved location list; refresh failed: {0}").format(error))
+        elif catalogue.skipped:
+            count = len(catalogue.skipped)
+            self._show_banner(
+                ngettext(
+                    "{0} server profile failed validation and was left out: {1}",
+                    "{0} server profiles failed validation and were left out: {1}",
+                    count,
+                ).format(count, ", ".join(name.rsplit("/", 1)[-1] for name, _reason in catalogue.skipped[:3]))
+            )
         elif refreshed and self.active is None:
             profiles = ngettext(
                 "{0} profile", "{0} profiles", catalogue.profile_count

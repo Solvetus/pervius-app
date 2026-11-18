@@ -156,20 +156,29 @@ def parse_catalogue(
     source_url: str,
     fetched_at: str | None = None,
 ) -> Catalogue:
+    """Validate the archive and every profile.
+
+    The archive itself must be sound (``validate_archive`` raises otherwise),
+    but an individual profile that fails validation is left out and reported
+    in ``Catalogue.skipped`` instead of failing the whole catalogue.
+    """
     entries = validate_archive(blob)
     by_location: dict[tuple[str, str], dict[str, ProfileRef]] = {}
+    skipped: list[tuple[str, str]] = []
 
     for entry in entries:
-        country, city, protocol, base = _split_entry_name(entry.name)
         try:
+            country, city, protocol, base = _split_entry_name(entry.name)
             parsed = parse_profile(entry.data, entry.name)
-        except ProfileError as exc:
-            raise CatalogueError(str(exc)) from exc
-        if parsed.protocol != protocol:
-            raise CatalogueError(f"profile protocol does not match filename: {entry.name!r}")
+            if parsed.protocol != protocol:
+                raise CatalogueError(f"profile protocol does not match filename: {entry.name!r}")
+        except (ProfileError, CatalogueError) as exc:
+            skipped.append((entry.name, str(exc)))
+            continue
         key = (country, city)
         if protocol in by_location.setdefault(key, {}):
-            raise CatalogueError(f"duplicate profile for {country}/{city}/{protocol}")
+            skipped.append((entry.name, f"duplicate profile for {country}/{city}/{protocol}"))
+            continue
         by_location[key][protocol] = ProfileRef(
             archive_name=entry.name,
             country_code=country,
@@ -196,6 +205,7 @@ def parse_catalogue(
         locations=tuple(locations),
         profile_count=sum(len(location.profiles) for location in locations),
         country_count=len(countries),
+        skipped=tuple(skipped),
     )
 
 

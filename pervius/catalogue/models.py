@@ -116,6 +116,8 @@ class Catalogue:
     locations: tuple[Location, ...]
     profile_count: int
     country_count: int
+    # Archive entries that failed validation and were left out, with reasons.
+    skipped: tuple[tuple[str, str], ...] = ()
 
     def location_by_key(self, key: str) -> Location | None:
         for location in self.locations:
