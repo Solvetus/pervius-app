@@ -3,6 +3,7 @@
 pervius \- unofficial Linux client for FastVPN
 .SH SYNOPSIS
 .B pervius
+.RB [ \-\-hidden ]
 .SH DESCRIPTION
 .B pervius
 starts the Pervius desktop application, a GTK 4/libadwaita client for an
@@ -14,11 +15,19 @@ are never written into the profile.
 Run it as your desktop user, never as root. NetworkManager performs the
 privileged network operations. The optional kill switch is controlled through
 .BR pervius\-killswitch (1).
+.SH OPTIONS
+.TP
+.B \-\-hidden
+Start in the tray without showing the window (used by Start at login). If no
+tray is available, the window is shown.
 .SH FILES
 .TP
 .I ~/.local/share/pervius/
 Settings, favorites, cached catalogue, CA file and ownership manifest. No
 passwords.
+.TP
+.I ~/.config/autostart/com.solvetus.Pervius.desktop
+Present only while Start at login is on.
 .SH SEE ALSO
 .BR pervius\-killswitch (1),
 .BR pervius\-inspect (1),

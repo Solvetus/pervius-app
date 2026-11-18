@@ -24,21 +24,32 @@ _Screenshots will be added here._
 - **NetworkManager does the privileged work.** The app runs as your user,
   never as root. One app-owned NetworkManager profile is reused for every
   location.
-- **Passwords stay out of the profile.** A NetworkManager secret agent supplies
-  the password on request. Saving it in the desktop keyring is optional; there
-  is never a plaintext fallback.
+- **Passwords stay out of the profile and out of sight.** A NetworkManager
+  secret agent supplies the password on request. Saving it in the desktop
+  keyring is optional; there is never a plaintext fallback. A saved password
+  is never shown again: the Account dialog says "Saved in the keyring" and
+  offers Replace and Forget.
+- **No DNS or IPv6 leaks while connected.** All DNS goes through the tunnel,
+  and IPv6 outside the (IPv4-only) tunnel is blocked by a NetworkManager hook,
+  whether or not the kill switch is on and whether or not the app is running.
 - **Locations:** country flags and names, search by city, country, code or
   alias (UK, USA, Holland…), favorites, and a UDP/TCP switch with a guide.
 - **Bounded automatic reconnect** after an established tunnel drops (2, 5, 10,
   20, 30, 60 s), with a countdown and Stop button. It never retries a failed
   first connection, a rejected password or a manual disconnect.
-- **Tray icon** (StatusNotifierItem) with connect, favorites, settings and
-  kill-switch actions; red when disconnected, green when connected.
+- **Tray icon** (StatusNotifierItem) with a status line and connected time,
+  connect, favorites, location and kill-switch actions; a green badge when
+  connected, amber while reconnecting.
 - **Desktop notifications** for drops and recovery while the window is hidden.
-- **Connection details:** ISP IP, VPN exit IP, **Switch IP** (reconnect),
-  traffic totals and the transport in use.
-- **Optional kill switch** that blocks traffic outside the tunnel while armed.
-  See [Kill switch](#kill-switch).
+- **Connection details:** ISP IP and VPN exit IP (hidden until you reveal
+  them), **Switch IP** (reconnect), traffic totals, connected time and the
+  transport in use.
+- **Optional kill switch** that blocks traffic outside the tunnel while armed,
+  and still lets you change location or protocol. See
+  [Kill switch](#kill-switch).
+- **Languages:** English, European Portuguese, French, Spanish and Italian,
+  following the system language or chosen in Settings.
+- **Start at login**, hidden in the tray (optional).
 
 ## Supported distributions
 
@@ -59,21 +70,29 @@ checksum, then install:
 
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
-sudo apt install ./pervius_0.2.0_all.deb
+sudo apt install ./pervius_0.3.0_all.deb
 ```
 
-`sha256sum` must print `pervius_0.2.0_all.deb: OK`. Do not install a package
+`sha256sum` must print `pervius_0.3.0_all.deb: OK`. Do not install a package
 whose checksum does not match. The packages are not signed yet.
 
 Start **Pervius** from the application menu or run `pervius`. Do not run it
 with `sudo`.
+
+### Upgrading from 0.2.0
+
+Disarm the kill switch, disconnect and quit Pervius before upgrading. 0.3.0
+pins the tunnel to the interface `pervius0`; an armed 0.2.0 kill switch that
+is restored by the new service blocks the old tunnel until you reconnect. The
+managed profile is re-imported automatically on the next connection (new
+tunnel name, DNS through the tunnel).
 
 ### Upgrading from the 0.1.x test builds
 
 **Turn the kill switch off in the old app before upgrading.** `apt` removes
 the old package first, and the old package's removal script deletes its own
 firewall table, so an armed kill switch would be turned off without asking.
-`sudo dpkg -i pervius_0.2.0_all.deb` instead refuses to install while the old
+`sudo dpkg -i pervius_0.3.0_all.deb` instead refuses to install while the old
 kill switch is armed and prints the command to disarm it.
 
 On the first start, Pervius moves your settings, favorites and cached server
@@ -84,7 +103,7 @@ deleted once Pervius works.
 
 ## First use
 
-1. Open the main menu and choose **Credentials**.
+1. In the **Account** row choose **Edit**.
 2. Enter your FastVPN username and password.
 3. Choose a location and UDP or TCP.
 4. Press **Connect**.
@@ -97,14 +116,28 @@ computer cannot use or change it.
 
 The package installs a small root service, `pervius-killswitchd`, that is idle
 until you arm the kill switch. Arming asks polkit for permission. While armed,
-a dedicated nftables table (`inet pervius_ks`) allows only loopback, the tunnel
-interface, DHCP, IPv6 neighbour discovery and the VPN server addresses, and
-drops all other IPv4 and IPv6 traffic, including plain DNS. **Allow local
-network** optionally permits RFC 1918/ULA ranges. Location and protocol are
-locked while armed, because the allowlist is built from the current profile.
+a dedicated nftables table (`inet pervius_ks`) allows only loopback, the
+Pervius tunnel (`pervius0`), the interfaces you always allow, DHCP, IPv6
+neighbour discovery and the VPN server addresses, and drops all other IPv4
+and IPv6 traffic, including plain DNS. Another VPN's tunnel is blocked unless
+you allow its interface.
+
+While armed you can still change location or protocol: the service resolves
+the new servers and swaps the allowed addresses in one atomic update, and the
+profile is pinned to those addresses so OpenVPN needs no DNS outside the
+tunnel. A connected tunnel resolves the new location through itself before it
+is dropped. When the tunnel is down, the service may resolve the server names
+through a DNS window of at most five seconds that admits only its own
+lookups.
+
+Options, editable while armed:
+
+- **Allow local network** permits RFC 1918/ULA ranges.
+- **Always allow these interfaces** (Settings) — for example `wt0` for NetBird.
+  The interfaces are also allowed by the IPv6 guard.
 
 The kill switch never arms itself, and a reboot turns it off (fail-open).
-Quitting the app can leave it armed.
+Quitting or a crash of the app leaves it armed.
 
 **Recovery:** if you are offline because the kill switch is still armed, run:
 
@@ -114,8 +147,31 @@ pervius-killswitch disarm
 
 As a last resort (for example if the service is broken), remove the table as
 root: `sudo nft delete table inet pervius_ks`. Other commands:
-`pervius-killswitch status`, `pervius-killswitch arm [--allow-lan]`,
-`pervius-killswitch diagnose`.
+`pervius-killswitch status`, `pervius-killswitch arm [--allow-lan]
+[--allow-interface IFACE]`, `pervius-killswitch configure …`,
+`pervius-killswitch update-endpoints`, `pervius-killswitch diagnose`.
+
+## IPv6 guard
+
+While the Pervius-managed VPN is up, a NetworkManager dispatcher hook
+(`/usr/lib/NetworkManager/dispatcher.d/90-pervius-ipv6-guard`) installs the
+nftables table `inet pervius_v6`, which blocks IPv6 outside the tunnel except
+loopback, link-local, neighbour discovery, unique local addresses and the
+interfaces you always allow. It is removed when the VPN goes down. It does not
+need the app or the kill switch. Turn it off with **Settings → Block IPv6
+while connected** (applies from the next connection). If a NetworkManager
+crash ever leaves it behind, `sudo nft delete table inet pervius_v6` removes
+it.
+
+## Settings
+
+- **Language:** system default, English, Português, Français, Español or
+  Italiano; takes effect after a restart.
+- **Start at login:** starts Pervius hidden in the tray through
+  `~/.config/autostart/com.solvetus.Pervius.desktop`.
+- **Desktop notifications** and **Reconnect automatically**.
+- **Block IPv6 while connected** (on by default) and **Always allow these
+  interfaces**.
 
 ## Privacy
 
@@ -125,6 +181,8 @@ root: `sudo nft delete table inet pervius_ks`. Other commands:
   which sees your public address. If Pervius starts while already connected,
   the ISP IP is shown as "Not captured": learning it would mean sending
   traffic outside the tunnel.
+- **IP addresses** in the connection details are hidden until you press the
+  eye button; the choice is remembered.
 - Pervius has no servers of its own and sends nothing to Solvetus Labs.
 
 ## Known limitations
@@ -133,25 +191,26 @@ root: `sudo nft delete table inet pervius_ks`. Other commands:
   ordinary NetworkManager OpenVPN behaviour: the current profiles are
   IPv4-only, so IPv6 traffic and DNS queries can bypass the tunnel. Arm the
   kill switch if that matters to you.
+- **Live verification of the 0.3.0 leak fixes is pending.** The IPv6 guard
+  and DNS-through-the-tunnel are tested in CI; until they are verified on a
+  real connection, treat the caveat above as current.
 - **No auto-protect.** The kill switch never arms automatically at login or on
   a network change, and a reboot turns it off.
 - **No DNS filtering** (no resolver, blocklists or DoH/DoT handling).
-- **Resolving the VPN server names before arming** is a small, one-time DNS
-  lookup outside the tunnel.
-- **The kill-switch allowlist is fixed when armed.** If the provider changes
-  server addresses while you are disconnected, reconnecting can fail until you
-  disarm and arm again.
+- **Resolving the VPN server names before arming** while disconnected is a
+  small, one-time DNS lookup outside the tunnel; while armed and
+  disconnected, only the kill-switch service's own lookups of the server names
+  can leave, for at most five seconds.
 - **One managed profile and one account.** Favorites change its location; no
   simultaneous VPNs, multiple accounts or split tunnelling.
 - **Switch IP is a reconnect** and can return the same exit IP. Traffic totals
   are interface counters since connecting, not provider data.
-- **Not yet verified live:** a real unexpected drop with automatic reconnect,
-  long hidden-window sessions with reauthentication, the GUI kill-switch switch
-  against the live service, and dual-stack IPv6 leak tests. The service and CLI
-  kill-switch path has been tested live.
+- **Not yet verified live:** a real unexpected drop with automatic reconnect
+  and long hidden-window sessions with reauthentication.
 - **GNOME's own VPN indicator stays visible**; it is the system's source of
   truth and is deliberately not hidden.
-- No localization, help pages or start-at-login yet. Packages are not signed.
+- City names come from the provider and are not translated; the command-line
+  tools and manual pages are English only. Packages are not signed.
 
 ## Files
 
@@ -159,8 +218,11 @@ root: `sudo nft delete table inet pervius_ks`. Other commands:
   ownership manifest. No passwords.
 - Desktop keyring (Secret Service schema `com.solvetus.Pervius`) — the saved
   password, only if you chose to save it.
+- `~/.config/autostart/com.solvetus.Pervius.desktop` — only while Start at
+  login is on.
 
-`sudo apt remove pervius` removes the app and the kill-switch service. The
+`sudo apt remove pervius` removes the app, the kill-switch service, the IPv6
+guard hook and both firewall tables. The
 NetworkManager profile **Pervius (managed)**, the data directory and the
 keyring entry stay until you remove them.
 
