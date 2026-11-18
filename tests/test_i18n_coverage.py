@@ -111,7 +111,14 @@ def untranslated(path: Path) -> list[str]:
         if node_id in visitor.exempt:
             continue
         text = value.strip()
-        if not text or text in ALLOWED or IDENTIFIER.match(text) or text.startswith("<node>"):
+        if (
+            not text
+            or text in ALLOWED
+            or IDENTIFIER.match(text)
+            or text.startswith("<node>")
+            or "headerbar." in text  # the stylesheet, not UI text
+            or text.startswith("px; }")
+        ):
             continue
         if not HUMAN.search(text):
             continue

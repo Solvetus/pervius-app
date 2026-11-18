@@ -19,7 +19,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("NM", "1.0")
-from gi.repository import Adw, Gio, GLib, Gtk, NM  # noqa: E402
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk, NM, Pango  # noqa: E402
 
 from .. import autostart, i18n
 from ..catalogue import Catalogue, CatalogueStore, Location, ProfileRef, parse_catalogue
@@ -98,9 +98,34 @@ _ACTIVE_STATES = {"preparing", "reconnecting", "connecting", "connected", "disco
 # Endpoints resolved within this many seconds are reused instead of asking the
 # kill-switch service again (e.g. right after a switch prepared them).
 _PINS_FRESH_SECONDS = 60
+TOAST_SECONDS = 3
+# One content column: the banner, the status card and every group share it.
+CONTENT_WIDTH = 620
+HEADER_HEIGHT = 58
 _HIDDEN_IP = "•••.•••.•••.•••"
 KEEP_PINS = object()
 NAMES = object()
+
+
+_CSS = f"""
+/* A little more room in the header: a taller bar, and a few pixels between
+   the title and its subtitle. The font sizes stay GNOME's own. */
+headerbar.pervius-header {{ min-height: {HEADER_HEIGHT}px; }}
+headerbar.pervius-header windowtitle label.subtitle {{ margin-top: 3px; }}
+"""
+_css_installed = False
+
+
+def _install_css() -> None:
+    global _css_installed
+    if _css_installed:
+        return
+    provider = Gtk.CssProvider()
+    provider.load_from_string(_CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+    )
+    _css_installed = True
 
 
 def format_duration(seconds: int) -> str:
@@ -296,7 +321,7 @@ class MainWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.set_title(APP_NAME)
-        self.set_default_size(520, 760)
+        self.set_default_size(580, 860)
 
         self.settings_store = SettingsStore()
         self.settings: Settings = self.settings_store.load()
@@ -319,6 +344,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._killswitch_pending = ""
         self._killswitch_ready = False
         self._interfaces_row = None
+        self._dismissed_banners: set[str] = set()
+        self._banner_text = ""
         # Incremented by every connect and cancel; late callbacks of an older
         # attempt see a different value and do nothing.
         self._attempt = 0
@@ -385,7 +412,9 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _build_ui(self):
         toolbar = Adw.ToolbarView()
+        _install_css()
         header = Adw.HeaderBar()
+        header.add_css_class("pervius-header")
         title = Adw.WindowTitle(title=APP_NAME, subtitle=_("Unofficial client for FastVPN"))
         header.set_title_widget(title)
 
@@ -409,6 +438,9 @@ class MainWindow(Adw.ApplicationWindow):
         root.set_margin_end(18)
 
         self.banner = Adw.Banner.new("")
+        # Adw.Banner has one text button; the cross dismisses the banner.
+        self.banner.set_button_label("✕")
+        self.banner.connect("button-clicked", self._on_banner_dismissed)
         self.banner.set_revealed(False)
         root.append(self.banner)
 
@@ -416,9 +448,8 @@ class MainWindow(Adw.ApplicationWindow):
         status_card.add_css_class("card")
         status_card.set_margin_top(4)
         status_card.set_margin_bottom(4)
-        status_card.set_margin_start(18)
-        status_card.set_margin_end(18)
-        status_card.set_valign(Gtk.Align.CENTER)
+        status_card.set_valign(Gtk.Align.START)
+        self.status_card = status_card
 
         self.status_stack = Gtk.Stack()
         self.status_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
@@ -439,7 +470,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.status_title = Gtk.Label(label=_("Starting…"))
         self.status_title.add_css_class("title-1")
-        self.status_title.set_wrap(True)
+        self.status_title.set_wrap(False)
+        self.status_title.set_ellipsize(Pango.EllipsizeMode.END)
         self.status_title.set_margin_start(18)
         self.status_title.set_margin_end(18)
         status_card.append(self.status_title)
@@ -447,7 +479,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.status_subtitle = Gtk.Label(label="")
         self.status_subtitle.add_css_class("dim-label")
         self.status_subtitle.set_wrap(True)
+        self.status_subtitle.set_lines(2)
+        self.status_subtitle.set_ellipsize(Pango.EllipsizeMode.END)
         self.status_subtitle.set_justify(Gtk.Justification.CENTER)
+        # Always two lines high, so error text never pushes content down.
+        self.status_subtitle.connect("realize", self._reserve_subtitle_height)
         self.status_subtitle.set_margin_start(22)
         self.status_subtitle.set_margin_end(22)
         self.status_subtitle.set_margin_bottom(8)
@@ -686,17 +722,26 @@ class MainWindow(Adw.ApplicationWindow):
         scroller = Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         clamp = Adw.Clamp()
-        clamp.set_maximum_size(620)
+        clamp.set_maximum_size(CONTENT_WIDTH)
+        clamp.set_tightening_threshold(CONTENT_WIDTH)
         clamp.set_child(root)
         scroller.set_child(clamp)
         toolbar.set_content(scroller)
-        self.set_content(toolbar)
+        # Toasts float over the content; they dismiss themselves.
+        self.toasts = Adw.ToastOverlay()
+        self.toasts.set_child(toolbar)
+        self.set_content(self.toasts)
 
         self.connect("close-request", self._on_close_request)
         self._update_ip_toggle()
         self._set_state("loading")
         self._update_account_row()
         self._update_location_row()
+
+    def _reserve_subtitle_height(self, label, *_args):
+        metrics = label.get_pango_context().get_metrics(None, None)
+        line = (metrics.get_ascent() + metrics.get_descent()) / Pango.SCALE
+        label.set_size_request(-1, int(math.ceil(2 * line)) + 2)
 
     def _reset_footer(self):
         # Translators: footer; {0} is the app name, {1} its version.
@@ -895,7 +940,7 @@ class MainWindow(Adw.ApplicationWindow):
             return
         self._set_killswitch_switch(self._killswitch_armed)
         if self._killswitch_busy:
-            self._show_banner(_("A kill-switch operation is already in progress."))
+            self._toast(_("A kill-switch operation is already in progress."))
         elif desired:
             self._confirm_enable_killswitch()
         else:
@@ -916,7 +961,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _configure_killswitch(self):
         """Apply LAN access and the allowed interfaces to the armed kill switch."""
         if self._killswitch_busy:
-            self._show_banner(_("A kill-switch operation is already in progress."))
+            self._toast(_("A kill-switch operation is already in progress."))
             return
         self._killswitch_busy = True
         self._killswitch_pending = "configure"
@@ -1021,21 +1066,21 @@ class MainWindow(Adw.ApplicationWindow):
             self._update_ip_labels()
             self._remember_resolved(status)
             self._pin_now()
-            self._show_banner(_("Kill switch armed. Traffic outside the VPN is blocked."))
+            self._toast(_("Kill switch armed. Traffic outside the VPN is blocked."))
         elif pending == "disarm":
             self._isp_ip_checked = False
             self._pins = None
             self._maybe_fetch_ip("isp")
             self._update_ip_labels()
-            self._show_banner(_("Kill switch disabled. Normal traffic is allowed."))
+            self._toast(_("Kill switch disabled. Normal traffic is allowed."))
         elif pending == "configure":
-            self._show_banner(_("Kill-switch settings applied."))
+            self._toast(_("Kill-switch settings applied."))
         self._refresh_killswitch_status()
 
     def _toggle_killswitch_from_tray(self):
         self._present_from_tray()
         if self._killswitch_busy:
-            self._show_banner(_("A kill-switch operation is already in progress."))
+            self._toast(_("A kill-switch operation is already in progress."))
             return
         if self._killswitch_status is None:
             self._show_banner(_("The kill-switch service is unavailable."))
@@ -1213,16 +1258,8 @@ class MainWindow(Adw.ApplicationWindow):
     def _refresh_connection_details(self):
         connected = self._state == "connected"
         self.protocol_value.set_label(f"OpenVPN · {self.settings.protocol.upper()}")
-        # While disconnected only the ISP IP and the protocol are meaningful.
-        for widget in (
-            self.vpn_ip_name,
-            self.vpn_ip_value,
-            self.switch_ip_button,
-            self.download_column,
-            self.upload_column,
-            self.duration_column,
-        ):
-            widget.set_visible(connected)
+        # Every detail always keeps its place (so the card never changes size);
+        # while disconnected the values show "—" and Switch IP is insensitive.
         if not connected:
             self._stop_stats()
             self._vpn_exit_ip = ""
@@ -1565,30 +1602,30 @@ class MainWindow(Adw.ApplicationWindow):
         elif self._state in {"idle", "error"}:
             self._connect()
         else:
-            self._show_banner(_("Wait for the current connection operation to finish."))
+            self._toast(_("Wait for the current connection operation to finish."))
 
     def _tray_select_favorite(self, key: str):
         self._present_from_tray()
         if self.catalogue is None:
-            self._show_banner(_("The location list is not loaded yet."))
+            self._toast(_("The location list is not loaded yet."))
             return
         location = self.catalogue.location_by_key(key)
         if location is None:
             self._set_favorite(key, False)
-            self._show_banner(_("That favorite is no longer in the catalogue and was removed."))
+            self._toast(_("That favorite is no longer in the catalogue and was removed."))
             return
         self._choose_location(location)
 
     def _choose_location(self, location: Location):
         """Select a location; when connected, offer to switch to it."""
         if self._state in {"preparing", "connecting", "disconnecting"}:
-            self._show_banner(_("Wait for the current connection operation to finish."))
+            self._toast(_("Wait for the current connection operation to finish."))
             return
         current = self._selected_location()
         if self._state == "connected":
             if current is not None and current.key == location.key:
                 # Translators: {0} is the location.
-                self._show_banner(_("Already connected to {0}.").format(place_name(location, flag=True)))
+                self._toast(_("Already connected to {0}.").format(place_name(location, flag=True)))
                 return
             dialog = Adw.AlertDialog.new(
                 _("Switch VPN location?"),
@@ -1844,7 +1881,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._catalogue_loading = True
         if self.catalogue is None and self.active is None:
             self._set_state("loading")
-        self.banner.set_revealed(False)
+        self._clear_banner()
 
         cached = None
         try:
@@ -1919,12 +1956,7 @@ class MainWindow(Adw.ApplicationWindow):
                 "{0} location", "{0} locations", len(catalogue.locations)
             ).format(len(catalogue.locations))
             # Translators: {0} is "N profiles", {1} is "N locations".
-            self._show_banner(_("Loaded {0} in {1}.").format(profiles, locations))
-            GLib.timeout_add_seconds(6, self._hide_banner)
-
-    def _hide_banner(self):
-        self.banner.set_revealed(False)
-        return False
+            self._toast(_("Loaded {0} in {1}.").format(profiles, locations))
 
     def _selected_ref(self) -> ProfileRef | None:
         if self.catalogue is None or not self.settings.location_key:
@@ -2041,15 +2073,15 @@ class MainWindow(Adw.ApplicationWindow):
             )
             return
         if self._selected_ref() is None:
-            self._show_banner(_("Choose a location and protocol first."))
+            self._toast(_("Choose a location and protocol first."))
             return
         if self.active is not None:
-            self._show_banner(_("A VPN connection is already active. Disconnect it first."))
+            self._toast(_("A VPN connection is already active. Disconnect it first."))
             return
         if not self._ensure_credentials():
             return
         self._warning = ""
-        self.banner.set_revealed(False)
+        self._clear_banner()
         self._intent_connected = True
         self._attempt += 1
         attempt = self._attempt
@@ -2319,7 +2351,7 @@ class MainWindow(Adw.ApplicationWindow):
 
             self._write_profile(connection, pins=pins, then=switch, on_error=failed)
 
-        self._show_banner(_("Preparing the new location…"))
+        self._toast(_("Preparing the new location…"))
         self._ensure_profile(
             then=lambda connection: self._resolve_for_kill_switch(
                 connection,
@@ -2418,7 +2450,7 @@ class MainWindow(Adw.ApplicationWindow):
             deactivate_async(self.client, active, lambda *_args: None)
         self._reset_footer()
         self._set_state("idle")
-        self._show_banner(_("Connection attempt cancelled."))
+        self._toast(_("Connection attempt cancelled."))
 
     def _should_retry_after_failure(self) -> bool:
         return bool(
@@ -2463,7 +2495,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._connected_since = None
         self._set_state("idle")
         if message:
-            self._show_banner(message)
+            self._toast(message)
         if self._quit_after_disconnect:
             self._pending_switch_key = None
             self._reconnect_after_disconnect = False
@@ -2632,7 +2664,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._start_timer()
             where = place_name(self._selected_location()) or _("the selected server")
             if was_reconnecting:
-                self._show_banner(_("VPN reconnected automatically."))
+                self._toast(_("VPN reconnected automatically."))
                 self._notify_if_background(
                     _("VPN reconnected"),
                     # Translators: {0} is the location.
@@ -2758,7 +2790,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         if not self._intent_connected or self._quitting:
             self._set_state("idle")
-            self._show_banner(_("The VPN connection ended."))
+            self._toast(_("The VPN connection ended."))
             self._notify_if_background(_("VPN disconnected"), _("The VPN connection ended."))
             return
         if not self.settings.auto_reconnect:
@@ -2785,7 +2817,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self._reconnect_attempt = 0
         self._reconnect_reason = reason
-        self._show_banner(_("The VPN connection was lost. Reconnecting automatically…"))
+        self._toast(_("The VPN connection was lost. Reconnecting automatically…"))
         self._notify_if_background(
             _("VPN connection lost"), _("Reconnecting automatically in a few seconds.")
         )
@@ -2862,7 +2894,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._reset_reconnect_state()
         self._set_state("idle")
         if message:
-            self._show_banner(message)
+            self._toast(message)
 
     def _give_up(self, reason: str):
         self._intent_connected = False
@@ -2970,7 +3002,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _open_locations(self):
         if self.catalogue is None:
-            self._show_banner(_("The location list is not loaded yet."))
+            self._toast(_("The location list is not loaded yet."))
             return
         LocationWindow(
             self,
@@ -3116,9 +3148,35 @@ class MainWindow(Adw.ApplicationWindow):
         )
         dialog.present(self)
 
+    def _toast(self, text: str):
+        """A short confirmation or hint that dismisses itself after ~3 s."""
+        toast = Adw.Toast.new(text)
+        toast.set_timeout(TOAST_SECONDS)
+        self.toasts.add_toast(toast)
+
     def _show_banner(self, text: str):
+        """A warning or error that stays until dismissed with the button.
+
+        A banner the user dismissed does not come back for the same condition:
+        the same text is suppressed until a new attempt (connect, refresh)
+        starts, so only a changed condition shows it again.
+        """
+        if text in self._dismissed_banners:
+            return
+        self._banner_text = text
         self.banner.set_title(text)
         self.banner.set_revealed(True)
+
+    def _on_banner_dismissed(self, *_args):
+        if self._banner_text:
+            self._dismissed_banners.add(self._banner_text)
+        self.banner.set_revealed(False)
+
+    def _clear_banner(self):
+        """A new attempt starts: hide the banner and forget what was dismissed."""
+        self._dismissed_banners.clear()
+        self._banner_text = ""
+        self.banner.set_revealed(False)
 
     # ------------------------------------------------------------ notifications
 
@@ -3411,7 +3469,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._killswitch_pending = "disarm_quit"
         self._render_killswitch_state()
         self._refresh_tray()
-        self._show_banner(_("Disarming the kill switch before quitting…"))
+        self._toast(_("Disarming the kill switch before quitting…"))
         call_async(self.killswitch.disarm, self._on_disarm_for_quit)
 
     def _on_disarm_for_quit(self, status, error):

@@ -36,7 +36,7 @@ def scenario(window, checks, done):
     checks.equal("retrying", window._state, "reconnecting")
     window.auto_reconnect_row.set_active(False)
     checks.equal("off during retry", window._state, "idle")
-    checks.equal("off banner", window.banner.get_title(), "Automatic reconnection disabled.")
+    checks.equal("off toast", window.recorded_toasts[-1].get_title(), "Automatic reconnection disabled.")
     done()
 
 

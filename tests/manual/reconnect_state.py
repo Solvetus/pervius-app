@@ -50,7 +50,7 @@ def scenario(window, checks, done):
 
     def after_success():
         checks.equal("reconnected", (window._state, calls), ("connected", [("success", True)]))
-        checks.equal("reconnected banner", window.banner.get_title(), "VPN reconnected automatically.")
+        checks.equal("reconnected toast", window.recorded_toasts[-1].get_title(), "VPN reconnected automatically.")
         # 2. retry failure and give up
         calls.clear()
         connected()

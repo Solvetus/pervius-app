@@ -12,7 +12,7 @@ HERE=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 DISPLAY_NUM=${BROADWAY_DISPLAY_NUM:-17}
 
 if [ "$#" -eq 0 ]; then
-    set -- account_dialog armed_switch connect_cancel connected_details favorites guard_startup idle_details killswitch_ui location_search \
+    set -- account_dialog armed_switch connect_cancel connected_details favorites guard_startup idle_details killswitch_ui layout_stable location_search \
         notifications protocol_switch reconnect_state reconnect_switch \
         settings_dialogs smoke stale_location tray_present tunnel_wait tray_sni window_tray
 fi

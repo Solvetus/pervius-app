@@ -72,6 +72,16 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.3.1" date="2026-11-18" type="stable">
+      <url type="details">https://github.com/Solvetus/pervius-app/releases/tag/v0.3.1</url>
+      <description>
+        <p>
+          A calmer window: short confirmations appear as toasts that disappear
+          by themselves, warnings stay in a banner you can dismiss, and the
+          window and status card keep the same size in every state.
+        </p>
+      </description>
+    </release>
     <release version="0.3.0" date="2026-11-18" type="stable">
       <url type="details">https://github.com/Solvetus/pervius-app/releases/tag/v0.3.0</url>
       <description>

@@ -163,6 +163,15 @@ def run_window_harness(name: str, scenario, *, delay_ms: int = 2000, catalogue: 
 
         def do_activate(self):
             self.window = MainWindow(application=self)
+            # Record every toast so scenarios can check its text and timeout.
+            self.window.recorded_toasts = []
+            original = self.window.toasts.add_toast
+
+            def add_toast(toast):
+                self.window.recorded_toasts.append(toast)
+                original(toast)
+
+            self.window.toasts.add_toast = add_toast
             self.window.present()
             GLib.timeout_add(delay_ms, self._run)
 

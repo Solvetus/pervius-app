@@ -8,6 +8,22 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-18
+
+### Changed
+
+- Short confirmations (kill switch armed or disabled, locations loaded,
+  connection cancelled, hints) are toasts that dismiss themselves after about
+  three seconds. Warnings and errors that need attention (a missing leak guard,
+  skipped catalogue profiles, connection errors) stay in a banner with a
+  dismiss button; a dismissed banner returns only when a new attempt raises it
+  again. No message can stay on screen without a way to close it.
+- The banner, the status card and every group below share one column width.
+- The window and the status card keep their size in every state: the
+  connection details always keep their place (showing "—" while disconnected,
+  with Switch IP insensitive) and the status text reserves two lines. The
+  default window is larger and its content scrolls when it is made smaller.
+- A taller header with a little space between the title and the subtitle.
 ## [0.3.0] - 2026-11-18
 
 ### Added
@@ -316,7 +332,8 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
   validation, import through NetworkManager's OpenVPN plugin, ownership
   manifest, system-bus secret agent, Debian package.
 
-[Unreleased]: https://github.com/Solvetus/pervius-app/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Solvetus/pervius-app/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/Solvetus/pervius-app/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Solvetus/pervius-app/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Solvetus/pervius-app/compare/v0.1.19...v0.2.0
 [0.1.19]: https://github.com/Solvetus/pervius-app/tree/v0.1.19

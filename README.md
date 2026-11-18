@@ -70,10 +70,10 @@ checksum, then install:
 
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
-sudo apt install ./pervius_0.3.0_all.deb
+sudo apt install ./pervius_0.3.1_all.deb
 ```
 
-`sha256sum` must print `pervius_0.3.0_all.deb: OK`. Do not install a package
+`sha256sum` must print `pervius_0.3.1_all.deb: OK`. Do not install a package
 whose checksum does not match. The packages are not signed yet.
 
 Start **Pervius** from the application menu or run `pervius`. Do not run it
@@ -92,7 +92,7 @@ tunnel name, DNS through the tunnel).
 **Turn the kill switch off in the old app before upgrading.** `apt` removes
 the old package first, and the old package's removal script deletes its own
 firewall table, so an armed kill switch would be turned off without asking.
-`sudo dpkg -i pervius_0.3.0_all.deb` instead refuses to install while the old
+`sudo dpkg -i pervius_0.3.1_all.deb` instead refuses to install while the old
 kill switch is armed and prints the command to disarm it.
 
 On the first start, Pervius moves your settings, favorites and cached server
