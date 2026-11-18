@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: pervius 0.3.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-18 17:56+0100\n"
+"POT-Creation-Date: 2026-11-18 18:04+0100\n"
 "PO-Revision-Date: 2026-11-18 17:56+0100\n"
 "Last-Translator: Solvetus Labs\n"
 "Language-Team: Italian\n"
@@ -22,8 +22,14 @@ msgid "Unofficial Linux client for FastVPN."
 msgstr "Client Linux non ufficiale per FastVPN."
 
 #: pervius/config.py:24 data/com.solvetus.Pervius.metainfo.xml.in:31
-msgid "Pervius is an independent open-source project by Solvetus Labs. It is not affiliated with, endorsed by, or sponsored by Namecheap, Inc. FastVPN is a trademark of Namecheap, Inc."
-msgstr "Pervius è un progetto open source indipendente di Solvetus Labs. Non è affiliato a Namecheap, Inc., né da essa approvato o sponsorizzato. FastVPN è un marchio di Namecheap, Inc."
+msgid ""
+"Pervius is an independent open-source project by Solvetus Labs. It is not "
+"affiliated with, endorsed by, or sponsored by Namecheap, Inc. FastVPN is a "
+"trademark of Namecheap, Inc."
+msgstr ""
+"Pervius è un progetto open source indipendente di Solvetus Labs. Non è "
+"affiliato a Namecheap, Inc., né da essa approvato o sponsorizzato. FastVPN è "
+"un marchio di Namecheap, Inc."
 
 #: pervius/ui/account.py:61 pervius/ui/window.py:609
 msgid "Account"
@@ -46,8 +52,12 @@ msgid "FastVPN account"
 msgstr "Account FastVPN"
 
 #: pervius/ui/account.py:88
-msgid "The password is sent to NetworkManager only when the VPN is activated. It is never written to the NetworkManager profile."
-msgstr "La password viene inviata a NetworkManager solo quando si attiva la VPN e non viene mai scritta nel profilo di NetworkManager."
+msgid ""
+"The password is sent to NetworkManager only when the VPN is activated. It is "
+"never written to the NetworkManager profile."
+msgstr ""
+"La password viene inviata a NetworkManager solo quando si attiva la VPN e "
+"non viene mai scritta nel profilo di NetworkManager."
 
 #: pervius/ui/account.py:93
 msgid "Username"
@@ -70,8 +80,13 @@ msgid "Forget Saved Password…"
 msgstr "Dimentica password salvata…"
 
 #: pervius/ui/account.py:141
-msgid "Credentials are not verified until a connection succeeds. Nothing is sent to Solvetus Labs; Pervius has no servers of its own."
-msgstr "Le credenziali non vengono verificate finché una connessione non va a buon fine. Nulla viene inviato a Solvetus Labs: Pervius non dispone di server propri."
+msgid ""
+"Credentials are not verified until a connection succeeds. Nothing is sent to "
+"Solvetus Labs; Pervius has no servers of its own."
+msgstr ""
+"Le credenziali non vengono verificate finché una connessione non va a buon "
+"fine. Nulla viene inviato a Solvetus Labs: Pervius non dispone di server "
+"propri."
 
 #: pervius/ui/account.py:170
 msgid "Saved in the keyring"
@@ -83,11 +98,15 @@ msgstr "Conservata solo per questa sessione"
 
 #: pervius/ui/account.py:179
 msgid "The desktop keyring is unavailable; the password will be session-only."
-msgstr "Il portachiavi del desktop non è disponibile: la password verrà conservata solo per questa sessione."
+msgstr ""
+"Il portachiavi del desktop non è disponibile: la password verrà conservata "
+"solo per questa sessione."
 
 #: pervius/ui/account.py:183
 msgid "If unavailable, the password is kept only for this session."
-msgstr "Se il portachiavi non è disponibile, la password viene conservata solo per questa sessione."
+msgstr ""
+"Se il portachiavi non è disponibile, la password viene conservata solo per "
+"questa sessione."
 
 #: pervius/ui/account.py:186
 msgid "Replace the password to change where it is kept."
@@ -99,8 +118,14 @@ msgstr "Dimenticare la password salvata?"
 
 #: pervius/ui/account.py:211
 #, python-brace-format
-msgid "This removes the desktop-keyring entry and the in-memory copy for {0}. An already-connected VPN stays up, but reauthentication may fail until you enter the password again."
-msgstr "Verranno rimosse la voce nel portachiavi del desktop e la copia in memoria per {0}. Una VPN già connessa resta attiva, ma la riautenticazione potrebbe non riuscire finché la password non viene inserita di nuovo."
+msgid ""
+"This removes the desktop-keyring entry and the in-memory copy for {0}. An "
+"already-connected VPN stays up, but reauthentication may fail until you "
+"enter the password again."
+msgstr ""
+"Verranno rimosse la voce nel portachiavi del desktop e la copia in memoria "
+"per {0}. Una VPN già connessa resta attiva, ma la riautenticazione potrebbe "
+"non riuscire finché la password non viene inserita di nuovo."
 
 #: pervius/ui/account.py:217
 msgid "Forget Password"
@@ -124,7 +149,9 @@ msgstr "Inserire la password della VPN."
 #: pervius/ui/account.py:264
 #, python-brace-format
 msgid "The password is in memory for this session, but could not be saved: {0}"
-msgstr "La password è in memoria per questa sessione, ma non è stato possibile salvarla: {0}"
+msgstr ""
+"La password è in memoria per questa sessione, ma non è stato possibile "
+"salvarla: {0}"
 
 #. Translators: a VPN location; {0} is the city, {1} the country.
 #: pervius/ui/window.py:118
@@ -171,8 +198,15 @@ msgid "Show favorites only"
 msgstr "Mostra solo i preferiti"
 
 #: pervius/ui/window.py:207
-msgid "Locations come from the provider's public catalogue. Star a location to add it to Favorites and the tray menu; search understands city names, country names, codes, and common aliases."
-msgstr "Le località provengono dal catalogo pubblico del fornitore. Contrassegnare una località con la stella per aggiungerla ai Preferiti e al menu dell'area di notifica; la ricerca riconosce nomi di città e di paesi, codici e alias comuni."
+msgid ""
+"Locations come from the provider's public catalogue. Star a location to add "
+"it to Favorites and the tray menu; search understands city names, country "
+"names, codes, and common aliases."
+msgstr ""
+"Le località provengono dal catalogo pubblico del fornitore. Contrassegnare "
+"una località con la stella per aggiungerla ai Preferiti e al menu dell'area "
+"di notifica; la ricerca riconosce nomi di città e di paesi, codici e alias "
+"comuni."
 
 #: pervius/ui/window.py:253 pervius/ui/window.py:273
 msgid "Add to favorites"
@@ -288,8 +322,13 @@ msgid "Change"
 msgstr "Cambia"
 
 #: pervius/ui/window.py:576
-msgid "UDP is the usual default. Try TCP only when UDP is blocked. Both carry the same encrypted tunnel; see Help for details."
-msgstr "UDP è la scelta predefinita abituale. Provare TCP solo se UDP è bloccato. Entrambi trasportano lo stesso tunnel cifrato; per i dettagli consultare l'Aiuto."
+msgid ""
+"UDP is the usual default. Try TCP only when UDP is blocked. Both carry the "
+"same encrypted tunnel; see Help for details."
+msgstr ""
+"UDP è la scelta predefinita abituale. Provare TCP solo se UDP è bloccato. "
+"Entrambi trasportano lo stesso tunnel cifrato; per i dettagli consultare "
+"l'Aiuto."
 
 #: pervius/ui/window.py:591
 msgid "UDP — lower latency; the usual choice."
@@ -312,8 +351,12 @@ msgid "Reconnect automatically"
 msgstr "Riconnetti automaticamente"
 
 #: pervius/ui/window.py:624 pervius/ui/window.py:1602
-msgid "Retry after an unexpected drop, with increasing delays. Manual disconnects and failed first attempts never retry."
-msgstr "Riprova dopo un'interruzione imprevista, a intervalli crescenti. Non riprova mai dopo una disconnessione manuale o se il primo tentativo non riesce."
+msgid ""
+"Retry after an unexpected drop, with increasing delays. Manual disconnects "
+"and failed first attempts never retry."
+msgstr ""
+"Riprova dopo un'interruzione imprevista, a intervalli crescenti. Non riprova "
+"mai dopo una disconnessione manuale o se il primo tentativo non riesce."
 
 #: pervius/ui/window.py:637
 msgid "Security"
@@ -340,13 +383,22 @@ msgid "Traffic outside the VPN is blocked"
 msgstr "Il traffico esterno alla VPN è bloccato"
 
 #: pervius/ui/window.py:661
-msgid "Only the VPN servers, the tunnel, the interfaces you always allow, DHCP and link control may pass. DNS outside the tunnel and global IPv6 are blocked."
-msgstr "Possono passare solo i server VPN, il tunnel, le interfacce sempre consentite, DHCP e il traffico di controllo del collegamento. Il DNS esterno al tunnel e l'IPv6 globale sono bloccati."
+msgid ""
+"Only the VPN servers, the tunnel, the interfaces you always allow, DHCP and "
+"link control may pass. DNS outside the tunnel and global IPv6 are blocked."
+msgstr ""
+"Possono passare solo i server VPN, il tunnel, le interfacce sempre "
+"consentite, DHCP e il traffico di controllo del collegamento. Il DNS esterno "
+"al tunnel e l'IPv6 globale sono bloccati."
 
 #: pervius/ui/window.py:698
 #, python-brace-format
-msgid "{0} {1} · independent project, not affiliated with the VPN provider · catalogue source: vpn.ncapi.io"
-msgstr "{0} {1} · progetto indipendente, non affiliato al fornitore della VPN · fonte del catalogo: vpn.ncapi.io"
+msgid ""
+"{0} {1} · independent project, not affiliated with the VPN provider · "
+"catalogue source: vpn.ncapi.io"
+msgstr ""
+"{0} {1} · progetto indipendente, non affiliato al fornitore della VPN · "
+"fonte del catalogo: vpn.ncapi.io"
 
 #. Translators: {0} is a technical error message.
 #: pervius/ui/window.py:708
@@ -366,22 +418,30 @@ msgstr "Il servizio del kill switch non è disponibile."
 
 #: pervius/ui/window.py:833
 msgid "System service unavailable; the optional package is not active."
-msgstr "Servizio di sistema non disponibile: il pacchetto opzionale non è attivo."
+msgstr ""
+"Servizio di sistema non disponibile: il pacchetto opzionale non è attivo."
 
 #: pervius/ui/window.py:848
 msgid "Applying…"
 msgstr "Applicazione in corso…"
 
 #: pervius/ui/window.py:851
-msgid "The system service reported an error. Disarm, then arm the kill switch again."
-msgstr "Il servizio di sistema ha segnalato un errore. Disattivare il kill switch e poi riattivarlo."
+msgid ""
+"The system service reported an error. Disarm, then arm the kill switch again."
+msgstr ""
+"Il servizio di sistema ha segnalato un errore. Disattivare il kill switch e "
+"poi riattivarlo."
 
 #: pervius/ui/window.py:856
 #, python-brace-format
 msgid "Armed — {0} VPN endpoint allowed; all other traffic is blocked."
 msgid_plural "Armed — {0} VPN endpoints allowed; all other traffic is blocked."
-msgstr[0] "Attivo — {0} indirizzo di server VPN consentito; tutto il resto del traffico è bloccato."
-msgstr[1] "Attivo — {0} indirizzi di server VPN consentiti; tutto il resto del traffico è bloccato."
+msgstr[0] ""
+"Attivo — {0} indirizzo di server VPN consentito; tutto il resto del traffico "
+"è bloccato."
+msgstr[1] ""
+"Attivo — {0} indirizzi di server VPN consentiti; tutto il resto del traffico "
+"è bloccato."
 
 #: pervius/ui/window.py:861
 msgid "Armed — VPN not connected; internet traffic is blocked."
@@ -410,8 +470,14 @@ msgstr "Attivare il kill switch?"
 
 #: pervius/ui/window.py:929
 #, python-brace-format
-msgid "All traffic outside the VPN will be blocked, including DNS and global IPv6. If the VPN is not connected, normal internet access will stop until you disarm it or connect. {0}"
-msgstr "Tutto il traffico esterno alla VPN verrà bloccato, compresi il DNS e l'IPv6 globale. Se la VPN non è connessa, il normale accesso a Internet si interromperà fino alla disattivazione del kill switch o alla connessione. {0}"
+msgid ""
+"All traffic outside the VPN will be blocked, including DNS and global IPv6. "
+"If the VPN is not connected, normal internet access will stop until you "
+"disarm it or connect. {0}"
+msgstr ""
+"Tutto il traffico esterno alla VPN verrà bloccato, compresi il DNS e l'IPv6 "
+"globale. Se la VPN non è connessa, il normale accesso a Internet si "
+"interromperà fino alla disattivazione del kill switch o alla connessione. {0}"
 
 #: pervius/ui/window.py:935
 msgid "Enable"
@@ -422,8 +488,12 @@ msgid "Disable the kill switch?"
 msgstr "Disattivare il kill switch?"
 
 #: pervius/ui/window.py:951
-msgid "The firewall rules will be removed and normal network traffic will be allowed again, even if the VPN is down."
-msgstr "Le regole del firewall verranno rimosse e il normale traffico di rete sarà di nuovo consentito, anche se la VPN non è attiva."
+msgid ""
+"The firewall rules will be removed and normal network traffic will be "
+"allowed again, even if the VPN is down."
+msgstr ""
+"Le regole del firewall verranno rimosse e il normale traffico di rete sarà "
+"di nuovo consentito, anche se la VPN non è attiva."
 
 #: pervius/ui/window.py:956
 msgid "Disable"
@@ -643,8 +713,12 @@ msgid "Desktop notifications"
 msgstr "Notifiche desktop"
 
 #: pervius/ui/window.py:1587
-msgid "Show connection loss, recovery, and background status while the window is hidden."
-msgstr "Segnala la perdita e il ripristino della connessione e lo stato in background quando la finestra è nascosta."
+msgid ""
+"Show connection loss, recovery, and background status while the window is "
+"hidden."
+msgstr ""
+"Segnala la perdita e il ripristino della connessione e lo stato in "
+"background quando la finestra è nascosta."
 
 #: pervius/ui/window.py:1614
 msgid "Privacy and security"
@@ -655,37 +729,63 @@ msgid "Block IPv6 while connected"
 msgstr "Blocca IPv6 durante la connessione"
 
 #: pervius/ui/window.py:1619
-msgid "While the VPN is up, IPv6 traffic outside the tunnel is blocked, even when the kill switch is off. Applies from the next connection."
-msgstr "Con la VPN attiva, il traffico IPv6 esterno al tunnel viene bloccato, anche quando il kill switch è disattivato. Ha effetto dalla connessione successiva."
+msgid ""
+"While the VPN is up, IPv6 traffic outside the tunnel is blocked, even when "
+"the kill switch is off. Applies from the next connection."
+msgstr ""
+"Con la VPN attiva, il traffico IPv6 esterno al tunnel viene bloccato, anche "
+"quando il kill switch è disattivato. Ha effetto dalla connessione successiva."
 
 #: pervius/ui/window.py:1633
 msgid "Always allow these interfaces"
 msgstr "Consenti sempre queste interfacce"
 
 #: pervius/ui/window.py:1638
-msgid "Interface names separated by commas, for example wt0 for NetBird. They are allowed by the kill switch and the IPv6 guard. Editable while the kill switch is armed."
-msgstr "Nomi di interfaccia separati da virgole, ad esempio wt0 per NetBird. Sono consentite dal kill switch e dalla protezione IPv6. Modificabile anche con il kill switch attivo."
+msgid ""
+"Interface names separated by commas, for example wt0 for NetBird. They are "
+"allowed by the kill switch and the IPv6 guard. Editable while the kill "
+"switch is armed."
+msgstr ""
+"Nomi di interfaccia separati da virgole, ad esempio wt0 per NetBird. Sono "
+"consentite dal kill switch e dalla protezione IPv6. Modificabile anche con "
+"il kill switch attivo."
 
 #: pervius/ui/window.py:1653
-msgid "Use interface names of up to 15 letters, digits, dots, dashes or underscores, at most 16 of them."
-msgstr "Usare al massimo 16 nomi di interfaccia, ciascuno di non più di 15 caratteri tra lettere, cifre, punti, trattini o trattini bassi."
+msgid ""
+"Use interface names of up to 15 letters, digits, dots, dashes or "
+"underscores, at most 16 of them."
+msgstr ""
+"Usare al massimo 16 nomi di interfaccia, ciascuno di non più di 15 caratteri "
+"tra lettere, cifre, punti, trattini o trattini bassi."
 
 #: pervius/ui/window.py:1671
 msgid "Password storage"
 msgstr "Archiviazione della password"
 
 #: pervius/ui/window.py:1674
-msgid "Saved only in the desktop keyring when you enable it in the Account dialog, which is also where you can forget it."
-msgstr "La password viene salvata solo nel portachiavi del desktop, se l'opzione è attivata nella finestra Account, dove è anche possibile dimenticarla."
+msgid ""
+"Saved only in the desktop keyring when you enable it in the Account dialog, "
+"which is also where you can forget it."
+msgstr ""
+"La password viene salvata solo nel portachiavi del desktop, se l'opzione è "
+"attivata nella finestra Account, dove è anche possibile dimenticarla."
 
 #: pervius/ui/window.py:1734
 #, python-brace-format
-msgid "A VPN connection uses the reserved Pervius UUID, but its ownership cannot be verified: {0}"
-msgstr "Una connessione VPN usa l'UUID riservato di Pervius, ma non è possibile verificarne la proprietà: {0}"
+msgid ""
+"A VPN connection uses the reserved Pervius UUID, but its ownership cannot be "
+"verified: {0}"
+msgstr ""
+"Una connessione VPN usa l'UUID riservato di Pervius, ma non è possibile "
+"verificarne la proprietà: {0}"
 
 #: pervius/ui/window.py:1742
-msgid "A VPN connection uses the reserved Pervius UUID, but no owned profile was found; refusing to manage it."
-msgstr "Una connessione VPN usa l'UUID riservato di Pervius, ma non è stato trovato alcun profilo di proprietà di Pervius; la connessione non verrà gestita."
+msgid ""
+"A VPN connection uses the reserved Pervius UUID, but no owned profile was "
+"found; refusing to manage it."
+msgstr ""
+"Una connessione VPN usa l'UUID riservato di Pervius, ma non è stato trovato "
+"alcun profilo di proprietà di Pervius; la connessione non verrà gestita."
 
 #. Translators: {0} is NetworkManager's technical reason.
 #: pervius/ui/window.py:1756
@@ -703,7 +803,8 @@ msgstr "Impossibile caricare l'elenco delle località: {0}"
 #: pervius/ui/window.py:1825
 #, python-brace-format
 msgid "Using the saved location list; refresh failed: {0}"
-msgstr "Viene usato l'elenco delle località salvato; aggiornamento non riuscito: {0}"
+msgstr ""
+"Viene usato l'elenco delle località salvato; aggiornamento non riuscito: {0}"
 
 #: pervius/ui/window.py:1828
 #, python-brace-format
@@ -734,8 +835,12 @@ msgid "NetworkManager is unavailable."
 msgstr "NetworkManager non è disponibile."
 
 #: pervius/ui/window.py:1950
-msgid "The NetworkManager secret agent is not registered; reconnect after restarting the app."
-msgstr "L'agente dei segreti di NetworkManager non è registrato; riavviare l'app e connettersi di nuovo."
+msgid ""
+"The NetworkManager secret agent is not registered; reconnect after "
+"restarting the app."
+msgstr ""
+"L'agente dei segreti di NetworkManager non è registrato; riavviare l'app e "
+"connettersi di nuovo."
 
 #: pervius/ui/window.py:1954 pervius/ui/window.py:1983
 msgid "Choose a location and protocol first."
@@ -769,8 +874,12 @@ msgstr "Impossibile salvare il profilo gestito: {0}"
 
 #: pervius/ui/window.py:2071
 #, python-brace-format
-msgid "The NetworkManager profile was created, but the ownership manifest could not be saved: {0}. The profile will not be used."
-msgstr "Il profilo di NetworkManager è stato creato, ma non è stato possibile salvare il manifesto di proprietà: {0}. Il profilo non verrà usato."
+msgid ""
+"The NetworkManager profile was created, but the ownership manifest could not "
+"be saved: {0}. The profile will not be used."
+msgstr ""
+"Il profilo di NetworkManager è stato creato, ma non è stato possibile "
+"salvare il manifesto di proprietà: {0}. Il profilo non verrà usato."
 
 #. Translators: {0} is a technical error message.
 #: pervius/ui/window.py:2108
@@ -813,7 +922,9 @@ msgstr "Impossibile arrestare la VPN: {0}"
 #: pervius/ui/window.py:2296
 #, python-brace-format
 msgid "{0} The profile from the previous release could not be adopted: {1}."
-msgstr "{0} Non è stato possibile recuperare il profilo della versione precedente: {1}."
+msgstr ""
+"{0} Non è stato possibile recuperare il profilo della versione precedente: "
+"{1}."
 
 #: pervius/ui/window.py:2325
 msgid "Loading locations…"
@@ -893,12 +1004,19 @@ msgstr "VPN connessa"
 
 #: pervius/ui/window.py:2455
 #, python-brace-format
-msgid "The VPN tunnel is not named {0}; the kill switch and the IPv6 guard may block it. Reconnect, or report this problem."
-msgstr "Il tunnel VPN non si chiama {0}; il kill switch e la protezione IPv6 potrebbero bloccarlo. Riconnettersi o segnalare il problema."
+msgid ""
+"The VPN tunnel is not named {0}; the kill switch and the IPv6 guard may "
+"block it. Reconnect, or report this problem."
+msgstr ""
+"Il tunnel VPN non si chiama {0}; il kill switch e la protezione IPv6 "
+"potrebbero bloccarlo. Riconnettersi o segnalare il problema."
 
 #: pervius/ui/window.py:2469
-msgid "IPv6 is not blocked outside the tunnel. Reconnect to apply the IPv6 guard."
-msgstr "IPv6 non è bloccato all'esterno del tunnel. Riconnettersi per applicare la protezione IPv6."
+msgid ""
+"IPv6 is not blocked outside the tunnel. Reconnect to apply the IPv6 guard."
+msgstr ""
+"IPv6 non è bloccato all'esterno del tunnel. Riconnettersi per applicare la "
+"protezione IPv6."
 
 #: pervius/ui/window.py:2502
 msgid "Choose a location to begin."
@@ -935,16 +1053,22 @@ msgstr "VPN disconnessa"
 
 #: pervius/ui/window.py:2554
 msgid "The VPN connection ended. Automatic reconnect is off."
-msgstr "La connessione VPN è terminata. La riconnessione automatica è disattivata."
+msgstr ""
+"La connessione VPN è terminata. La riconnessione automatica è disattivata."
 
 #: pervius/ui/window.py:2556
 msgid "The VPN connection ended; automatic reconnect is off."
-msgstr "La connessione VPN è terminata; la riconnessione automatica è disattivata."
+msgstr ""
+"La connessione VPN è terminata; la riconnessione automatica è disattivata."
 
 #: pervius/ui/window.py:2565
 #, python-brace-format
-msgid "The VPN connection ended and cannot be safely reconnected: {0}. Press Try Again to rebuild it."
-msgstr "La connessione VPN è terminata e non può essere ripristinata in sicurezza: {0}. Premere «Riprova» per ricrearla."
+msgid ""
+"The VPN connection ended and cannot be safely reconnected: {0}. Press Try "
+"Again to rebuild it."
+msgstr ""
+"La connessione VPN è terminata e non può essere ripristinata in sicurezza: "
+"{0}. Premere «Riprova» per ricrearla."
 
 #: pervius/ui/window.py:2570
 msgid "VPN reconnection stopped"
@@ -982,10 +1106,18 @@ msgstr "{0} (tentativo {1} di {2})."
 
 #: pervius/ui/window.py:2659
 #, python-brace-format
-msgid "The VPN connection was lost and automatic reconnection stopped after {0} attempt: {1}"
-msgid_plural "The VPN connection was lost and automatic reconnection stopped after {0} attempts: {1}"
-msgstr[0] "La connessione VPN si è interrotta e la riconnessione automatica è stata sospesa dopo {0} tentativo: {1}"
-msgstr[1] "La connessione VPN si è interrotta e la riconnessione automatica è stata sospesa dopo {0} tentativi: {1}"
+msgid ""
+"The VPN connection was lost and automatic reconnection stopped after {0} "
+"attempt: {1}"
+msgid_plural ""
+"The VPN connection was lost and automatic reconnection stopped after {0} "
+"attempts: {1}"
+msgstr[0] ""
+"La connessione VPN si è interrotta e la riconnessione automatica è stata "
+"sospesa dopo {0} tentativo: {1}"
+msgstr[1] ""
+"La connessione VPN si è interrotta e la riconnessione automatica è stata "
+"sospesa dopo {0} tentativi: {1}"
 
 #: pervius/ui/window.py:2665
 msgid "Automatic reconnection stopped"
@@ -1008,33 +1140,77 @@ msgid "UDP or TCP"
 msgstr "UDP o TCP"
 
 #: pervius/ui/window.py:2821
-msgid "Both choices carry the same encrypted OpenVPN tunnel, with the same certificate checks and authentication. Neither is more private or more secure."
-msgstr "Entrambe le opzioni trasportano lo stesso tunnel OpenVPN cifrato, con gli stessi controlli dei certificati e la stessa autenticazione. Nessuna delle due è più riservata o più sicura dell'altra."
+msgid ""
+"Both choices carry the same encrypted OpenVPN tunnel, with the same "
+"certificate checks and authentication. Neither is more private or more "
+"secure."
+msgstr ""
+"Entrambe le opzioni trasportano lo stesso tunnel OpenVPN cifrato, con gli "
+"stessi controlli dei certificati e la stessa autenticazione. Nessuna delle "
+"due è più riservata o più sicura dell'altra."
 
 #: pervius/ui/window.py:2825
-msgid "UDP sends packets without a connection handshake or retransmission. That usually means lower overhead and lower latency, which is why it is the default for VPNs, games, and calls."
-msgstr "UDP invia i pacchetti senza handshake di connessione né ritrasmissione. Di solito questo comporta un overhead e una latenza minori, ed è per questo che è la scelta predefinita per VPN, giochi e chiamate."
+msgid ""
+"UDP sends packets without a connection handshake or retransmission. That "
+"usually means lower overhead and lower latency, which is why it is the "
+"default for VPNs, games, and calls."
+msgstr ""
+"UDP invia i pacchetti senza handshake di connessione né ritrasmissione. Di "
+"solito questo comporta un overhead e una latenza minori, ed è per questo che "
+"è la scelta predefinita per VPN, giochi e chiamate."
 
 #: pervius/ui/window.py:2830
-msgid "TCP adds ordered delivery and retransmission. Use it when a network blocks UDP or only lets TCP through. Because OpenVPN over TCP carries TCP inside TCP, packet loss can cause duplicate retransmissions and stalls, so it is often slower and less responsive on unstable connections."
-msgstr "TCP aggiunge la consegna ordinata e la ritrasmissione. Usarlo quando una rete blocca UDP o lascia passare solo TCP. Poiché OpenVPN su TCP incapsula TCP dentro TCP, la perdita di pacchetti può causare ritrasmissioni duplicate e blocchi temporanei, per cui sulle connessioni instabili risulta spesso più lento e meno reattivo."
+msgid ""
+"TCP adds ordered delivery and retransmission. Use it when a network blocks "
+"UDP or only lets TCP through. Because OpenVPN over TCP carries TCP inside "
+"TCP, packet loss can cause duplicate retransmissions and stalls, so it is "
+"often slower and less responsive on unstable connections."
+msgstr ""
+"TCP aggiunge la consegna ordinata e la ritrasmissione. Usarlo quando una "
+"rete blocca UDP o lascia passare solo TCP. Poiché OpenVPN su TCP incapsula "
+"TCP dentro TCP, la perdita di pacchetti può causare ritrasmissioni duplicate "
+"e blocchi temporanei, per cui sulle connessioni instabili risulta spesso più "
+"lento e meno reattivo."
 
 #: pervius/ui/window.py:2836
-msgid "Practical rule: use UDP first. Switch to TCP only if UDP cannot connect or is unstable because the local network filters it."
-msgstr "Regola pratica: provare prima UDP. Passare a TCP solo se con UDP non si riesce a connettersi o la connessione è instabile perché la rete locale lo filtra."
+msgid ""
+"Practical rule: use UDP first. Switch to TCP only if UDP cannot connect or "
+"is unstable because the local network filters it."
+msgstr ""
+"Regola pratica: provare prima UDP. Passare a TCP solo se con UDP non si "
+"riesce a connettersi o la connessione è instabile perché la rete locale lo "
+"filtra."
 
 #: pervius/ui/window.py:2847
-msgid "While the kill switch is armed, only the VPN servers, the tunnel and the interfaces you always allow can be reached; everything else is blocked, including DNS outside the tunnel. A restart of the computer turns it off."
-msgstr "Mentre il kill switch è attivo, sono raggiungibili solo i server VPN, il tunnel e le interfacce sempre consentite; tutto il resto è bloccato, compreso il DNS esterno al tunnel. Il riavvio del computer lo disattiva."
+msgid ""
+"While the kill switch is armed, only the VPN servers, the tunnel and the "
+"interfaces you always allow can be reached; everything else is blocked, "
+"including DNS outside the tunnel. A restart of the computer turns it off."
+msgstr ""
+"Mentre il kill switch è attivo, sono raggiungibili solo i server VPN, il "
+"tunnel e le interfacce sempre consentite; tutto il resto è bloccato, "
+"compreso il DNS esterno al tunnel. Il riavvio del computer lo disattiva."
 
 #: pervius/ui/window.py:2853
 #, python-brace-format
-msgid "If you are offline because the kill switch is still armed, run {0} in a terminal."
-msgstr "Se si è rimasti senza connessione perché il kill switch è ancora attivo, eseguire {0} in un terminale."
+msgid ""
+"If you are offline because the kill switch is still armed, run {0} in a "
+"terminal."
+msgstr ""
+"Se si è rimasti senza connessione perché il kill switch è ancora attivo, "
+"eseguire {0} in un terminale."
 
 #: pervius/ui/window.py:2876
-msgid "It manages an existing FastVPN (OpenVPN) subscription through NetworkManager and its OpenVPN plugin. The application never runs as root; NetworkManager performs privileged network operations, and the optional kill switch is a separate system service."
-msgstr "Gestisce un abbonamento FastVPN (OpenVPN) esistente tramite NetworkManager e il relativo plugin OpenVPN. L'applicazione non viene mai eseguita come root: le operazioni di rete privilegiate sono svolte da NetworkManager e il kill switch opzionale è un servizio di sistema separato."
+msgid ""
+"It manages an existing FastVPN (OpenVPN) subscription through NetworkManager "
+"and its OpenVPN plugin. The application never runs as root; NetworkManager "
+"performs privileged network operations, and the optional kill switch is a "
+"separate system service."
+msgstr ""
+"Gestisce un abbonamento FastVPN (OpenVPN) esistente tramite NetworkManager e "
+"il relativo plugin OpenVPN. L'applicazione non viene mai eseguita come root: "
+"le operazioni di rete privilegiate sono svolte da NetworkManager e il kill "
+"switch opzionale è un servizio di sistema separato."
 
 #. Translators: put your names here, one per line, as shown in About.
 #: pervius/ui/window.py:2888
@@ -1051,8 +1227,17 @@ msgstr "Componenti di terze parti"
 
 #: pervius/ui/window.py:2898
 #, python-brace-format
-msgid "{0} is an independent front end. It uses the installed NetworkManager, NetworkManager-openvpn, OpenVPN, nftables, polkit, GTK, libadwaita, libsecret, libsoup, dnspython and iso-codes components. Those projects are distributed under their own licenses and are not bundled in this package."
-msgstr "{0} è un'interfaccia indipendente. Utilizza i componenti NetworkManager, NetworkManager-openvpn, OpenVPN, nftables, polkit, GTK, libadwaita, libsecret, libsoup, dnspython e iso-codes installati nel sistema. Questi progetti sono distribuiti con le rispettive licenze e non sono inclusi in questo pacchetto."
+msgid ""
+"{0} is an independent front end. It uses the installed NetworkManager, "
+"NetworkManager-openvpn, OpenVPN, nftables, polkit, GTK, libadwaita, "
+"libsecret, libsoup, dnspython and iso-codes components. Those projects are "
+"distributed under their own licenses and are not bundled in this package."
+msgstr ""
+"{0} è un'interfaccia indipendente. Utilizza i componenti NetworkManager, "
+"NetworkManager-openvpn, OpenVPN, nftables, polkit, GTK, libadwaita, "
+"libsecret, libsoup, dnspython e iso-codes installati nel sistema. Questi "
+"progetti sono distribuiti con le rispettive licenze e non sono inclusi in "
+"questo pacchetto."
 
 #: pervius/ui/window.py:2987 pervius/ui/window.py:3001
 msgid "VPN is reconnecting"
@@ -1060,12 +1245,22 @@ msgstr "Riconnessione della VPN in corso"
 
 #: pervius/ui/window.py:2990
 #, python-brace-format
-msgid "{0} is still retrying in the background. Open it from the app menu to see the status."
-msgstr "{0} sta ancora riprovando in background. Per vedere lo stato, aprirlo dal menu delle applicazioni."
+msgid ""
+"{0} is still retrying in the background. Open it from the app menu to see "
+"the status."
+msgstr ""
+"{0} sta ancora riprovando in background. Per vedere lo stato, aprirlo dal "
+"menu delle applicazioni."
 
 #: pervius/ui/window.py:3003
-msgid "The tunnel is currently down and the app is waiting to retry. Closing this window hides it and keeps retrying in the background. Quit stops automatic reconnection."
-msgstr "Al momento il tunnel non è attivo e l'app è in attesa di riprovare. Chiudendo questa finestra, la si nasconde e i tentativi proseguono in background. «Esci» interrompe la riconnessione automatica."
+msgid ""
+"The tunnel is currently down and the app is waiting to retry. Closing this "
+"window hides it and keeps retrying in the background. Quit stops automatic "
+"reconnection."
+msgstr ""
+"Al momento il tunnel non è attivo e l'app è in attesa di riprovare. "
+"Chiudendo questa finestra, la si nasconde e i tentativi proseguono in "
+"background. «Esci» interrompe la riconnessione automatica."
 
 #: pervius/ui/window.py:3007
 msgid "Keep Retrying"
@@ -1082,8 +1277,17 @@ msgid "{0} is running in the background with firewall protection active."
 msgstr "{0} è in esecuzione in background con la protezione firewall attiva."
 
 #: pervius/ui/window.py:3035
-msgid "Closing hides the window and keeps the app and firewall rules running. Quitting can disarm first, or leave protection active; while armed, traffic outside the VPN stays blocked. If the VPN is not connected, normal internet access remains blocked."
-msgstr "Chiudendo la finestra, la si nasconde e l'app e le regole del firewall restano in funzione. Uscendo, è possibile disattivare prima la protezione oppure lasciarla attiva; finché è attiva, il traffico esterno alla VPN resta bloccato. Se la VPN non è connessa, anche il normale accesso a Internet resta bloccato."
+msgid ""
+"Closing hides the window and keeps the app and firewall rules running. "
+"Quitting can disarm first, or leave protection active; while armed, traffic "
+"outside the VPN stays blocked. If the VPN is not connected, normal internet "
+"access remains blocked."
+msgstr ""
+"Chiudendo la finestra, la si nasconde e l'app e le regole del firewall "
+"restano in funzione. Uscendo, è possibile disattivare prima la protezione "
+"oppure lasciarla attiva; finché è attiva, il traffico esterno alla VPN resta "
+"bloccato. Se la VPN non è connessa, anche il normale accesso a Internet "
+"resta bloccato."
 
 #: pervius/ui/window.py:3042
 msgid "Hide Window"
@@ -1103,13 +1307,26 @@ msgstr "La VPN è ancora connessa"
 
 #: pervius/ui/window.py:3062
 #, python-brace-format
-msgid "{0} is running in the background. Open it from the app menu to disconnect or quit."
-msgstr "{0} è in esecuzione in background. Per disconnettersi o uscire, aprirlo dal menu delle applicazioni."
+msgid ""
+"{0} is running in the background. Open it from the app menu to disconnect or "
+"quit."
+msgstr ""
+"{0} è in esecuzione in background. Per disconnettersi o uscire, aprirlo dal "
+"menu delle applicazioni."
 
 #: pervius/ui/window.py:3074
 #, python-brace-format
-msgid "Closing this window hides it and leaves the app process running so it can answer reauthentication requests. Open {0} again from the app menu to show the window. If the process exits, the tunnel may stay up without the secret agent."
-msgstr "Chiudendo questa finestra, la si nasconde e il processo dell'app resta in esecuzione per poter rispondere alle richieste di riautenticazione. Per mostrare di nuovo la finestra, riaprire {0} dal menu delle applicazioni. Se il processo termina, il tunnel potrebbe restare attivo senza l'agente dei segreti."
+msgid ""
+"Closing this window hides it and leaves the app process running so it can "
+"answer reauthentication requests. Open {0} again from the app menu to show "
+"the window. If the process exits, the tunnel may stay up without the secret "
+"agent."
+msgstr ""
+"Chiudendo questa finestra, la si nasconde e il processo dell'app resta in "
+"esecuzione per poter rispondere alle richieste di riautenticazione. Per "
+"mostrare di nuovo la finestra, riaprire {0} dal menu delle applicazioni. Se "
+"il processo termina, il tunnel potrebbe restare attivo senza l'agente dei "
+"segreti."
 
 #: pervius/ui/window.py:3081
 msgid "Keep VPN Connected"
@@ -1124,16 +1341,27 @@ msgid "Quit while reconnecting?"
 msgstr "Uscire durante la riconnessione?"
 
 #: pervius/ui/window.py:3104
-msgid "Automatic reconnection will stop if the app exits. The VPN is not connected at this moment."
-msgstr "Se l'app viene chiusa, la riconnessione automatica si interromperà. Al momento la VPN non è connessa."
+msgid ""
+"Automatic reconnection will stop if the app exits. The VPN is not connected "
+"at this moment."
+msgstr ""
+"Se l'app viene chiusa, la riconnessione automatica si interromperà. Al "
+"momento la VPN non è connessa."
 
 #: pervius/ui/window.py:3135
 msgid "Quit while connected?"
 msgstr "Uscire con la VPN connessa?"
 
 #: pervius/ui/window.py:3137
-msgid "The tunnel can stay up after the app exits, but the secret agent will also exit. If the VPN asks for credentials again, reauthentication cannot succeed until you reopen the app. Quit and disconnect if you want a clean stop."
-msgstr "Il tunnel può restare attivo dopo la chiusura dell'app, ma verrà chiuso anche l'agente dei segreti. Se la VPN richiede di nuovo le credenziali, la riautenticazione non potrà riuscire finché l'app non verrà riaperta. Per un arresto pulito, disconnettersi e uscire."
+msgid ""
+"The tunnel can stay up after the app exits, but the secret agent will also "
+"exit. If the VPN asks for credentials again, reauthentication cannot succeed "
+"until you reopen the app. Quit and disconnect if you want a clean stop."
+msgstr ""
+"Il tunnel può restare attivo dopo la chiusura dell'app, ma verrà chiuso "
+"anche l'agente dei segreti. Se la VPN richiede di nuovo le credenziali, la "
+"riautenticazione non potrà riuscire finché l'app non verrà riaperta. Per un "
+"arresto pulito, disconnettersi e uscire."
 
 #: pervius/ui/window.py:3143
 msgid "Quit and Leave Connected"
@@ -1153,8 +1381,15 @@ msgstr "Uscire con il kill switch attivo?"
 
 #: pervius/ui/window.py:3169
 #, python-brace-format
-msgid "The system firewall rules will stay active if you quit without disarming. That keeps traffic blocked outside the VPN, but you may need the pervius-killswitch command to disarm later. {0}"
-msgstr "Uscendo senza disattivare il kill switch, le regole del firewall di sistema resteranno attive. Il traffico esterno alla VPN resterà quindi bloccato, ma in seguito potrebbe essere necessario il comando pervius-killswitch per disattivarlo. {0}"
+msgid ""
+"The system firewall rules will stay active if you quit without disarming. "
+"That keeps traffic blocked outside the VPN, but you may need the pervius-"
+"killswitch command to disarm later. {0}"
+msgstr ""
+"Uscendo senza disattivare il kill switch, le regole del firewall di sistema "
+"resteranno attive. Il traffico esterno alla VPN resterà quindi bloccato, ma "
+"in seguito potrebbe essere necessario il comando pervius-killswitch per "
+"disattivarlo. {0}"
 
 #: pervius/ui/window.py:3191
 msgid "Disarming the kill switch before quitting…"
@@ -1181,21 +1416,78 @@ msgid "VPN;OpenVPN;NetworkManager;kill switch;"
 msgstr "VPN;OpenVPN;NetworkManager;kill switch;rete privata virtuale;privacy;"
 
 #: data/com.solvetus.Pervius.metainfo.xml.in:9
-msgid "Pervius is a GTK 4/libadwaita desktop client for an existing FastVPN (OpenVPN) subscription. It downloads the provider's public server catalogue, validates every profile strictly, and imports the selected profile through NetworkManager and its OpenVPN plugin."
-msgstr "Pervius è un client desktop GTK 4/libadwaita per un abbonamento FastVPN (OpenVPN) esistente. Scarica il catalogo pubblico dei server del fornitore, convalida rigorosamente ogni profilo e importa il profilo selezionato tramite NetworkManager e il relativo plugin OpenVPN."
+msgid ""
+"Pervius is a GTK 4/libadwaita desktop client for an existing FastVPN "
+"(OpenVPN) subscription. It downloads the provider's public server catalogue, "
+"validates every profile strictly, and imports the selected profile through "
+"NetworkManager and its OpenVPN plugin."
+msgstr ""
+"Pervius è un client desktop GTK 4/libadwaita per un abbonamento FastVPN "
+"(OpenVPN) esistente. Scarica il catalogo pubblico dei server del fornitore, "
+"convalida rigorosamente ogni profilo e importa il profilo selezionato "
+"tramite NetworkManager e il relativo plugin OpenVPN."
 
 #: data/com.solvetus.Pervius.metainfo.xml.in:15
-msgid "The application runs as an ordinary user. NetworkManager performs the privileged network operations, and passwords are supplied by a NetworkManager secret agent instead of being written into the VPN profile. While connected, all DNS goes through the tunnel and IPv6 outside the tunnel is blocked. An optional kill switch, backed by a small system service and polkit, blocks all other traffic outside the tunnel while it is armed."
-msgstr "L'applicazione viene eseguita come utente normale. Le operazioni di rete privilegiate sono svolte da NetworkManager e le password vengono fornite da un agente dei segreti di NetworkManager anziché essere scritte nel profilo VPN. Durante la connessione, tutto il traffico DNS passa attraverso il tunnel e l'IPv6 esterno al tunnel viene bloccato. Un kill switch opzionale, basato su un piccolo servizio di sistema e su polkit, blocca tutto il resto del traffico esterno al tunnel quando è attivo."
+msgid ""
+"The application runs as an ordinary user. NetworkManager performs the "
+"privileged network operations, and passwords are supplied by a "
+"NetworkManager secret agent instead of being written into the VPN profile. "
+"While connected, all DNS goes through the tunnel and IPv6 outside the tunnel "
+"is blocked. An optional kill switch, backed by a small system service and "
+"polkit, blocks all other traffic outside the tunnel while it is armed."
+msgstr ""
+"L'applicazione viene eseguita come utente normale. Le operazioni di rete "
+"privilegiate sono svolte da NetworkManager e le password vengono fornite da "
+"un agente dei segreti di NetworkManager anziché essere scritte nel profilo "
+"VPN. Durante la connessione, tutto il traffico DNS passa attraverso il "
+"tunnel e l'IPv6 esterno al tunnel viene bloccato. Un kill switch opzionale, "
+"basato su un piccolo servizio di sistema e su polkit, blocca tutto il resto "
+"del traffico esterno al tunnel quando è attivo."
 
 #: data/com.solvetus.Pervius.metainfo.xml.in:24
-msgid "It offers country search with flags, favorites, bounded automatic reconnection, a tray icon, desktop notifications, connection details such as the VPN exit IP and traffic totals, and English, Portuguese, French, Spanish and Italian translations. It manages one NetworkManager profile and does not provide auto-protect or DNS filtering."
-msgstr "Offre la ricerca dei paesi con bandiere, i preferiti, la riconnessione automatica con un numero limitato di tentativi, un'icona nell'area di notifica, le notifiche desktop, dettagli della connessione come l'IP di uscita VPN e il totale del traffico, e le traduzioni in inglese, portoghese, francese, spagnolo e italiano. Gestisce un solo profilo di NetworkManager e non offre la protezione automatica né il filtraggio DNS."
+msgid ""
+"It offers country search with flags, favorites, bounded automatic "
+"reconnection, a tray icon, desktop notifications, connection details such as "
+"the VPN exit IP and traffic totals, and English, Portuguese, French, Spanish "
+"and Italian translations. It manages one NetworkManager profile and does not "
+"provide auto-protect or DNS filtering."
+msgstr ""
+"Offre la ricerca dei paesi con bandiere, i preferiti, la riconnessione "
+"automatica con un numero limitato di tentativi, un'icona nell'area di "
+"notifica, le notifiche desktop, dettagli della connessione come l'IP di "
+"uscita VPN e il totale del traffico, e le traduzioni in inglese, portoghese, "
+"francese, spagnolo e italiano. Gestisce un solo profilo di NetworkManager e "
+"non offre la protezione automatica né il filtraggio DNS."
 
 #: data/com.solvetus.Pervius.metainfo.xml.in:58
 msgid "kill switch"
 msgstr "kill switch"
 
 #: data/com.solvetus.Pervius.metainfo.xml.in:78
-msgid "First public release under the name Pervius, licensed under the Apache License 2.0. Settings, favorites, a saved password and the managed NetworkManager profile from earlier test builds are adopted automatically on first start."
-msgstr "Prima versione pubblica con il nome Pervius, distribuita con licenza Apache License 2.0. Impostazioni, preferiti, l'eventuale password salvata e il profilo NetworkManager gestito delle precedenti versioni di prova vengono recuperati automaticamente al primo avvio."
+msgid ""
+"A new logo, Portuguese, French, Spanish and Italian translations, and leak "
+"protection that works even with the kill switch off: while the VPN is "
+"connected, all DNS goes through the tunnel and IPv6 outside the tunnel is "
+"blocked."
+msgstr "Un nuovo logo, le traduzioni in portoghese, francese, spagnolo e italiano e una protezione dalle fughe di dati che funziona anche con il kill switch disattivato: mentre la VPN è connessa, tutto il DNS passa attraverso il tunnel e l'IPv6 al di fuori del tunnel viene bloccato."
+
+#: data/com.solvetus.Pervius.metainfo.xml.in:84
+msgid ""
+"The kill switch now allows only the Pervius tunnel and interfaces you "
+"choose, and lets you change location or protocol while it stays armed. A "
+"saved password is never shown again; the Account dialog only says that one "
+"is saved and offers to replace or forget it. Pervius can also start at "
+"login, hidden in the tray."
+msgstr "Il kill switch ora consente solo il tunnel di Pervius e le interfacce scelte, e permette di cambiare località o protocollo senza disattivarlo. Una password salvata non viene mai più mostrata: la finestra Account indica solo che ne è salvata una e permette di sostituirla o dimenticarla. Pervius può anche avviarsi all'accesso, nascosto nell'area di notifica."
+
+#: data/com.solvetus.Pervius.metainfo.xml.in:96
+msgid ""
+"First public release under the name Pervius, licensed under the Apache "
+"License 2.0. Settings, favorites, a saved password and the managed "
+"NetworkManager profile from earlier test builds are adopted automatically on "
+"first start."
+msgstr ""
+"Prima versione pubblica con il nome Pervius, distribuita con licenza Apache "
+"License 2.0. Impostazioni, preferiti, l'eventuale password salvata e il "
+"profilo NetworkManager gestito delle precedenti versioni di prova vengono "
+"recuperati automaticamente al primo avvio."

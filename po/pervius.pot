@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-18 17:56+0100\n"
+"POT-Creation-Date: 2026-11-18 18:04+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1316,6 +1316,23 @@ msgid "kill switch"
 msgstr ""
 
 #: data/com.solvetus.Pervius.metainfo.xml.in:78
+msgid ""
+"A new logo, Portuguese, French, Spanish and Italian translations, and leak "
+"protection that works even with the kill switch off: while the VPN is "
+"connected, all DNS goes through the tunnel and IPv6 outside the tunnel is "
+"blocked."
+msgstr ""
+
+#: data/com.solvetus.Pervius.metainfo.xml.in:84
+msgid ""
+"The kill switch now allows only the Pervius tunnel and interfaces you "
+"choose, and lets you change location or protocol while it stays armed. A "
+"saved password is never shown again; the Account dialog only says that one "
+"is saved and offers to replace or forget it. Pervius can also start at "
+"login, hidden in the tray."
+msgstr ""
+
+#: data/com.solvetus.Pervius.metainfo.xml.in:96
 msgid ""
 "First public release under the name Pervius, licensed under the Apache "
 "License 2.0. Settings, favorites, a saved password and the managed "

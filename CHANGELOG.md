@@ -8,6 +8,80 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-18
+
+### Added
+
+- European Portuguese, French, Spanish and Italian translations (gettext
+  domain `pervius`), including notifications, the tray menu, error messages,
+  the desktop file and the AppStream metadata. Settings → Language follows the
+  system by default or picks a language; country names follow the UI
+  language through iso-codes.
+- IPv6 leak guard: while the Pervius-managed VPN is up, a NetworkManager
+  dispatcher hook blocks IPv6 outside the tunnel (loopback, link-local,
+  neighbour discovery, unique local addresses and allowed interfaces still
+  pass), whether or not the kill switch is armed or the app is running.
+  Settings → Block IPv6 while connected, on by default.
+- Kill-switch service API version 2: `UpdateEndpoints` swaps the allowed VPN
+  server addresses in one nftables transaction and `Configure` changes LAN
+  access and allowed interfaces while armed. `pervius-killswitch` gains
+  `configure`, `update-endpoints` and `--allow-interface`.
+- Settings → Always allow these interfaces (for example NetBird's `wt0`) for
+  the kill switch and the IPv6 guard.
+- Start at login, hidden in the tray (`pervius --hidden`).
+- A connected timer in the connection details and the tray, and an eye
+  toggle that hides or shows the ISP and VPN exit IPs (hidden by default).
+- A Help dialog with the protocol guide and the kill-switch recovery command.
+- Network-namespace integration tests for the kill switch and the IPv6 guard
+  in CI.
+
+### Changed
+
+- New logo (tunnel and keystone), tray icons with connected and reconnecting
+  badges, a symbolic icon, and the app icon on the status card.
+- Location and protocol can change while the kill switch is armed. The
+  service resolves the new servers, the profile is pinned to those addresses
+  so OpenVPN needs no DNS outside the tunnel, and a connected tunnel resolves
+  the new location through itself before it is dropped. Endpoints are
+  refreshed after every connection and before the first reconnect attempt to
+  follow provider IP rotation.
+- The kill switch allows the tunnel by name (`pervius0`, pinned in the
+  managed profile) plus the interfaces you allow, instead of any `tun*`.
+- "Allow local network" and the allowed interfaces are editable only while the
+  kill switch is armed, and apply immediately.
+- One About dialog (with trademark and third-party legal sections and
+  translator credits) replaces the About, License and Third-party dialogs.
+- Main menu: Refresh Locations, Settings, Help, About, Quit. Tray: status
+  line, Connect/Disconnect, Favorites, Choose Location, Kill switch, Show
+  Pervius, Quit.
+- The protocol is shown only in the Protocol row (help text in its tooltip)
+  and the connection details; while disconnected the details show only the
+  ISP IP and protocol. Header subtitle "Unofficial client for FastVPN".
+- AppStream lists only the public releases; the 0.1.x test builds remain in
+  this changelog.
+- The package depends on python3-dnspython and iso-codes.
+
+### Fixed
+
+- Traffic totals now count the VPN tunnel instead of the physical interface.
+
+### Security
+
+- The Account dialog no longer loads the saved password into the password
+  field, where the reveal button could show it. It now says "Saved in the
+  keyring" with Replace (an empty entry) and Forget (with confirmation);
+  only the secret agent reads a stored password, when NetworkManager asks.
+  Forget Saved Password is removed from the main and tray menus.
+- All DNS goes through the tunnel while connected: the managed profile makes
+  the VPN's DNS exclusive (`dns-priority=-1`, routing domain `~.`).
+- IPv6 no longer leaks outside the IPv4-only tunnel while connected (IPv6
+  guard).
+- While the kill switch is armed and the tunnel is down, DNS for new server
+  names goes through a window of at most five seconds that matches only the
+  kill-switch service's own cgroup; the service resolves with dnspython (A and
+  AAAA only, random ID and source port, size cap, truncated or mismatched
+  replies rejected).
+
 ## [0.2.0] - 2026-11-18
 
 ### Changed
@@ -219,6 +293,7 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
   validation, import through NetworkManager's OpenVPN plugin, ownership
   manifest, system-bus secret agent, Debian package.
 
-[Unreleased]: https://github.com/Solvetus/pervius-app/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Solvetus/pervius-app/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Solvetus/pervius-app/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Solvetus/pervius-app/compare/v0.1.19...v0.2.0
 [0.1.19]: https://github.com/Solvetus/pervius-app/tree/v0.1.19

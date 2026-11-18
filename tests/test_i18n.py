@@ -99,7 +99,7 @@ class CatalogueTests(unittest.TestCase):
 
     def test_placeholders_and_plurals_are_kept(self):
         for lang in LANGUAGES:
-            for (context, msgid), entry in entries(PO / f"{lang}.po").items():
+            for (_context, msgid), entry in entries(PO / f"{lang}.po").items():
                 if not msgid:
                     continue
                 wanted = set(PLACEHOLDER.findall(msgid + (entry["plural"] or "")))
