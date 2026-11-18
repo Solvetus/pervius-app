@@ -1,0 +1,13 @@
+Pervius
+Copyright 2026 Solvetus Labs
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Pervius is an independent open-source project by Solvetus Labs. It is not
+affiliated with, endorsed by, or sponsored by Namecheap, Inc. FastVPN is a
+trademark of Namecheap, Inc.
+
+Pervius bundles no third-party code. At run time it uses system components
+(NetworkManager, NetworkManager-openvpn, OpenVPN, GTK, libadwaita, libsecret,
+libsoup, PyGObject, nftables, polkit, systemd), which are distributed under
+their own licenses.
