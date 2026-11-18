@@ -15,7 +15,7 @@ data/                    shared assets installed by every package
   icons/hicolor/         app, tray, status-card and symbolic icons
   man/man1/              manual pages for the four commands
   dbus/                  system bus policy and activation file for the kill-switch service
-  networkmanager/        90-pervius-ipv6-guard, the IPv6 leak guard dispatcher hook
+  networkmanager/        90-pervius-guard, the DNS/IPv6 leak guard dispatcher hook
   polkit/                polkit action
   systemd/               pervius-killswitchd.service
 po/                      LINGUAS, POTFILES, pervius.pot and one .po per language
@@ -82,7 +82,7 @@ Debian-specific behaviour, all under `packaging/debian/`:
 - `preinst` refuses to install over an armed 0.1.x kill switch (effective
   for `dpkg -i`; apt removes the old package first).
 - `postinst`/`postrm` reload systemd and the system bus policy; `prerm` stops
-  the service; `postrm` removes the `inet pervius_ks` and `inet pervius_v6`
+  the service; `postrm` removes the `inet pervius_ks` and `inet pervius_guard`
   tables on removal.
 
 ## Adding a distribution
@@ -98,7 +98,7 @@ Debian-specific behaviour, all under `packaging/debian/`:
    and reload the system bus policy (`busctl call org.freedesktop.DBus
    /org/freedesktop/DBus org.freedesktop.DBus ReloadConfig`). Before removal,
    stop `pervius-killswitchd.service`; after removal, delete the
-   `inet pervius_ks` and `inet pervius_v6` tables and `/run/pervius`. Do not
+   `inet pervius_ks` and `inet pervius_guard` tables and `/run/pervius`. Do not
    enable the service; it is D-Bus activated. The dispatcher hook must be
    root-owned and not group- or world-writable.
 5. If the distribution needs a runtime difference to be visible, add a

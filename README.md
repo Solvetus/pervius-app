@@ -134,7 +134,7 @@ Options, editable while armed:
 
 - **Allow local network** permits RFC 1918/ULA ranges.
 - **Always allow these interfaces** (Settings) — for example `wt0` for NetBird.
-  The interfaces are also allowed by the IPv6 guard.
+  The interfaces are also allowed by the leak guard.
 
 The kill switch never arms itself, and a reboot turns it off (fail-open).
 Quitting or a crash of the app leaves it armed.
@@ -151,17 +151,25 @@ root: `sudo nft delete table inet pervius_ks`. Other commands:
 [--allow-interface IFACE]`, `pervius-killswitch configure …`,
 `pervius-killswitch update-endpoints`, `pervius-killswitch diagnose`.
 
-## IPv6 guard
+## Leak guard
 
 While the Pervius-managed VPN is up, a NetworkManager dispatcher hook
-(`/usr/lib/NetworkManager/dispatcher.d/90-pervius-ipv6-guard`) installs the
-nftables table `inet pervius_v6`, which blocks IPv6 outside the tunnel except
-loopback, link-local, neighbour discovery, unique local addresses and the
-interfaces you always allow. It is removed when the VPN goes down. It does not
-need the app or the kill switch. Turn it off with **Settings → Block IPv6
-while connected** (applies from the next connection). If a NetworkManager
-crash ever leaves it behind, `sudo nft delete table inet pervius_v6` removes
-it.
+(`/usr/lib/NetworkManager/dispatcher.d/90-pervius-guard`) installs the
+nftables table `inet pervius_guard`:
+
+- **DNS** may only go through the tunnel, loopback and the interfaces you
+  always allow; nothing reaches your router's resolver, whatever another tool
+  (for example NetBird's search domain) configured.
+- **IPv6** outside the tunnel is blocked except loopback, link-local,
+  neighbour discovery, unique local addresses and the interfaces you always
+  allow. Turn this part off with **Settings → Block IPv6 while connected**
+  (applies from the next connection).
+
+It is removed when the VPN goes down and needs neither the app nor the kill
+switch. The VPN profile is always pinned to resolved server addresses, so
+reconnecting never needs DNS outside the tunnel. If a NetworkManager crash
+ever leaves the table behind, `sudo nft delete table inet pervius_guard`
+removes it.
 
 ## Settings
 
@@ -191,7 +199,7 @@ it.
   ordinary NetworkManager OpenVPN behaviour: the current profiles are
   IPv4-only, so IPv6 traffic and DNS queries can bypass the tunnel. Arm the
   kill switch if that matters to you.
-- **Live verification of the 0.3.0 leak fixes is pending.** The IPv6 guard
+- **Live verification of the 0.3.0 leak fixes is pending.** The leak guard
   and DNS-through-the-tunnel are tested in CI; until they are verified on a
   real connection, treat the caveat above as current.
 - **No auto-protect.** The kill switch never arms automatically at login or on

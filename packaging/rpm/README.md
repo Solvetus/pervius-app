@@ -52,7 +52,7 @@ Let `%py_byte_compile` / brp scripts compile the package as usual.
   reload (`busctl call org.freedesktop.DBus /org/freedesktop/DBus
   org.freedesktop.DBus ReloadConfig`); `%preun`: stop
   `pervius-killswitchd.service`; `%postun` on erase (`$1 -eq 0`): delete
-  `inet pervius_ks`, `inet pervius_v6` and `/run/pervius`. Do not enable the service; it is D-Bus
+  `inet pervius_ks`, `inet pervius_guard`, `/run/pervius` and (on purge) `/var/lib/pervius`. Do not enable the service; it is D-Bus
   activated. There is no 0.1.x RPM, so no upgrade guard is needed.
 
 ## To verify on Fedora before shipping
@@ -61,7 +61,7 @@ Let `%py_byte_compile` / brp scripts compile the package as usual.
   `~/.local/share/pervius/certificates/nm-openvpn/`. Fedora's policy expects
   user certificates in `~/.cert` (`home_cert_t`); the import path may need to
   change or a label may be needed. Check for AVC denials on first connect.
-- **firewalld:** confirm the `inet pervius_ks` and `inet pervius_v6` tables at
+- **firewalld:** confirm the `inet pervius_ks` and `inet pervius_guard` tables at
   priority -10 coexist with firewalld's tables and that a firewalld reload
   does not remove them.
 - **SELinux and the dispatcher hook:** confirm `NetworkManager-dispatcher`

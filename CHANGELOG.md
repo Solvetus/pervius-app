@@ -17,14 +17,16 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
   the desktop file and the AppStream metadata. Settings → Language follows the
   system by default or picks a language; country names follow the UI
   language through iso-codes.
-- IPv6 leak guard: while the Pervius-managed VPN is up, a NetworkManager
-  dispatcher hook blocks IPv6 outside the tunnel (loopback, link-local,
+- Leak guard: while the Pervius-managed VPN is up, a NetworkManager
+  dispatcher hook keeps DNS in the tunnel (no query reaches the router's
+  resolver) and blocks IPv6 outside the tunnel (loopback, link-local,
   neighbour discovery, unique local addresses and allowed interfaces still
   pass), whether or not the kill switch is armed or the app is running.
   Settings → Block IPv6 while connected, on by default.
 - Kill-switch service API version 2: `UpdateEndpoints` swaps the allowed VPN
-  server addresses in one nftables transaction and `Configure` changes LAN
-  access and allowed interfaces while armed. `pervius-killswitch` gains
+  server addresses in one nftables transaction, `Configure` changes LAN
+  access and allowed interfaces while armed, and `SetGuardOptions` stores the
+  leak guard's options. `pervius-killswitch` gains
   `configure`, `update-endpoints` and `--allow-interface`.
 - Settings → Always allow these interfaces (for example NetBird's `wt0`) for
   the kill switch and the IPv6 guard.
@@ -32,6 +34,7 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
 - A connected timer in the connection details and the tray, and an eye
   toggle that hides or shows the ISP and VPN exit IPs (hidden by default).
 - A Help dialog with the protocol guide and the kill-switch recovery command.
+- A Cancel button (and tray item) while connecting.
 - Network-namespace integration tests for the kill switch and the IPv6 guard
   in CI.
 
@@ -46,7 +49,14 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
   refreshed after every connection and before the first reconnect attempt to
   follow provider IP rotation.
 - The kill switch allows the tunnel by name (`pervius0`, pinned in the
-  managed profile) plus the interfaces you allow, instead of any `tun*`.
+  managed profile) plus the interfaces you allow, instead of any `tun*`, and
+  never lets DNS reach the LAN, even with the LAN allowed.
+- The managed profile is always pinned to resolved server addresses, so
+  OpenVPN never needs DNS to (re)connect; arming the kill switch allows
+  exactly what the live tunnel uses.
+- A catalogue profile that fails validation is left out and reported instead
+  of failing the whole refresh; `verify-x509-name` with one argument (the
+  default `subject` type) is accepted.
 - "Allow local network" and the allowed interfaces are editable only while the
   kill switch is armed, and apply immediately.
 - One About dialog (with trademark and third-party legal sections and
@@ -64,6 +74,11 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
 ### Fixed
 
 - Traffic totals now count the VPN tunnel instead of the physical interface.
+- Connecting no longer freezes the window: the secret agent answers
+  NetworkManager asynchronously instead of waiting on the keyring, every
+  NetworkManager call has a timeout, and Quit works while connecting.
+- Tray "Show Pervius" unminimises and focuses the window (it uses the tray
+  host's activation token) instead of GNOME showing "Pervius is ready".
 
 ### Security
 
@@ -73,7 +88,9 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
   only the secret agent reads a stored password, when NetworkManager asks.
   Forget Saved Password is removed from the main and tray menus.
 - All DNS goes through the tunnel while connected: the managed profile makes
-  the VPN's DNS exclusive (`dns-priority=-1`, routing domain `~.`).
+  the VPN's DNS exclusive (`dns-priority=-1`, routing domain `~.`), the leak
+  guard drops DNS to every other interface, and the app's own exit-IP lookup
+  resolves through the tunnel's DNS only.
 - IPv6 no longer leaks outside the IPv4-only tunnel while connected (IPv6
   guard).
 - While the kill switch is armed and the tunnel is down, DNS for new server

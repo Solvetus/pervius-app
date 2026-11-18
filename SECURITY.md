@@ -36,7 +36,8 @@ dispatcher hook:
   `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp` and a 0700 runtime
   directory `/run/pervius`.
 - **API:** `Arm(uuid, allow_lan, interfaces)`, `Configure(allow_lan,
-  interfaces)`, `UpdateEndpoints(uuid, replace)`, `Disarm()`, `GetStatus()`.
+  interfaces)`, `UpdateEndpoints(uuid, replace)`, `SetGuardOptions(block_ipv6,
+  interfaces)`, `Disarm()`, `GetStatus()`.
   Every method except `GetStatus` requires the polkit action
   `com.solvetus.pervius.killswitch.control` (active local sessions only).
   `Arm` and `UpdateEndpoints` accept only the reserved profile UUID and only
@@ -51,11 +52,13 @@ dispatcher hook:
   down it may send A/AAAA queries for the profile's server names itself
   (dnspython) through a DNS window of at most five seconds that matches only
   its own cgroup.
-- **`/usr/lib/NetworkManager/dispatcher.d/90-pervius-ipv6-guard`** — a POSIX
+- **`/usr/lib/NetworkManager/dispatcher.d/90-pervius-guard`** — a POSIX
   shell hook run by NetworkManager. It exits immediately for any connection
-  other than the reserved Pervius profile, takes no input except
-  NetworkManager's arguments and environment, validates every value, and
-  only creates or deletes the table `inet pervius_v6`.
+  other than the reserved Pervius profile, reads only NetworkManager's
+  arguments and environment and the root-owned `/var/lib/pervius/guard.conf`
+  (written by the service's `SetGuardOptions`; ignored unless root-owned,
+  0644 and not a symlink), validates every value, and only creates or deletes
+  the table `inet pervius_guard`.
 
 Also in scope: the NetworkManager secret agent (it must release the password
 only to NetworkManager, for the owned profile), profile and catalogue

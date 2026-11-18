@@ -62,9 +62,11 @@ dbus-broker as the system bus. Fedora support is planned; see
   profile owner and the VPN account name are separate**: the local login (for
   example `alice`) goes into `connection.permissions`; the VPN account (for
   example `vpnuser@example`) goes into `vpn.user-name`. It also pins the
-  tunnel device to `pervius0`, makes VPN DNS exclusive, records the IPv6-guard
-  options and the provider's server names in connection user-data, and pins
-  or unpins the remote list (section 5).
+  tunnel device to `pervius0`, makes VPN DNS exclusive and pins the remote
+  list to resolved IP addresses (section 5). It keeps nothing in connection
+  user-data: NetworkManager 1.58 drops it when it reads the profile back.
+  Every change starts from NetworkManager's current settings (`GetSettings`),
+  never from libnm's cached copy, which can lag behind our own last write.
 - `pervius/nm/agent.py` — system-bus NetworkManager SecretAgent. Only
   NetworkManager (uid 0) may call it. It checks the UUID, connection ID,
   OpenVPN service type and an exact single-user permission before returning a
@@ -85,6 +87,8 @@ dbus-broker as the system bus. Fedora support is planned; see
   external CA/cert/key files, inline certificates and keys, TLS-auth keys,
   scripts, plugins, compression, proxies and unknown options.
 - `pervius/catalogue/validator.py` — archive validation and catalogue parsing.
+  A profile that fails validation is left out and reported; it never fails
+  the whole catalogue (an unsafe archive still does).
 - `pervius/catalogue/store.py` — last-known-good cache with atomic writes,
   mode 0600.
 - `pervius/catalogue/countries.py` — ISO country names, flags, aliases and
@@ -100,7 +104,7 @@ dbus-broker as the system bus. Fedora support is planned; see
 - `pervius/killswitchd/` — root service (`daemon.py`), pure rule generation
   (`rules.py`), profile validation (`profile.py`) and the service's own DNS
   lookups for the DNS window (`dnsquery.py`, dnspython).
-- `data/networkmanager/90-pervius-ipv6-guard` — the IPv6 leak guard, a
+- `data/networkmanager/90-pervius-guard` — the IPv6 leak guard, a
   NetworkManager dispatcher hook (section 6).
 - `pervius/tools/` — catalogue inspector, live proof CLI and kill-switch CLI.
 - `pervius/migration.py` — one-time upgrade from 0.1.x (section 10).
@@ -124,6 +128,13 @@ dbus-broker as the system bus. Fedora support is planned; see
   checkmark from the service's real state), Show Pervius and Quit. GNOME's own
   VPN indicator stays visible as the system-level source of truth.
 - Notifications are sent only while the window is unfocused or hidden.
+- **The window never blocks.** The secret agent answers `GetSecrets`
+  asynchronously (the keyring may have to be unlocked first); every
+  NetworkManager call is bounded by a timeout and kill-switch calls run in
+  worker threads (15 s). Connecting and reconnecting can always be
+  cancelled, and Quit works at once even mid-connect.
+- Tray "Show Pervius" presents the window with the XDG activation token the
+  tray host provides (`ProvideXdgActivationToken`), so GNOME raises it.
 - **DNS goes only through the tunnel.** The managed profile sets
   `ipv4.dns-priority=-1` and `ipv6.dns-priority=-1` (a negative priority
   excludes the DNS servers of every connection with a higher value) and the
@@ -163,13 +174,16 @@ Interface `com.solvetus.Pervius.KillSwitch1`:
 - `UpdateEndpoints(s uuid, b replace) -> a{sv}` — resolve the profile's server
   names again and swap the endpoint sets in one transaction (`replace=false`
   keeps the current endpoints as well, so a live tunnel is never cut).
+- `SetGuardOptions(b block_ipv6, as interfaces) -> a{sv}` — options of the
+  leak guard (section 6), written to the root-owned
+  `/var/lib/pervius/guard.conf`; the caller must own the managed profile.
 - `Disarm() -> a{sv}`
 - `GetStatus() -> a{sv}`
 - signal `StateChanged(a{sv})`
 
 Status keys: `armed`, `state` (`off`/`armed`/`error`), `detail`, `uuid`,
 `allow_lan`, `interfaces`, `endpoints` (a count, not addresses),
-`resolved_at`, `ipv6_guard` (whether the guard table exists), `backend`,
+`resolved_at`, `guard` (whether the leak-guard table exists), `backend`,
 `table`, `since`. Replies to `Arm` and `UpdateEndpoints` also carry
 `resolved` (the endpoints, for the caller to pin its profile); `GetStatus`
 and `StateChanged` never do. Errors: `PermissionDenied`, `NotAvailable`,
@@ -220,19 +234,25 @@ messages.
 Every catalogue remote is a host name, and while the kill switch is armed
 and the tunnel is down, DNS is blocked. Pervius therefore:
 
-1. **Resolves in the service.** At arm time (before any rule exists, or
-   through the tunnel's DNS when connected) and on `UpdateEndpoints`.
-2. **Pins the profile.** While armed, the GUI writes the resolved IP literals
-   into the managed profile's remote list and keeps the provider's names in
-   user-data, so OpenVPN needs no DNS while the tunnel is down. Verification
-   accepts a pinned list only if the recorded names match the catalogue
-   profile and every entry is an IP literal on one of its ports; the CA and
-   `verify-x509-name` checks still decide whether a server is genuine. An
-   unarmed connection unpins the profile first.
+1. **The profile is always pinned.** Before every activation the remote list
+   is set to resolved IP addresses, so OpenVPN never needs DNS to (re)connect
+   while the leak guard or the kill switch blocks it. Without the kill switch
+   the app resolves the names (asynchronously, before the tunnel exists);
+   with it armed the app writes the provider's names (from the catalogue)
+   into the profile and the service resolves and allows them, then the app
+   pins the answer. Verification accepts IP literals on the catalogue
+   profile's ports; which catalogue profile the stored one is comes from the
+   ownership manifest's source hash. The CA and `verify-x509-name` checks
+   still decide whether a server is genuine.
+2. **Arming keeps the live tunnel.** Because the profile is pinned, arming
+   allows exactly the addresses the tunnel uses; the service also adds the
+   live VPN server (NetworkManager's host route to it). Arming never cuts an
+   active tunnel.
 3. **Refreshes through the tunnel.** After every connection while armed the
    GUI calls `UpdateEndpoints(replace=false)`, which resolves through the
    tunnel's DNS, so provider IP rotation is tracked without any DNS outside
-   the tunnel.
+   the tunnel. If that fails, the profile is pinned back to its previous
+   addresses; it never stays on bare names.
 4. **Switches location without a gap.** A connected tunnel switching location
    imports the new profile, calls `UpdateEndpoints(replace=true)` while the
    old tunnel still carries DNS, pins the new addresses and only then
@@ -284,20 +304,23 @@ dummy interfaces (`tests/integration/`), using the kernel as the oracle
 (`EPERM` from the output hook): endpoints on their exact protocol and port,
 the pinned tunnel versus other tunnels, always-allowed interfaces, LAN
 access, atomic endpoint swaps, a rejected transaction keeping the old set,
-the DNS window admitting only its cgroup and expiring, and the IPv6 guard.
+the DNS window admitting only its cgroup and expiring, and the leak guard.
 
 Not yet tested live with 0.3.0: the checks in the release checklist (DNS
-only through the tunnel, the IPv6 guard on a real dual-stack link, a
+only through the tunnel, the leak guard on a real link, a
 location switch while armed, an always-allowed NetBird interface).
 
-## 6. IPv6 leak guard
+## 6. Leak guard (DNS and IPv6)
 
 The FastVPN profiles are IPv4-only. Without a guard, IPv6 traffic would leave
-over the physical link while the VPN is "connected".
+over the physical link while the VPN is "connected", and DNS could still
+reach the physical link's resolver: a tool such as NetBird can put its search
+domain on that link, and failed lookups are then retried with the suffix
+against the router (observed on the 0.3.0 test machine).
 
 ### Design: a NetworkManager dispatcher hook
 
-`/usr/lib/NetworkManager/dispatcher.d/90-pervius-ipv6-guard` (POSIX sh, 0755,
+`/usr/lib/NetworkManager/dispatcher.d/90-pervius-guard` (POSIX sh, 0755,
 root-owned) with a link in `pre-up.d/`. It was chosen over the kill-switch
 service because:
 
@@ -314,24 +337,34 @@ service because:
 ### Behaviour
 
 - First statement: exit unless `CONNECTION_UUID` is the reserved Pervius
-  UUID. The hook takes no input except NetworkManager's arguments and
-  environment, and validates every value it uses (action, `VPN_IP_IFACE`,
-  the user-data variables).
-- `vpn-pre-up` / `vpn-up`: atomically (re)install the table `inet pervius_v6`
-  (IPv6-only output and forward chains at priority -10). Outside the tunnel
-  only loopback, link-local (`fe80::/10`, `ff02::/16`), ICMPv6 neighbour
-  discovery, unique local addresses (`fc00::/7`, not routable on the
-  internet) and the always-allowed interfaces pass; all other IPv6 is
-  dropped. IPv4 is untouched.
+  UUID. Its inputs are NetworkManager's arguments and environment and one
+  root-owned options file (below); every value is validated.
+- `vpn-pre-up` / `vpn-up`: atomically (re)install the table
+  `inet pervius_guard` (output and forward chains at priority -10):
+  - **DNS** (UDP/TCP 53, TCP 853) may use only loopback, the tunnel and the
+    always-allowed interfaces; queries to any other interface, such as the
+    router's resolver, are dropped. NetBird's own domain keeps working
+    through NetBird's local resolver or its interface (if allowed); public
+    names never reach the physical resolver.
+  - **IPv6** (unless turned off): outside the tunnel only loopback,
+    link-local (`fe80::/10`, `ff02::/16`), ICMPv6 neighbour discovery,
+    unique local addresses (`fc00::/7`, not routable on the internet) and
+    the always-allowed interfaces pass; all other IPv6 is dropped.
+  - Other IPv4 is untouched.
 - `vpn-down`: delete the table. A guard left behind by a NetworkManager crash
   fails closed for IPv6 only; it is cleared by the next managed VPN event, by
   the kill-switch service when it starts (if the managed VPN is not active),
-  by a reboot, or with `sudo nft delete table inet pervius_v6`.
-- Options come from the profile's user-data, which NetworkManager passes as
-  `CONNECTION_USER_*` variables: `com.solvetus.pervius.block-ipv6`
-  (Settings → Block IPv6 while connected, default on) and
-  `com.solvetus.pervius.allowed-interfaces`. Changes apply from the next
-  connection.
+  by a reboot, or with `sudo nft delete table inet pervius_guard`.
+- Options: `/var/lib/pervius/guard.conf`, written by the kill-switch service
+  (`SetGuardOptions`, from Settings → Block IPv6 while connected, default on,
+  and Always allow these interfaces). The hook reads it only if it is
+  root-owned, mode 0644 and not a symlink; otherwise it uses the defaults
+  (block IPv6, no extra interfaces). Changes apply from the next
+  connection. (NetworkManager user-data would have been the natural
+  channel, but NetworkManager 1.58 does not keep it.)
+- The app's own lookups while connected also stay in the tunnel: the exit-IP
+  lookup resolves through `pervius0`'s DNS only (systemd-resolved, search
+  domains off) and fails rather than fall back.
 - It works whether or not the kill switch is armed; with both active, both
   tables must accept a packet.
 
@@ -341,7 +374,8 @@ service because:
 
 - DNS queries outside the tunnel: NetworkManager makes the VPN's DNS
   exclusive (section 4).
-- IPv6 traffic escaping the IPv4-only tunnel: the IPv6 guard (section 6).
+- IPv6 traffic escaping the IPv4-only tunnel, and DNS reaching the physical
+  link's resolver: the leak guard (section 6).
 
 ### Protected against while the kill switch is armed
 
@@ -412,7 +446,7 @@ service because:
     because apt removes the old package (whose removal script deletes its
     table) before unpacking Pervius. `dpkg -i` is guarded. See section 10.
 
-16. **The IPv6 guard and the kill switch protect this machine's traffic**;
+16. **The leak guard and the kill switch protect this machine's traffic**;
     the guard also drops forwarded IPv6, but containers or VMs in their own
     network namespaces are outside both.
 17. **The DNS window needs cgroup v2** (standard on current distributions).
@@ -435,7 +469,7 @@ that knows about distribution differences is `pervius/distro.py`, and it only
   table (fail-open until armed again). `diagnose` warns about it.
 - **polkit:** Pervius ships only an action file in
   `/usr/share/polkit-1/actions`; local rules can narrow it.
-- **NetworkManager dispatcher:** the IPv6 guard lives in
+- **NetworkManager dispatcher:** the leak guard lives in
   `/usr/lib/NetworkManager/dispatcher.d`, the same path on Debian/Ubuntu and
   Fedora.
 
@@ -509,7 +543,7 @@ protects `dpkg -i` upgrades only.
   guarantees, fetcher, country search, reconnect policy, tray properties,
   public-IP parsing, kill-switch rules and service (authorization, atomic
   updates, DNS window, recovery), the dnspython lookups against malformed and
-  spoofed replies, the IPv6 guard hook, translation completeness and coverage,
+  spoofed replies, the leak-guard hook, translation completeness and coverage,
   the language override, start at login, every upgrade-migration path, the
   Debian preinst guard, the distribution checks, and version and identifier
   consistency.
