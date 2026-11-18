@@ -202,7 +202,8 @@ def main(argv: list[str] | None = None) -> int:
         # Register the agent only after the manifest exists; the agent refuses
         # any UUID that is not manifest-owned.
         agent = NetworkManagerSecretAgent(
-            lambda _local_user: credentials.lookup(username),
+            credentials,
+            lambda: username,
             username=local_user,
             store_provider=OwnershipStore.load,
         )

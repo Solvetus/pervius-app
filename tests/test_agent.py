@@ -96,7 +96,8 @@ class AgentValidationTests(unittest.TestCase):
 
     def test_agent_starts_unregistered(self):
         agent = NetworkManagerSecretAgent(
-            lambda _username: None,
+            _EmptyStore(),
+            lambda: "vpnuser@example",
             username=USER,
             store_provider=lambda: None,  # type: ignore[arg-type]
         )
@@ -104,7 +105,8 @@ class AgentValidationTests(unittest.TestCase):
 
     def test_agent_does_not_release_password_without_manifest(self):
         agent = NetworkManagerSecretAgent(
-            lambda _username: "password",
+            _EmptyStore(),
+            lambda: "vpnuser@example",
             username=USER,
             store_provider=lambda: _EmptyStore(),
         )

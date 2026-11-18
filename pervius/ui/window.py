@@ -44,7 +44,7 @@ from ..config import (  # noqa: E402
     certificate_dir,
     local_username,
 )
-from ..credentials import CredentialError, CredentialStore  # noqa: E402
+from ..credentials import CredentialStore  # noqa: E402
 from ..killswitch_client import KillSwitchClient, call_async  # noqa: E402
 from ..migration import REFUSED, migrate_profile  # noqa: E402
 from ..nm.agent import AgentError, NetworkManagerSecretAgent  # noqa: E402
@@ -72,139 +72,13 @@ from ..ownership import (
 from ..public_ip import fetch_public_ip  # noqa: E402
 from ..reconnect import ReconnectPolicy  # noqa: E402
 from ..settings import Settings, SettingsStore  # noqa: E402
+from .account import CredentialsWindow  # noqa: E402
 from .tray import MenuItem, TrayError, TrayIcon  # noqa: E402
 
 log = logging.getLogger(__name__)
 
 _RECONNECT = ReconnectPolicy()
 _ACTIVE_STATES = {"preparing", "reconnecting", "connecting", "connected", "disconnecting"}
-
-
-class CredentialsWindow(Adw.Window):
-    def __init__(self, parent, store: CredentialStore, settings: Settings, on_saved):
-        super().__init__()
-        self._store = store
-        self._settings = settings
-        self._on_saved = on_saved
-        self.set_title("Account")
-        self.set_transient_for(parent)
-        self.set_modal(True)
-        self.set_default_size(460, 390)
-
-        toolbar = Adw.ToolbarView()
-        header = Adw.HeaderBar()
-        cancel = Gtk.Button(label="Cancel")
-        cancel.connect("clicked", lambda *_: self.close())
-        save = Gtk.Button(label="Save")
-        save.add_css_class("suggested-action")
-        save.connect("clicked", self._save)
-        header.pack_start(cancel)
-        header.pack_end(save)
-        toolbar.add_top_bar(header)
-
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        box.set_margin_top(18)
-        box.set_margin_bottom(18)
-        box.set_margin_start(18)
-        box.set_margin_end(18)
-
-        page = Adw.PreferencesPage()
-        group = Adw.PreferencesGroup()
-        group.set_title("FastVPN account")
-        group.set_description(
-            "The password is sent to NetworkManager only when the VPN is activated. "
-            "It is never written to the NetworkManager profile."
-        )
-        self.username_row = Adw.EntryRow()
-        self.username_row.set_title("Username")
-        self.username_row.set_text(settings.username)
-        self.password_row = Adw.PasswordEntryRow()
-        self.password_row.set_title("Password")
-        self.save_row = Adw.SwitchRow()
-        self.save_row.set_title("Save password in the desktop keyring")
-        self.save_row.set_subtitle(
-            "If unavailable, the password is kept only for this session."
-            if store.persistence_available
-            else "The desktop keyring is unavailable; the password will be session-only."
-        )
-        self.save_row.set_active(bool(settings.save_password and store.persistence_available))
-        self.save_row.set_sensitive(store.persistence_available)
-        group.add(self.username_row)
-        group.add(self.password_row)
-        group.add(self.save_row)
-        page.add(group)
-        box.append(page)
-
-        self.error_label = Gtk.Label()
-        self.error_label.set_wrap(True)
-        self.error_label.set_xalign(0.0)
-        self.error_label.add_css_class("error")
-        self.error_label.set_visible(False)
-        box.append(self.error_label)
-
-        note = Gtk.Label()
-        note.set_wrap(True)
-        note.set_xalign(0.0)
-        note.add_css_class("dim-label")
-        note.set_label(
-            "Credentials are not verified until a connection succeeds. "
-            "Nothing is sent to Solvetus Labs; Pervius has no servers of its own."
-        )
-        box.append(note)
-
-        clamp = Adw.Clamp()
-        clamp.set_maximum_size(560)
-        clamp.set_child(box)
-        scroller = Gtk.ScrolledWindow()
-        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scroller.set_child(clamp)
-        toolbar.set_content(scroller)
-        self.set_content(toolbar)
-
-        username = settings.username.strip()
-        if username:
-            remembered = store.lookup(username)
-            if remembered:
-                self.password_row.set_text(remembered)
-        self.username_row.grab_focus()
-
-    def _show_error(self, message: str) -> None:
-        self.error_label.set_label(message)
-        self.error_label.set_visible(True)
-
-    def _save(self, *_args) -> None:
-        username = self.username_row.get_text().strip()
-        password = self.password_row.get_text()
-        if not username:
-            self._show_error("Enter your VPN username.")
-            return
-        if not password:
-            self._show_error("Enter your VPN password.")
-            return
-
-        persist = bool(self.save_row.get_active())
-        if persist and not self._store.persistence_available:
-            persist = False
-            self._store.remember(username, password)
-            self._settings.username = username
-            self._settings.save_password = False
-            SettingsStore().save(self._settings)
-            self._on_saved()
-            self.close()
-            return
-        try:
-            self._store.store(username, password, persist=persist)
-        except CredentialError as exc:
-            self._show_error(
-                f"The password is in memory for this session, but could not be saved: {exc}"
-            )
-            self.save_row.set_active(False)
-            return
-        self._settings.username = username
-        self._settings.save_password = persist
-        SettingsStore().save(self._settings)
-        self._on_saved()
-        self.close()
 
 
 class LocationWindow(Adw.Window):
@@ -435,7 +309,6 @@ class MainWindow(Adw.ApplicationWindow):
         for name, callback in (
             ("refresh", lambda *_: self._load_catalogue(force=True)),
             ("credentials", lambda *_: self._open_credentials(False)),
-            ("forget_password", lambda *_: self._forget_saved_password()),
             ("settings", lambda *_: self._show_settings()),
             ("protocols", lambda *_: self._show_protocol_help()),
             ("about", lambda *_: self._show_about()),
@@ -454,7 +327,6 @@ class MainWindow(Adw.ApplicationWindow):
         menu = Gio.Menu()
         menu.append("Refresh Locations", "win.refresh")
         menu.append("Credentials", "win.credentials")
-        menu.append("Forget Saved Password", "win.forget_password")
         menu.append("Settings", "win.settings")
         menu.append("Protocol Guide", "win.protocols")
         menu.append("About", "win.about")
@@ -750,9 +622,8 @@ class MainWindow(Adw.ApplicationWindow):
             self._migration_problem = result.detail
         try:
             self.agent = NetworkManagerSecretAgent(
-                lambda _local_user: self.credentials.lookup(
-                    self.settings.username.strip()
-                ),
+                self.credentials,
+                lambda: self.settings.username,
                 store_provider=OwnershipStore.load,
             )
             self.agent.register()
@@ -1363,12 +1234,6 @@ class MainWindow(Adw.ApplicationWindow):
                 ),
             ),
             MenuItem(14, separator=True),
-            MenuItem(
-                15,
-                "Forget Saved Password…",
-                enabled=bool(self.settings.username.strip()),
-                action="forget",
-            ),
             MenuItem(16, "Quit", action="quit"),
         )
 
@@ -1404,8 +1269,6 @@ class MainWindow(Adw.ApplicationWindow):
             self._show_legal("license")
         elif action == "legal_components":
             self._show_legal("components")
-        elif action == "forget":
-            self._forget_saved_password()
 
     def _tray_toggle_connection(self):
         self._present_from_tray()
@@ -1514,7 +1377,7 @@ class MainWindow(Adw.ApplicationWindow):
         keyring.set_title("Password storage")
         keyring.set_subtitle(
             "Saved only in the desktop keyring when you enable it in the Account "
-            "dialog. Use Forget Saved Password to remove it."
+            "dialog, which is also where you can forget it."
         )
         keyring.set_icon_name("channel-secure-symbolic")
         privacy.add(keyring)
@@ -1744,42 +1607,6 @@ class MainWindow(Adw.ApplicationWindow):
             self._cancel_reconnect("Automatic reconnection disabled.")
         self._refresh_tray()
 
-    def _forget_saved_password(self):
-        username = self.settings.username.strip()
-        if not username:
-            self._show_banner("No VPN username is set; there is no saved password to forget.")
-            return
-        dialog = Adw.MessageDialog.new(
-            self,
-            "Forget saved password?",
-            f"This removes the desktop-keyring entry and the in-memory copy for "
-            f"{username}. An already-connected VPN stays up, but reauthentication "
-            "may fail until you enter the password again.",
-        )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("forget", "Forget Password")
-        dialog.set_close_response("cancel")
-        dialog.set_default_response("cancel")
-        dialog.set_response_appearance("forget", Adw.ResponseAppearance.DESTRUCTIVE)
-        dialog.set_transient_for(self)
-
-        def response(_dialog, response_id):
-            if response_id == "forget":
-                try:
-                    removed = self.credentials.forget(username)
-                except CredentialError as exc:
-                    self._show_banner(f"Could not remove the saved password: {exc}")
-                else:
-                    self._show_banner(
-                        "Saved password removed."
-                        if removed
-                        else "Password removed from this session; no keyring entry was present."
-                    )
-            dialog.destroy()
-
-        dialog.connect("response", response)
-        dialog.present()
-
     # --------------------------------------------------------------- actions
 
     def _on_connect_clicked(self, *_args):
@@ -1795,7 +1622,7 @@ class MainWindow(Adw.ApplicationWindow):
         if not username:
             self._open_credentials(True)
             return False
-        if self.credentials.lookup(username):
+        if self.credentials.password_state(username):
             return True
         self._open_credentials(True)
         return False

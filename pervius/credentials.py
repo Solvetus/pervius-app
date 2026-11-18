@@ -8,6 +8,11 @@ Python strings cannot be reliably zeroized, so this module does not claim to
 erase every copy from memory.  It does guarantee that passwords are never
 written to our logs or non-secret settings, and that a failed keyring store
 does not silently degrade to a plaintext file.
+
+Only the NetworkManager secret agent reads a stored password
+(``lookup``).  The user interface asks ``password_state`` instead, which
+reports whether a password exists without loading it, so a stored secret
+never reaches a widget.
 """
 
 from __future__ import annotations
@@ -31,6 +36,11 @@ log = logging.getLogger(__name__)
 
 class CredentialError(RuntimeError):
     pass
+
+
+# Values returned by CredentialStore.password_state().
+SAVED_IN_KEYRING = "keyring"
+SESSION_ONLY = "session"
 
 
 class CredentialStore:
@@ -70,7 +80,34 @@ class CredentialStore:
         if username:
             self._memory[username] = password
 
+    def password_state(self, username: str) -> str | None:
+        """Report where a password for ``username`` is kept, without reading it.
+
+        Returns SESSION_ONLY for a password held in memory only,
+        SAVED_IN_KEYRING when the keyring has an entry, or None.  The keyring
+        search uses no LOAD_SECRETS/UNLOCK flags, so the secret value is never
+        transferred to this process.
+        """
+        if not username:
+            return None
+        found_in_memory = username in self._memory
+        if self._schema is not None:
+            try:
+                items = Secret.password_search_sync(
+                    self._schema,
+                    self._attributes(username),
+                    Secret.SearchFlags.NONE,
+                    None,
+                )
+            except GLib.Error as exc:
+                log.warning("Secret Service search failed: %s", exc.message)
+                items = []
+            if items:
+                return SAVED_IN_KEYRING
+        return SESSION_ONLY if found_in_memory else None
+
     def lookup(self, username: str) -> str | None:
+        """Return the password.  Only the secret agent may call this."""
         if not username:
             return None
         if username in self._memory:

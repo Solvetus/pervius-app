@@ -129,14 +129,24 @@ def ownership_matches(entry: OwnershipEntry | None) -> bool:
 
 
 class NetworkManagerSecretAgent:
+    """Serve the VPN password to NetworkManager, and to nothing else.
+
+    ``credentials`` is the password store and ``vpn_username_provider``
+    returns the VPN account name to look up.  This class is the only place
+    that reads a stored password; it does so only inside GetSecrets, after
+    the caller and the connection have been authorized.
+    """
+
     def __init__(
         self,
-        password_provider: Callable[[str], str | None],
+        credentials,
+        vpn_username_provider: Callable[[], str],
         *,
         username: str | None = None,
         store_provider: Callable[[], OwnershipStore] | None = None,
     ):
-        self._password_provider = password_provider
+        self._credentials = credentials
+        self._vpn_username_provider = vpn_username_provider
         self._username = username or _current_username()
         self._store_provider = store_provider or (lambda: OwnershipStore.load())
         self._bus: Gio.DBusConnection | None = None
@@ -266,6 +276,15 @@ class NetworkManagerSecretAgent:
             log.warning("could not read ownership manifest in secret agent: %s", exc)
             return None
 
+    def _lookup_password(self) -> str | None:
+        try:
+            vpn_username = (self._vpn_username_provider() or "").strip()
+        except Exception:
+            return None
+        if not vpn_username:
+            return None
+        return self._credentials.lookup(vpn_username)
+
     def _on_method_call(
         self,
         _connection,
@@ -288,7 +307,7 @@ class NetworkManagerSecretAgent:
                 _unpack_connection_hash(connection_hash, self._username)
                 if not ownership_matches(self._manifest_entry()):
                     raise AgentError(NOT_AUTHORIZED, "connection is not in the ownership manifest")
-                password = self._password_provider(self._username)
+                password = self._lookup_password()
                 if not password:
                     raise AgentError(NO_SECRETS, "no password is available")
                 secrets = {"vpn": {"password": GLib.Variant("s", password)}}
