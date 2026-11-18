@@ -59,9 +59,25 @@ jobs:
       - name: Run unit tests
         run: /usr/bin/python3 -m unittest discover -s tests -t . -v
 
+  integration:
+    name: Firewall integration (network namespace)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends nftables iproute2
+      # The tests refuse to run in the host network namespace; unshare gives
+      # them a throwaway one with only dummy interfaces.
+      - name: Kill switch and IPv6 guard in a network namespace
+        run: sudo unshare --net /usr/bin/python3 -m unittest discover -s tests/integration -t . -v
+
   deb:
     name: Debian package
-    needs: [lint, test]
+    needs: [lint, test, integration]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
