@@ -1,0 +1,102 @@
+#!/bin/sh
+# Pervius IPv6 leak guard, a NetworkManager dispatcher hook.
+#
+# While the Pervius-managed VPN is up, IPv6 traffic must not leave outside
+# the (IPv4-only) tunnel. This hook installs the nftables table
+# "inet pervius_v6" when that VPN comes up (vpn-pre-up, which NetworkManager
+# waits for, and vpn-up) and deletes it when the VPN goes down. It runs for
+# every activation path (the app, nmcli, the desktop's VPN menu) and needs no
+# Pervius process.
+#
+# Allowed outside the tunnel: loopback, link-local (fe80::/10, ff02::/16),
+# ICMPv6 neighbour discovery, unique local addresses (fc00::/7, not routable
+# on the internet) and the interfaces the user always allows. Everything else
+# over IPv6 is dropped. IPv4 is untouched.
+#
+# Input is only NetworkManager's arguments and environment. The first
+# statement ignores every connection except the reserved Pervius profile;
+# every value used after that is validated.
+
+[ "${CONNECTION_UUID:-}" = "22d97462-fd9d-5bc6-9f0b-7110f7153e4f" ] || exit 0
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+LC_ALL=C
+export LC_ALL
+umask 077
+set -f
+
+NFT=/usr/sbin/nft
+TUNNEL=pervius0
+MAX_INTERFACES=16
+
+case ${2:-} in
+    vpn-pre-up | vpn-up | vpn-down) action=$2 ;;
+    *) exit 0 ;;
+esac
+
+# Linux interface-name rules, stricter charset: 1-15 characters from
+# [A-Za-z0-9_.-], starting with a letter or digit, never "." or "..".
+valid_ifname() {
+    case $1 in
+        '' | . | .. | *[!A-Za-z0-9_.-]* | [!A-Za-z0-9]*) return 1 ;;
+    esac
+    [ "${#1}" -le 15 ]
+}
+
+remove_guard() {
+    "$NFT" delete table inet pervius_v6 >/dev/null 2>&1 || true
+}
+
+if [ "$action" = vpn-down ]; then
+    remove_guard
+    exit 0
+fi
+
+case ${CONNECTION_USER_COM__SOLVETUS__PERVIUS__BLOCK_055IPV6:-yes} in
+    no) block=no ;;
+    *) block=yes ;;
+esac
+if [ "$block" = no ]; then
+    remove_guard
+    exit 0
+fi
+
+tunnel=${VPN_IP_IFACE:-$TUNNEL}
+valid_ifname "$tunnel" || tunnel=$TUNNEL
+interfaces="\"$tunnel\""
+count=0
+saved_ifs=$IFS
+IFS=,
+for name in ${CONNECTION_USER_COM__SOLVETUS__PERVIUS__ALLOWED_055INTERFACES:-}; do
+    valid_ifname "$name" || continue
+    [ "$name" = "$tunnel" ] && continue
+    count=$((count + 1))
+    [ "$count" -le "$MAX_INTERFACES" ] || break
+    interfaces="$interfaces, \"$name\""
+done
+IFS=$saved_ifs
+
+# One transaction: create if missing, delete, define again.
+"$NFT" -f - <<RULES
+table inet pervius_v6 {}
+delete table inet pervius_v6
+table inet pervius_v6 {
+  chain output {
+    type filter hook output priority -10; policy accept;
+    meta nfproto ipv4 accept
+    oifname "lo" accept
+    oifname { $interfaces } accept
+    ip6 daddr { fe80::/10, ff02::/16, fc00::/7 } accept
+    icmpv6 type { 133, 134, 135, 136 } accept
+    meta nfproto ipv6 drop
+  }
+  chain forward {
+    type filter hook forward priority -10; policy accept;
+    meta nfproto ipv4 accept
+    oifname { $interfaces } accept
+    ip6 daddr { fe80::/10, ff02::/16, fc00::/7 } accept
+    meta nfproto ipv6 drop
+  }
+}
+RULES

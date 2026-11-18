@@ -4,6 +4,7 @@ case "$1" in
     remove|purge)
         if command -v nft >/dev/null 2>&1; then
             nft delete table inet pervius_ks >/dev/null 2>&1 || true
+            nft delete table inet pervius_v6 >/dev/null 2>&1 || true
         fi
         rm -rf /run/pervius
         ;;

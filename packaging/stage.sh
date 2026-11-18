@@ -28,6 +28,10 @@ while IFS=$TAB read -r mode source destination; do
                 install -m 0644 "$ROOT/$source/$file" "$DESTDIR$destination/$file"
             done
             ;;
+        link)
+            install -d -m 0755 "$DESTDIR$(dirname "$destination")"
+            ln -s "$source" "$DESTDIR$destination"
+            ;;
         [0-7][0-7][0-7][0-7])
             install -d -m 0755 "$DESTDIR$(dirname "$destination")"
             install -m "$mode" "$ROOT/$source" "$DESTDIR$destination"

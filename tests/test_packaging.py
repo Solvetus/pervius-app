@@ -60,12 +60,18 @@ class LayoutTests(unittest.TestCase):
         for row in layout_rows():
             self.assertEqual(len(row), 3, row)
             mode, source, destination = row
-            self.assertRegex(mode, r"^(tree|0[0-7]{3})$")
+            self.assertRegex(mode, r"^(tree|link|0[0-7]{3})$")
+            if mode == "link":
+                # A relative link to another installed file.
+                self.assertFalse(source.startswith("/"), source)
+                target = os.path.normpath(os.path.join(os.path.dirname(destination), source))
+                self.assertIn(target, {d for m, _s, d in layout_rows() if m != "link"})
+                continue
             self.assertTrue((REPO / source).exists(), source)
             self.assertTrue(destination.startswith(("/", "{pythondir}/")), destination)
 
     def test_every_shared_asset_is_installed(self):
-        sources = {source for _mode, source, _dest in layout_rows()}
+        sources = {source for mode, source, _dest in layout_rows() if mode != "link"}
         assets = {str(path.relative_to(REPO)) for path in DATA.rglob("*") if path.is_file()}
         self.assertEqual(assets - sources, set())
 
@@ -133,6 +139,7 @@ class AssetIdentifierTests(unittest.TestCase):
     def test_debian_scripts_use_the_current_identifiers(self):
         postrm = (REPO / "packaging" / "debian" / "postrm").read_text()
         self.assertIn(f"nft delete table {rules.TABLE_SPEC}", postrm)
+        self.assertIn(f"nft delete table {rules.GUARD_TABLE_SPEC}", postrm)
         self.assertIn(f"rm -rf {daemon.STATE_DIR}", postrm)
         self.assertIn("pervius-killswitchd.service", (REPO / "packaging" / "debian" / "prerm").read_text())
 

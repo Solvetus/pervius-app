@@ -39,7 +39,7 @@ jobs:
         run: |
           shellcheck packaging/stage.sh packaging/debian/build.sh packaging/debian/preinst \
             packaging/debian/postinst packaging/debian/prerm packaging/debian/postrm \
-            tests/manual/run.sh
+            tests/manual/run.sh data/networkmanager/90-pervius-ipv6-guard
       - name: AppStream metadata
         run: appstreamcli validate --no-net data/com.solvetus.Pervius.metainfo.xml
       - name: Desktop file
