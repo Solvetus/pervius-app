@@ -1,0 +1,127 @@
+"""Packaging consistency: one version source, one install layout, matching IDs."""
+
+import configparser
+import os
+import re
+import subprocess
+import sys
+import unittest
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+import pervius
+from pervius import config
+from pervius.killswitchd import daemon, rules
+
+REPO = Path(__file__).resolve().parents[1]
+DATA = REPO / "data"
+sys.path.insert(0, str(REPO / "scripts"))
+from changelog import releases, section  # noqa: E402
+
+
+def layout_rows():
+    rows = []
+    for line in (REPO / "packaging" / "layout.tsv").read_text(encoding="utf-8").splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        rows.append(tuple(line.split("\t")))
+    return rows
+
+
+class VersionTests(unittest.TestCase):
+    def test_debian_version_equals_package_version(self):
+        result = subprocess.run(
+            ["sh", str(REPO / "packaging" / "debian" / "build.sh"), "--print-version"],
+            capture_output=True, text=True, check=True,
+        )
+        self.assertEqual(result.stdout.strip(), pervius.__version__)
+
+    def test_version_is_semver(self):
+        self.assertRegex(pervius.__version__, r"^\d+\.\d+\.\d+$")
+
+    def test_latest_changelog_release_is_the_package_version(self):
+        self.assertEqual(releases()[0].version, pervius.__version__)
+        self.assertTrue(section(pervius.__version__).strip())
+
+    def test_latest_appstream_release_is_the_package_version(self):
+        root = ET.parse(DATA / "com.solvetus.Pervius.metainfo.xml").getroot()
+        self.assertEqual(root.find("releases/release").get("version"), pervius.__version__)
+
+    def test_generated_debian_changelog_starts_with_the_package_version(self):
+        result = subprocess.run(
+            [sys.executable, str(REPO / "packaging" / "debian" / "gen-changelog.py"), "pervius", "X <x@example.com>"],
+            capture_output=True, text=True, check=True,
+        )
+        self.assertTrue(result.stdout.startswith(f"pervius ({pervius.__version__}) unstable;"))
+
+
+class LayoutTests(unittest.TestCase):
+    def test_every_row_is_well_formed_and_exists(self):
+        for row in layout_rows():
+            self.assertEqual(len(row), 3, row)
+            mode, source, destination = row
+            self.assertRegex(mode, r"^(tree|0[0-7]{3})$")
+            self.assertTrue((REPO / source).exists(), source)
+            self.assertTrue(destination.startswith(("/", "{pythondir}/")), destination)
+
+    def test_every_shared_asset_is_installed(self):
+        sources = {source for _mode, source, _dest in layout_rows()}
+        assets = {str(path.relative_to(REPO)) for path in DATA.rglob("*") if path.is_file()}
+        self.assertEqual(assets - sources, set())
+
+    def test_commands_are_executable_and_installed_to_usr_bin(self):
+        for name in ("pervius", "pervius-killswitch", "pervius-inspect", "pervius-proof"):
+            self.assertTrue(os.access(DATA / "bin" / name, os.X_OK), name)
+            self.assertIn(("0755", f"data/bin/{name}", f"/usr/bin/{name}"), layout_rows())
+
+    def test_only_the_python_directory_is_distribution_specific(self):
+        for _mode, _source, destination in layout_rows():
+            if "{" in destination:
+                self.assertTrue(destination.startswith("{pythondir}/"), destination)
+
+
+class AssetIdentifierTests(unittest.TestCase):
+    def test_desktop_file(self):
+        parser = configparser.ConfigParser(interpolation=None)
+        parser.optionxform = str
+        parser.read(DATA / f"{config.APP_ID}.desktop", encoding="utf-8")
+        entry = parser["Desktop Entry"]
+        self.assertEqual(entry["Name"], config.APP_NAME)
+        self.assertEqual(entry["Exec"], "pervius")
+        self.assertEqual(entry["Icon"], config.APP_ID)
+        self.assertEqual(entry["StartupWMClass"], config.APP_ID)
+        self.assertNotIn("FastVPN", entry["Name"] + entry.get("Keywords", ""))
+
+    def test_appstream(self):
+        root = ET.parse(DATA / f"{config.APP_ID}.metainfo.xml").getroot()
+        self.assertEqual(root.findtext("id"), config.APP_ID)
+        self.assertEqual(root.findtext("project_license"), "Apache-2.0")
+        self.assertEqual(root.findtext("developer/name"), "Solvetus Labs")
+        self.assertEqual(root.findtext("launchable"), f"{config.APP_ID}.desktop")
+        description = " ".join(" ".join(p.itertext()) for p in root.find("description"))
+        self.assertIn(config.DISCLAIMER, re.sub(r"\s+", " ", description))
+        for url in root.findall("url"):
+            self.assertTrue(url.text.startswith(config.HOMEPAGE_URL), url.text)
+
+    def test_dbus_polkit_and_systemd_files_match_the_service(self):
+        service = (DATA / "dbus" / f"{daemon.BUS_NAME}.service").read_text()
+        self.assertIn(f"Name={daemon.BUS_NAME}\n", service)
+        self.assertIn("SystemdService=pervius-killswitchd.service\n", service)
+        policy = (DATA / "dbus" / f"{daemon.BUS_NAME}.conf").read_text()
+        self.assertEqual(policy.count(daemon.BUS_NAME), 4)
+        polkit = ET.parse(DATA / "polkit" / f"{daemon.POLKIT_ACTION.rsplit('.', 1)[0]}.policy").getroot()
+        self.assertEqual(polkit.find("action").get("id"), daemon.POLKIT_ACTION)
+        unit = (DATA / "systemd" / "pervius-killswitchd.service").read_text()
+        self.assertIn(f"BusName={daemon.BUS_NAME}\n", unit)
+        self.assertIn("ExecStart=/usr/bin/python3 -m pervius.killswitchd.daemon\n", unit)
+        self.assertIn(f"RuntimeDirectory={daemon.STATE_DIR.name}\n", unit)
+
+    def test_debian_scripts_use_the_current_identifiers(self):
+        postrm = (REPO / "packaging" / "debian" / "postrm").read_text()
+        self.assertIn(f"nft delete table {rules.TABLE_SPEC}", postrm)
+        self.assertIn(f"rm -rf {daemon.STATE_DIR}", postrm)
+        self.assertIn("pervius-killswitchd.service", (REPO / "packaging" / "debian" / "prerm").read_text())
+
+
+if __name__ == "__main__":
+    unittest.main()
