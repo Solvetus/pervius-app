@@ -1,3 +1,3 @@
-"""Diagnostic and proof tools shipped with the test build."""
+"""Diagnostic, recovery and proof command-line tools."""
 
 __all__ = []

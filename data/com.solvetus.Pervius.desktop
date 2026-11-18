@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Pervius
+GenericName=VPN Client
+Comment=Unofficial Linux client for FastVPN
+Exec=pervius
+Icon=com.solvetus.Pervius
+Terminal=false
+Type=Application
+Categories=Network;
+Keywords=VPN;OpenVPN;NetworkManager;
+StartupNotify=true
+StartupWMClass=com.solvetus.Pervius

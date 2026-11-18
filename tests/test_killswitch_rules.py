@@ -110,7 +110,7 @@ class RulesetTests(unittest.TestCase):
 
     def test_ruleset_has_isolated_table_and_drops(self):
         text = build_ruleset(self.endpoints)
-        self.assertIn("table inet solvetus_ks {", text)
+        self.assertIn("table inet pervius_ks {", text)
         self.assertIn('oifname "tun*" accept', text)
         self.assertIn("ip daddr 192.0.2.10 udp dport 1194 accept", text)
         self.assertIn("ip6 daddr 2001:db8::1 tcp dport 443 accept", text)

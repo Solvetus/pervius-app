@@ -1,1 +1,1 @@
-"""Unit tests for Solvetus VPN Manager."""
+"""Unit tests for Pervius."""

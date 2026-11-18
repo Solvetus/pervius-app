@@ -3,9 +3,10 @@
  "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
 <policyconfig>
-  <vendor>Solvetus project</vendor>
-  <action id="org.solvetus.killswitch.control">
-    <description>Control the Solvetus VPN kill switch</description>
+  <vendor>Solvetus Labs</vendor>
+  <vendor_url>https://github.com/Solvetus/pervius-app</vendor_url>
+  <action id="com.solvetus.pervius.killswitch.control">
+    <description>Control the Pervius kill switch</description>
     <message>An application is requesting to change the system-wide VPN kill switch.</message>
     <defaults>
       <allow_any>no</allow_any>

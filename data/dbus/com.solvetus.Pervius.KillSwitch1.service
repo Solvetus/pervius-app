@@ -1,0 +1,5 @@
+[D-BUS Service]
+Name=com.solvetus.Pervius.KillSwitch1
+Exec=/usr/bin/systemctl start --no-block pervius-killswitchd.service
+User=root
+SystemdService=pervius-killswitchd.service

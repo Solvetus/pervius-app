@@ -1,4 +1,4 @@
-"""Unprivileged client for the optional Solvetus kill-switch service."""
+"""Unprivileged client for the Pervius kill-switch service."""
 
 from __future__ import annotations
 
@@ -80,6 +80,6 @@ def call_async(
         else:
             GLib.idle_add(lambda result=result: callback(result, None))
 
-    thread = threading.Thread(target=worker, name="solvetus-killswitch", daemon=True)
+    thread = threading.Thread(target=worker, name="pervius-killswitch", daemon=True)
     thread.start()
     return thread

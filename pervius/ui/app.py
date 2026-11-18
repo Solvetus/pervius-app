@@ -11,11 +11,11 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, Gtk  # noqa: E402
 
-from ..config import APP_ID, VERSION  # noqa: E402
+from ..config import APP_ID, APP_NAME, NOTIFICATION_ID  # noqa: E402
 from .window import MainWindow  # noqa: E402
 
 
-class SolvetusApplication(Adw.Application):
+class PerviusApplication(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=0)
         self.window: MainWindow | None = None
@@ -27,11 +27,11 @@ class SolvetusApplication(Adw.Application):
     def do_activate(self):
         if self.window is None:
             self.window = MainWindow(application=self)
-        self.withdraw_notification("solvetus-vpn-state")
+        self.withdraw_notification(NOTIFICATION_ID)
         self.window.present()
 
     def do_shutdown(self):
-        self.withdraw_notification("solvetus-vpn-state")
+        self.withdraw_notification(NOTIFICATION_ID)
         if self.window is not None:
             self.window.cleanup()
         Adw.Application.do_shutdown(self)
@@ -40,14 +40,14 @@ class SolvetusApplication(Adw.Application):
 def main(argv: list[str] | None = None) -> int:
     if os.geteuid() == 0:
         sys.stderr.write(
-            "Refusing to run as root. Start Solvetus VPN Manager as your desktop user;\n"
+            f"Refusing to run as root. Start {APP_NAME} as your desktop user;\n"
             "NetworkManager performs privileged network operations.\n"
         )
         return 1
     argv = list(sys.argv if argv is None else argv)
     Gtk.init()
     Adw.init()
-    app = SolvetusApplication()
+    app = PerviusApplication()
     return app.run(argv)
 
 

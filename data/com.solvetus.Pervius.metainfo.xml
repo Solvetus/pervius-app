@@ -1,35 +1,65 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>org.solvetus.VPNManager</id>
+  <id>com.solvetus.Pervius</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>LicenseRef-proprietary</project_license>
-  <name>Solvetus VPN Manager</name>
-  <summary>Manage an existing OpenVPN subscription through NetworkManager</summary>
+  <project_license>Apache-2.0</project_license>
+  <name>Pervius</name>
+  <summary>Unofficial Linux client for FastVPN</summary>
   <description>
     <p>
-      Solvetus VPN Manager is an independent GTK4/libadwaita front end for an
-      existing FastVPN/OpenVPN subscription. It downloads the provider's public
-      server catalogue, validates every profile strictly, and imports the
-      selected profile through NetworkManager and its OpenVPN plugin.
+      Pervius is a GTK 4/libadwaita desktop client for an existing FastVPN
+      (OpenVPN) subscription. It downloads the provider's public server
+      catalogue, validates every profile strictly, and imports the selected
+      profile through NetworkManager and its OpenVPN plugin.
     </p>
     <p>
-      The application runs as an ordinary user. NetworkManager performs all
-      privileged network operations. Passwords are handled by the NetworkManager
-      secret agent and are never written into the VPN profile.
+      The application runs as an ordinary user. NetworkManager performs the
+      privileged network operations, and passwords are supplied by a
+      NetworkManager secret agent instead of being written into the VPN profile.
+      An optional kill switch, backed by a small system service and polkit,
+      blocks traffic outside the tunnel while it is armed.
     </p>
     <p>
-      This is an early test build. It manages one reusable NetworkManager
-      profile. It does not provide a kill switch, auto-protect, DNS filtering, or
-      background reconnection.
+      It offers country search with flags, favorites, bounded automatic
+      reconnection, a tray icon, desktop notifications, and connection details
+      such as the VPN exit IP and traffic totals. It manages one NetworkManager
+      profile and does not provide auto-protect or DNS filtering.
+    </p>
+    <p>
+      Pervius is an independent open-source project by Solvetus Labs. It is not
+      affiliated with, endorsed by, or sponsored by Namecheap, Inc. FastVPN is a
+      trademark of Namecheap, Inc.
     </p>
   </description>
-  <launchable type="desktop-id">org.solvetus.VPNManager.desktop</launchable>
-  <developer id="org.solvetus">
-    <name>Solvetus project</name>
+  <launchable type="desktop-id">com.solvetus.Pervius.desktop</launchable>
+  <developer id="com.solvetus">
+    <name>Solvetus Labs</name>
   </developer>
+  <url type="homepage">https://github.com/Solvetus/pervius-app</url>
+  <url type="bugtracker">https://github.com/Solvetus/pervius-app/issues</url>
+  <url type="vcs-browser">https://github.com/Solvetus/pervius-app</url>
+  <url type="contribute">https://github.com/Solvetus/pervius-app/blob/main/CONTRIBUTING.md</url>
   <categories>
     <category>Network</category>
   </categories>
+  <keywords>
+    <keyword>VPN</keyword>
+    <keyword>OpenVPN</keyword>
+    <keyword>NetworkManager</keyword>
+  </keywords>
+  <provides>
+    <binary>pervius</binary>
+    <binary>pervius-killswitch</binary>
+    <binary>pervius-inspect</binary>
+    <binary>pervius-proof</binary>
+  </provides>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
   <content_rating type="oars-1.1"/>
   <releases>
     <release version="0.1.19" date="2026-11-17">
@@ -129,7 +159,7 @@
     </release>
     <release version="0.1.0" date="2026-11-17">
       <description>
-        <p>First test build for a single Ubuntu virtual machine.</p>
+        <p>First test build.</p>
       </description>
     </release>
   </releases>

@@ -9,9 +9,9 @@ from pervius.ui.tray import MenuItem, TrayIcon
 
 def make_tray(icon_provider=None):
     return TrayIcon(
-        app_id="org.solvetus.VPNManager",
-        title="Solvetus VPN Manager",
-        icon_name="org.solvetus.VPNManager",
+        app_id="com.solvetus.Pervius",
+        title="Pervius",
+        icon_name="com.solvetus.Pervius",
         menu_provider=lambda: (),
         tooltip_provider=lambda: ("title", "body"),
         action_handler=lambda _action: None,
@@ -23,8 +23,8 @@ def make_tray(icon_provider=None):
 
 class TrayTests(unittest.TestCase):
     def test_icon_provider_is_used(self):
-        tray = make_tray(lambda: "org.solvetus.VPNManager-connected")
-        self.assertEqual(tray._current_icon(), "org.solvetus.VPNManager-connected")
+        tray = make_tray(lambda: "com.solvetus.Pervius-connected")
+        self.assertEqual(tray._current_icon(), "com.solvetus.Pervius-connected")
 
     def test_icon_provider_failure_falls_back(self):
         def broken():
@@ -32,7 +32,7 @@ class TrayTests(unittest.TestCase):
 
         tray = make_tray(broken)
         with self.assertLogs("pervius.ui.tray", level="ERROR"):
-            self.assertEqual(tray._current_icon(), "org.solvetus.VPNManager")
+            self.assertEqual(tray._current_icon(), "com.solvetus.Pervius")
 
     def test_separator_properties(self):
         props = TrayIcon._item_properties(MenuItem(1, separator=True))

@@ -3,22 +3,21 @@ Version: @VERSION@
 Section: net
 Priority: optional
 Architecture: all
-Maintainer: Solvetus project <noreply@example.invalid>
+Maintainer: Solvetus Labs <info@solvetus.com>
 Installed-Size: @INSTALLED_SIZE@
+Homepage: https://github.com/Solvetus/pervius-app
 Depends: python3 (>= 3.10), python3-gi, gir1.2-glib-2.0, gir1.2-gtk-4.0, gir1.2-adw-1, gir1.2-nm-1.0, gir1.2-secret-1, gir1.2-soup-3.0, network-manager, network-manager-openvpn, openvpn, nftables, polkitd | policykit-1, dbus-broker | dbus-daemon | dbus, systemd
-Conflicts: solvetus-vpn-killswitch (<< @VERSION@)
-Replaces: solvetus-vpn-killswitch (<< @VERSION@)
-Breaks: solvetus-vpn-killswitch (<< @VERSION@)
-Provides: solvetus-vpn-killswitch (= @VERSION@)
-Description: desktop manager for an existing OpenVPN subscription
- Solvetus VPN Manager is an independent GTK4/libadwaita front end that
- imports provider-supplied OpenVPN profiles through NetworkManager and
- its OpenVPN plugin. The application runs as an ordinary user;
- NetworkManager performs privileged network operations.
+Description: unofficial Linux client for FastVPN
+ Pervius is a GTK 4/libadwaita desktop client for an existing FastVPN
+ (OpenVPN) subscription. It validates the provider's public server
+ catalogue and imports profiles through NetworkManager and its OpenVPN
+ plugin. The application runs as an ordinary user; NetworkManager performs
+ privileged network operations.
  .
- This combined test package also installs the optional kill-switch system
- service and CLI. The service is idle until explicitly armed through polkit;
- the GUI remains unprivileged.
+ The package also installs an optional kill-switch system service and CLI.
+ The service is idle until explicitly armed through polkit; the GUI remains
+ unprivileged.
  .
- This is an early test build. It manages one reusable NetworkManager
- profile and does not implement auto-protect or DNS filtering.
+ Pervius is an independent open-source project by Solvetus Labs. It is not
+ affiliated with, endorsed by, or sponsored by Namecheap, Inc. FastVPN is a
+ trademark of Namecheap, Inc.

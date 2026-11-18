@@ -222,7 +222,7 @@ def find_managed_connection(
     if entry is None:
         if matches:
             raise OwnershipError(
-                "a connection using the reserved Solvetus ID or UUID already exists, "
+                "a connection using the reserved Pervius ID or UUID already exists, "
                 "but the ownership manifest has no matching entry; refusing to touch it"
             )
         return ManagedLookup(connection=None, entry=None)
@@ -237,13 +237,13 @@ def find_managed_connection(
 
     if len(matches) > 1:
         raise OwnershipError(
-            "multiple connections use the reserved Solvetus ID or UUID; refusing to choose"
+            "multiple connections use the reserved Pervius ID or UUID; refusing to choose"
         )
 
     connection = matches[0]
     if not connection_is_owned(connection, entry, username):
         raise OwnershipError(
-            "the connection with the reserved Solvetus ID/UUID does not match the "
+            "the connection with the reserved Pervius ID/UUID does not match the "
             "ownership manifest or is not restricted to the current user; refusing to modify it"
         )
     return ManagedLookup(connection=connection, entry=entry)
@@ -260,6 +260,6 @@ def check_create_collision(
             continue
         if s_con.get_id() == MANAGED_CONNECTION_ID or s_con.get_uuid() == MANAGED_UUID:
             raise OwnershipError(
-                "the reserved Solvetus connection ID or UUID is already in use by "
+                "the reserved Pervius connection ID or UUID is already in use by "
                 "an unowned connection; refusing to overwrite it"
             )

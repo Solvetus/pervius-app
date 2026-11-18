@@ -1,8 +1,8 @@
 """Main window and dialogs.
 
 The UI is deliberately conservative: it exposes only actions that are backed
-by the tested backend.  There is no kill switch, auto-protect, DNS filter or
-other security toggle in this test build.
+by the tested backend.  The kill switch is shown only with the state reported
+by the system service; there is no auto-protect or DNS-filter toggle.
 """
 
 from __future__ import annotations
@@ -25,9 +25,15 @@ from ..catalogue.fetcher import fetch_catalogue
 from ..config import (  # noqa: E402
     APP_ID,
     APP_NAME,
+    APP_TAGLINE,
     CATALOGUE_URL,
+    DEVELOPER_NAME,
+    DISCLAIMER,
+    HOMEPAGE_URL,
+    ISSUES_URL,
     MANAGED_CONNECTION_ID,
     MANAGED_UUID,
+    NOTIFICATION_ID,
     OPENVPN_SERVICE_TYPE,
     TRAY_ICON_CONNECTED,
     TRAY_ICON_DISCONNECTED,
@@ -139,7 +145,7 @@ class CredentialsWindow(Adw.Window):
         note.add_css_class("dim-label")
         note.set_label(
             "Credentials are not verified until a connection succeeds. "
-            "Nothing is sent to Solvetus project servers; the app has no servers."
+            "Nothing is sent to Solvetus Labs; Pervius has no servers of its own."
         )
         box.append(note)
 
@@ -438,7 +444,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _build_ui(self):
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
-        title = Adw.WindowTitle(title=APP_NAME, subtitle="FastVPN via NetworkManager")
+        title = Adw.WindowTitle(title=APP_NAME, subtitle="for FastVPN · via NetworkManager")
         header.set_title_widget(title)
 
         menu = Gio.Menu()
@@ -1069,7 +1075,7 @@ class MainWindow(Adw.ApplicationWindow):
         threading.Thread(
             target=self._fetch_ip_worker,
             args=(role,),
-            name=f"solvetus-public-ip-{role}",
+            name=f"pervius-public-ip-{role}",
             daemon=True,
         ).start()
 
@@ -1213,7 +1219,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.present()
         app = self.get_application()
         if app is not None:
-            app.withdraw_notification("solvetus-vpn-state")
+            app.withdraw_notification(NOTIFICATION_ID)
 
     def _tray_icon_name(self) -> str:
         return (
@@ -1312,7 +1318,7 @@ class MainWindow(Adw.ApplicationWindow):
                 action="locations",
             ),
             MenuItem(5, separator=True),
-            MenuItem(6, "Show Solvetus VPN Manager", action="show"),
+            MenuItem(6, f"Show {APP_NAME}", action="show"),
             MenuItem(7, separator=True),
             MenuItem(8, "Settings…", action="settings"),
             MenuItem(
@@ -1335,14 +1341,14 @@ class MainWindow(Adw.ApplicationWindow):
                 "Help",
                 children=(
                     MenuItem(121, "Protocol Guide", action="protocols"),
-                    MenuItem(122, "About Solvetus VPN Manager", action="about"),
+                    MenuItem(122, f"About {APP_NAME}", action="about"),
                 ),
             ),
             MenuItem(
                 13,
                 "Legal Information",
                 children=(
-                    MenuItem(131, "License status", action="legal_license"),
+                    MenuItem(131, "License", action="legal_license"),
                     MenuItem(132, "Third-party components", action="legal_components"),
                 ),
             ),
@@ -1510,20 +1516,17 @@ class MainWindow(Adw.ApplicationWindow):
         if topic == "components":
             title = "Third-party components"
             body = (
-                "Solvetus VPN Manager is an independent front end. It uses the "
-                "installed NetworkManager, NetworkManager-openvpn, OpenVPN, GTK, "
-                "libadwaita, libsecret, and libsoup components. Those projects are "
-                "distributed under their own licenses and are not part of this test "
-                "build. No third-party code is bundled in the package."
+                f"{APP_NAME} is an independent front end. It uses the installed "
+                "NetworkManager, NetworkManager-openvpn, OpenVPN, nftables, polkit, "
+                "GTK, libadwaita, libsecret, and libsoup components. Those projects "
+                "are distributed under their own licenses and are not bundled in "
+                "this package."
             )
         else:
-            title = "License status"
+            title = "License"
             body = (
-                "No license has been chosen for this test build. All rights are "
-                "reserved by the author. Do not redistribute the package without "
-                "permission. The product name, application ID, and licensing remain "
-                "provisional.\n\nSolvetus VPN Manager is not affiliated with the VPN "
-                "provider or with NetworkManager."
+                f"{APP_NAME} is free software, licensed under the Apache License, "
+                f"Version 2.0. Source code: {HOMEPAGE_URL}\n\n{DISCLAIMER}"
             )
         dialog = Adw.MessageDialog.new(self, title, body)
         dialog.add_response("close", "Close")
@@ -1545,13 +1548,13 @@ class MainWindow(Adw.ApplicationWindow):
             )
         except OwnershipError as exc:
             self._blocked(
-                "A VPN connection uses the reserved Solvetus UUID, but its ownership "
+                "A VPN connection uses the reserved Pervius UUID, but its ownership "
                 f"cannot be verified: {exc}"
             )
             return
         if lookup.connection is None:
             self._blocked(
-                "A VPN connection uses the reserved Solvetus UUID, but no owned "
+                "A VPN connection uses the reserved Pervius UUID, but no owned "
                 "profile was found; refusing to manage it."
             )
             return
@@ -1603,7 +1606,7 @@ class MainWindow(Adw.ApplicationWindow):
                 GLib.idle_add(self._on_catalogue_loaded, catalogue, None, True)
 
         self._catalogue_thread = threading.Thread(
-            target=worker, name="solvetus-catalogue", daemon=True
+            target=worker, name="pervius-catalogue", daemon=True
         )
         self._catalogue_thread.start()
 
@@ -2518,19 +2521,21 @@ class MainWindow(Adw.ApplicationWindow):
     def _show_about(self):
         dialog = Adw.AboutDialog()
         dialog.set_application_name(APP_NAME)
-        dialog.set_application_icon("org.solvetus.VPNManager")
+        dialog.set_application_icon(APP_ID)
         dialog.set_version(VERSION)
-        dialog.set_developer_name("Solvetus project (independent)")
+        dialog.set_developer_name(DEVELOPER_NAME)
+        dialog.set_website(HOMEPAGE_URL)
+        dialog.set_issue_url(ISSUES_URL)
         dialog.set_comments(
-            "An early test build of a desktop front end for an existing FastVPN/OpenVPN "
-            "subscription, using NetworkManager and its OpenVPN plugin.\n\n"
-            "Not affiliated with the VPN provider. No kill switch, auto-protect, or DNS "
-            "filtering is implemented. The application never runs as root; NetworkManager "
-            "performs privileged network operations."
+            f"{APP_TAGLINE} It manages an existing FastVPN (OpenVPN) subscription "
+            "through NetworkManager and its OpenVPN plugin. The application never "
+            "runs as root; NetworkManager performs privileged network operations, "
+            "and the optional kill switch is a separate system service.\n\n"
+            f"{DISCLAIMER}"
         )
-        dialog.set_copyright("© 2026 Solvetus project")
-        dialog.set_developers(["Solvetus project"])
-        dialog.set_license_type(Gtk.License.UNKNOWN)
+        dialog.set_copyright("© 2026 Solvetus Labs")
+        dialog.set_developers([DEVELOPER_NAME])
+        dialog.set_license_type(Gtk.License.APACHE_2_0)
         dialog.present(self)
 
     def _show_banner(self, text: str):
@@ -2548,9 +2553,9 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             notification = Gio.Notification.new(title)
             notification.set_body(body)
-            notification.set_icon(Gio.ThemedIcon.new("org.solvetus.VPNManager"))
+            notification.set_icon(Gio.ThemedIcon.new(APP_ID))
             notification.set_default_action("app.present")
-            app.send_notification("solvetus-vpn-state", notification)
+            app.send_notification(NOTIFICATION_ID, notification)
         except Exception as exc:
             log.warning("could not send desktop notification: %s", exc)
 
@@ -2616,7 +2621,7 @@ class MainWindow(Adw.ApplicationWindow):
                     self.hide()
                     self._send_notification(
                         "VPN is reconnecting",
-                        "Solvetus VPN Manager is still retrying in the background. "
+                        f"{APP_NAME} is still retrying in the background. "
                         "Open it from the app menu to see the status.",
                     )
                 elif response_id == "quit":
@@ -2657,7 +2662,7 @@ class MainWindow(Adw.ApplicationWindow):
                     self.hide()
                     self._send_notification(
                         "Kill switch is armed",
-                        "Solvetus VPN Manager is running in the background with "
+                        f"{APP_NAME} is running in the background with "
                         "firewall protection active.",
                     )
                 elif response_id == "disarm_quit":
@@ -2676,8 +2681,8 @@ class MainWindow(Adw.ApplicationWindow):
         dialog = Adw.MessageDialog.new(
             self,
             "VPN is still connected",
-            "Closing this window hides it and leaves the app process running in this "
-            "build so it can answer reauthentication requests. Open Solvetus VPN Manager "
+            "Closing this window hides it and leaves the app process running so it "
+            f"can answer reauthentication requests. Open {APP_NAME} "
             "again from the app menu to show the window. If the process exits, the tunnel "
             "may stay up without the secret agent.",
         )
@@ -2694,7 +2699,7 @@ class MainWindow(Adw.ApplicationWindow):
                 self.hide()
                 self._send_notification(
                     "VPN is still connected",
-                    "Solvetus VPN Manager is running in the background. "
+                    f"{APP_NAME} is running in the background. "
                     "Open it from the app menu to disconnect or quit.",
                 )
             elif response_id == "quit":
@@ -2785,7 +2790,7 @@ class MainWindow(Adw.ApplicationWindow):
             "Quit with the kill switch armed?",
             "The system firewall rules will stay active if you quit without "
             "disarming. That keeps traffic blocked outside the VPN, but you may "
-            "need the solvetus-killswitch CLI to disarm later."
+            "need the pervius-killswitch CLI to disarm later."
             + detail,
         )
         dialog.add_response("cancel", "Cancel")

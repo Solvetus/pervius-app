@@ -1,4 +1,4 @@
-"""Static configuration for Solvetus VPN Manager.
+"""Static configuration for Pervius.
 
 No secret material belongs in this file or in any file derived from it.
 """
@@ -7,20 +7,29 @@ from __future__ import annotations
 
 import os
 import pwd
-import uuid
 from pathlib import Path
 
-APP_ID = "org.solvetus.VPNManager"
-APP_NAME = "Solvetus VPN Manager"
-APP_SLUG = "solvetus-vpn"
-VERSION = "0.1.19"
+from . import __version__ as VERSION
+
+APP_ID = "com.solvetus.Pervius"
+APP_NAME = "Pervius"
+APP_SLUG = "pervius"
+APP_TAGLINE = "Unofficial Linux client for FastVPN."
+DEVELOPER_NAME = "Solvetus Labs"
+HOMEPAGE_URL = "https://github.com/Solvetus/pervius-app"
+ISSUES_URL = f"{HOMEPAGE_URL}/issues"
+DISCLAIMER = (
+    "Pervius is an independent open-source project by Solvetus Labs. It is not "
+    "affiliated with, endorsed by, or sponsored by Namecheap, Inc. FastVPN is a "
+    "trademark of Namecheap, Inc."
+)
 
 # Public catalogue snapshot.  The app validates the archive and every profile
 # before it will import anything.  Refresh cadence is not guaranteed by the
 # upstream provider.
 CATALOGUE_URL = "https://vpn.ncapi.io/groupedServerList.zip"
 PUBLIC_IP_URL = "https://api64.ipify.org?format=json"
-USER_AGENT = f"SolvetusVPNManager/{VERSION} (NetworkManager OpenVPN front end)"
+USER_AGENT = f"Pervius/{VERSION} (+{HOMEPAGE_URL})"
 
 # Resource limits, deliberately conservative.
 MAX_ARCHIVE_BYTES = 5 * 1024 * 1024
@@ -31,12 +40,15 @@ MAX_CA_BYTES = 256 * 1024
 MAX_REMOTES = 64
 
 # One reusable, app-owned NetworkManager profile in v1.
-MANAGED_CONNECTION_ID = "Solvetus VPN (managed)"
-MANAGED_UUID = str(uuid.uuid5(uuid.NAMESPACE_DNS, "org.solvetus.vpn.managed-profile"))
+MANAGED_CONNECTION_ID = "Pervius (managed)"
+# Reserved UUID of the app-owned profile.  It is a fixed literal and must never
+# change: installations upgraded from 0.1.x adopt their existing profile by it.
+MANAGED_UUID = "22d97462-fd9d-5bc6-9f0b-7110f7153e4f"
 MANAGED_CONNECTION_TYPE = "vpn"
 OPENVPN_SERVICE_TYPE = "org.freedesktop.NetworkManager.openvpn"
 
 # Tray status icons: red when down, green with a check when the tunnel is up.
+NOTIFICATION_ID = "pervius-state"
 TRAY_ICON_CONNECTED = f"{APP_ID}-connected"
 TRAY_ICON_DISCONNECTED = f"{APP_ID}-disconnected"
 
@@ -55,7 +67,7 @@ SECRET_AGENT_PATH = "/org/freedesktop/NetworkManager/SecretAgent"
 SECRET_AGENT_INTERFACE = "org.freedesktop.NetworkManager.SecretAgent"
 AGENT_MANAGER_INTERFACE = "org.freedesktop.NetworkManager.AgentManager"
 AGENT_MANAGER_PATH = "/org/freedesktop/NetworkManager/AgentManager"
-SECRET_SCHEMA_NAME = "org.solvetus.vpn"
+SECRET_SCHEMA_NAME = APP_ID
 SECRET_SCHEMA_ATTRIBUTE_USERNAME = "username"
 SECRET_SCHEMA_ATTRIBUTE_PURPOSE = "purpose"
 SECRET_PURPOSE = "vpn-password"

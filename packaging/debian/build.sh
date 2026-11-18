@@ -11,11 +11,11 @@ ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 HERE="$ROOT/packaging/debian"
 cd "$ROOT"
 
-PACKAGE=solvetus-vpn
+PACKAGE=pervius
 PYTHONDIR=/usr/lib/python3/dist-packages
 
 version() {
-    PYTHONPATH="$ROOT" python3 -c 'from pervius.config import VERSION; print(VERSION)'
+    PYTHONPATH="$ROOT" python3 -c 'import pervius; print(pervius.__version__)'
 }
 
 if [ "${1:-}" = "--print-version" ]; then

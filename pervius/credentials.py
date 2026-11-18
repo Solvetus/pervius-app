@@ -103,7 +103,7 @@ class CredentialStore:
                 self._schema,
                 self._attributes(username),
                 Secret.COLLECTION_DEFAULT,
-                f"Solvetus VPN password for {username}",
+                f"Pervius VPN password for {username}",
                 password,
                 None,
             )

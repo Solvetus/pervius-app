@@ -1,4 +1,4 @@
-"""Solvetus kill-switch system service.
+"""Pervius kill-switch system service.
 
 Runs as root under systemd.  It owns exactly one nftables table, never flushes
 the global ruleset, and never invokes a shell.  The public D-Bus surface is
@@ -36,22 +36,22 @@ from .rules import (  # noqa: E402
 
 log = logging.getLogger(__name__)
 
-BUS_NAME = "org.solvetus.KillSwitch1"
-OBJECT_PATH = "/org/solvetus/KillSwitch1"
-INTERFACE = "org.solvetus.KillSwitch1"
-POLKIT_ACTION = "org.solvetus.killswitch.control"
-STATE_DIR = Path("/run/solvetus")
+BUS_NAME = "com.solvetus.Pervius.KillSwitch1"
+OBJECT_PATH = "/com/solvetus/Pervius/KillSwitch1"
+INTERFACE = "com.solvetus.Pervius.KillSwitch1"
+POLKIT_ACTION = "com.solvetus.pervius.killswitch.control"
+STATE_DIR = Path("/run/pervius")
 STATE_FILE = STATE_DIR / "killswitch.json"
 STATE_VERSION = 1
 NFT_TIMEOUT = 20
 
-PERMISSION_DENIED = "org.solvetus.KillSwitch1.PermissionDenied"
-OPERATION_FAILED = "org.solvetus.KillSwitch1.Failed"
-NOT_AVAILABLE = "org.solvetus.KillSwitch1.NotAvailable"
+PERMISSION_DENIED = f"{INTERFACE}.PermissionDenied"
+OPERATION_FAILED = f"{INTERFACE}.Failed"
+NOT_AVAILABLE = f"{INTERFACE}.NotAvailable"
 
 _INTROSPECTION_XML = """
 <node>
-  <interface name="org.solvetus.KillSwitch1">
+  <interface name="@INTERFACE@">
     <method name="Arm">
       <arg name="uuid" type="s" direction="in"/>
       <arg name="allow_lan" type="b" direction="in"/>
@@ -68,7 +68,7 @@ _INTROSPECTION_XML = """
     </signal>
   </interface>
 </node>
-"""
+""".replace("@INTERFACE@", INTERFACE)
 
 
 class ServiceError(RuntimeError):
@@ -331,7 +331,7 @@ class KillSwitchService:
         rules = build_ruleset(endpoints, allow_lan=allow_lan)
         self._run_nft(["-f", "-"], input_text=rules)
         if not self._table_exists():
-            raise ServiceError("nftables did not create the Solvetus table")
+            raise ServiceError("nftables did not create the Pervius table")
         log.info("kill switch armed with %d endpoint(s), allow_lan=%s", len(endpoints), allow_lan)
 
     def _delete_rules(self):
@@ -339,14 +339,14 @@ class KillSwitchService:
             return
         self._run_nft(["delete", "table", TABLE_SPEC])
         if self._table_exists():
-            raise ServiceError("Solvetus nftables table still exists after deletion")
+            raise ServiceError("Pervius nftables table still exists after deletion")
         log.info("kill switch disarmed")
 
     # -------------------------------------------------------------- profile
 
     def _load_profile(self, uuid: str, uid: int) -> tuple[Endpoint, ...]:
         if uuid != MANAGED_UUID:
-            raise PermissionDenied("this service only protects the reserved Solvetus profile")
+            raise PermissionDenied("this service only protects the reserved Pervius profile")
         try:
             client = NM.Client.new(None)
         except Exception as exc:
@@ -511,7 +511,7 @@ class KillSwitchService:
                 self._armed = True
                 self._state = "error"
                 self._detail = (
-                    "Solvetus firewall table exists without recoverable state; "
+                    "Pervius firewall table exists without recoverable state; "
                     "Disarm before arming again"
                 )
                 log.error(self._detail)
@@ -555,10 +555,10 @@ class KillSwitchService:
 def main() -> int:
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s solvetus-killswitchd[%(process)d]: %(levelname)s %(message)s",
+        format="%(asctime)s pervius-killswitchd[%(process)d]: %(levelname)s %(message)s",
     )
     if os.geteuid() != 0:
-        sys.stderr.write("solvetus-killswitchd must run as root\n")
+        sys.stderr.write("pervius-killswitchd must run as root\n")
         return 1
     service = KillSwitchService()
     if not service.start():

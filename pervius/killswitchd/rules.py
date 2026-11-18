@@ -12,7 +12,7 @@ import socket
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
-TABLE_NAME = "solvetus_ks"
+TABLE_NAME = "pervius_ks"
 TABLE_SPEC = f"inet {TABLE_NAME}"
 DEFAULT_OPENVPN_PORT = 1194
 MAX_ENDPOINTS = 256

@@ -136,7 +136,7 @@ def prepare_managed_profile_async(
         else:
             GLib.idle_add(deliver, result, None)
 
-    thread = threading.Thread(target=worker, name="solvetus-import", daemon=True)
+    thread = threading.Thread(target=worker, name="pervius-import", daemon=True)
     thread.start()
     return thread
 

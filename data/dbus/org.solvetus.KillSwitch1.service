@@ -1,5 +1,0 @@
-[D-BUS Service]
-Name=org.solvetus.KillSwitch1
-Exec=/usr/bin/systemctl start --no-block solvetus-killswitchd.service
-User=root
-SystemdService=solvetus-killswitchd.service

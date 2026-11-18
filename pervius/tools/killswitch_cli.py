@@ -1,4 +1,4 @@
-"""Small CLI for the optional Solvetus kill-switch service.
+"""Small CLI for the Pervius kill-switch service.
 
 This tool is unprivileged; polkit authorizes the request and the system service
 applies the rules.  It is intended for diagnostics and recovery, not as a
@@ -25,6 +25,7 @@ from ..killswitchd.daemon import (  # noqa: E402
     BUS_NAME,
     INTERFACE,
     OBJECT_PATH,
+    STATE_DIR,
 )
 
 
@@ -124,14 +125,14 @@ def command_diagnose(_args) -> int:
         print("nft version:", version or "unknown")
     print("service installed/active:", _service_available())
     print("reserved profile UUID:", MANAGED_UUID)
-    print("state directory:", "/run/solvetus")
+    print("state directory:", STATE_DIR)
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="solvetus-killswitch",
-        description="Control or inspect the optional Solvetus kill-switch service",
+        prog="pervius-killswitch",
+        description="Control or inspect the Pervius kill-switch service",
     )
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("status", help="show the service state")
@@ -154,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "diagnose":
             return command_diagnose(args)
     except CliError as exc:
-        print(f"solvetus-killswitch: {exc}", file=sys.stderr)
+        print(f"pervius-killswitch: {exc}", file=sys.stderr)
         return 1
     return 2
 
