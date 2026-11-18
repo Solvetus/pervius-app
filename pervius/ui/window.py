@@ -321,7 +321,7 @@ class MainWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.set_title(APP_NAME)
-        self.set_default_size(580, 860)
+        self.set_default_size(520, 760)
 
         self.settings_store = SettingsStore()
         self.settings: Settings = self.settings_store.load()
@@ -568,10 +568,14 @@ class MainWindow(Adw.ApplicationWindow):
             column.append(icon)
             value_label.set_xalign(0.5)
             value_label.add_css_class("body")
+            # Long values shorten instead of widening the window.
+            value_label.set_ellipsize(Pango.EllipsizeMode.END)
+            value_label.set_max_width_chars(14)
             column.append(value_label)
             caption_label = Gtk.Label(label=caption)
             caption_label.add_css_class("caption")
             caption_label.add_css_class("dim-label")
+            caption_label.set_ellipsize(Pango.EllipsizeMode.END)
             column.append(caption_label)
             return column
 

@@ -22,7 +22,8 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
 - The window and the status card keep their size in every state: the
   connection details always keep their place (showing "—" while disconnected,
   with Switch IP insensitive) and the status text reserves two lines. The
-  default window is larger and its content scrolls when it is made smaller.
+  default window size is unchanged from 0.3.0, and its content scrolls when
+  it does not fit.
 - A taller header with a little space between the title and the subtitle.
 ## [0.3.0] - 2026-11-18
 
