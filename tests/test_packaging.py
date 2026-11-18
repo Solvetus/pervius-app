@@ -143,8 +143,41 @@ class AssetIdentifierTests(unittest.TestCase):
         self.assertEqual(polkit.find("action").get("id"), daemon.POLKIT_ACTION)
         unit = (DATA / "systemd" / "pervius-killswitchd.service").read_text()
         self.assertIn(f"BusName={daemon.BUS_NAME}\n", unit)
-        self.assertIn("ExecStart=/usr/bin/python3 -m pervius.killswitchd.daemon\n", unit)
+        self.assertIn("ExecStart=/usr/bin/python3 -I -u -m pervius.killswitchd.daemon\n", unit)
         self.assertIn(f"RuntimeDirectory={daemon.STATE_DIR.name}\n", unit)
+
+    def test_service_is_sandboxed(self):
+        unit = (DATA / "systemd" / "pervius-killswitchd.service").read_text()
+        directives = dict(
+            line.split("=", 1) for line in unit.splitlines() if "=" in line and not line.startswith("#")
+        )
+        expected = {
+            "CapabilityBoundingSet": "CAP_NET_ADMIN",
+            "NoNewPrivileges": "yes",
+            "ProtectSystem": "strict",
+            "ProtectHome": "yes",
+            "PrivateTmp": "yes",
+            "PrivateDevices": "yes",
+            "ProtectKernelTunables": "yes",
+            "ProtectKernelModules": "yes",
+            "ProtectKernelLogs": "yes",
+            "ProtectControlGroups": "yes",
+            "ProtectClock": "yes",
+            "ProtectHostname": "yes",
+            "ProtectProc": "invisible",
+            "RestrictNamespaces": "yes",
+            "RestrictRealtime": "yes",
+            "RestrictSUIDSGID": "yes",
+            "LockPersonality": "yes",
+            "SystemCallArchitectures": "native",
+            "SystemCallFilter": "@system-service",
+            "UMask": "0077",
+            "RestrictAddressFamilies": "AF_UNIX AF_INET AF_INET6 AF_NETLINK",
+        }
+        for key, value in expected.items():
+            self.assertEqual(directives.get(key), value, key)
+        # Isolated mode ignores PYTHON* variables, so nothing may rely on them.
+        self.assertNotIn("Environment=PYTHON", unit)
 
     def test_debian_scripts_use_the_current_identifiers(self):
         postrm = (REPO / "packaging" / "debian" / "postrm").read_text()

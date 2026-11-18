@@ -38,6 +38,10 @@ class FakeBackend:
         self.profile_owner = "alice"
         self.gateways: list[str] = []
         self.guard_options = None
+        self.remotes = REMOTES
+        self.table_checks = 0
+        self.timers: dict[int, tuple[float, object]] = {}
+        self._next_timer = 0
 
     def run_nft(self, args, *, input_text=None):
         if self.fail_next_nft:
@@ -50,12 +54,13 @@ class FakeBackend:
             self.tables.discard(" ".join(args[2:]))
 
     def table_exists(self, spec):
+        self.table_checks += 1
         return spec in self.tables
 
     def profile_remotes(self, uuid, uid, local_username):
         if uid != 0 and local_username(uid) != self.profile_owner:
             raise daemon.PermissionDenied("profile is not restricted to the current local user")
-        return REMOTES, "udp"
+        return self.remotes, "udp"
 
     def resolve_system(self, remotes, protocol):
         self.system_calls += 1
@@ -94,6 +99,19 @@ class FakeBackend:
     def clock(self):
         return self.now
 
+    def schedule(self, seconds, callback):
+        self._next_timer += 1
+        self.timers[self._next_timer] = (seconds, callback)
+        return self._next_timer
+
+    def cancel(self, handle):
+        self.timers.pop(handle, None)
+
+    def fire_timers(self):
+        pending, self.timers = self.timers, {}
+        for _seconds, callback in pending.values():
+            callback()
+
 
 class Service(daemon.KillSwitchService):
     @staticmethod
@@ -121,7 +139,8 @@ class ArmTests(ServiceTestCase):
         resolved = self.service.arm(MANAGED_UUID, False, ["wt0"], OWNER)
         self.assertEqual(resolved, OLD)
         script = self.last_script()
-        self.assertIn('elements = { "pervius0", "wt0" }', script)
+        self.assertIn('elements = { "wt0" }', script)
+        self.assertIn('oifname "pervius0" oifkind { "tun", "ovpn", "ovpn-dco" } accept', script)
         self.assertIn('socket cgroupv2 level 2 "system.slice/pervius-killswitchd.service"', script)
         status = self.service.status()
         self.assertTrue(status["armed"].unpack())
@@ -162,6 +181,7 @@ class ArmWhileConnectedTests(ServiceTestCase):
     """Arming must never cut a tunnel that is already running."""
 
     def test_live_server_is_allowed_even_if_the_names_resolve_elsewhere(self):
+        self.backend.remotes = (("198.51.100.77", 1194),)  # the pinned profile
         self.backend.gateways = ["198.51.100.77"]
         self.service.arm(MANAGED_UUID, False, [], OWNER)
         script = self.last_script()
@@ -170,10 +190,24 @@ class ArmWhileConnectedTests(ServiceTestCase):
         self.assertEqual(self.service.status()["endpoints"].unpack(), 2)
 
     def test_live_server_alone_is_enough_when_names_fail(self):
+        self.backend.remotes = (("198.51.100.77", 1194),)
         self.backend.gateways = ["198.51.100.77"]
         self.backend.system_error = RulesError("could not resolve any VPN server endpoint")
         resolved = self.service.arm(MANAGED_UUID, False, [], OWNER)
         self.assertEqual([e.address for e in resolved], ["198.51.100.77"])
+
+    def test_an_unrelated_host_route_is_not_the_live_server(self):
+        """Regression: any /32 host route was allowlisted as "the live server"."""
+        self.backend.gateways = ["203.0.113.99", "fe80::1%eth0", "not-an-ip"]
+        self.service.arm(MANAGED_UUID, False, [], OWNER)
+        self.assertNotIn("203.0.113.99", self.last_script())
+        self.assertEqual(self.service.status()["endpoints"].unpack(), 1)
+
+    def test_unrelated_host_route_does_not_rescue_failed_names(self):
+        self.backend.gateways = ["203.0.113.99"]
+        self.backend.system_error = RulesError("could not resolve any VPN server endpoint")
+        with self.assertRaises(RulesError):
+            self.service.arm(MANAGED_UUID, False, [], OWNER)
 
     def test_without_a_live_tunnel_resolution_errors_still_fail(self):
         self.backend.system_error = RulesError("could not resolve any VPN server endpoint")
@@ -463,6 +497,33 @@ class RecoveryTests(ServiceTestCase):
         self.service._recover_state()
         self.assertEqual(self.service._state, "error")
 
+    def test_unknown_owner_means_root_only(self):
+        """Regression: after a failed recovery anybody could disarm."""
+        self.backend.tables.add("inet pervius_ks")
+        self.service._recover_state()
+        self.assertEqual(self.service._state, "error")
+        for uid in (OWNER, OTHER):
+            with self.assertRaises(daemon.PermissionDenied):
+                self.service.disarm(uid)
+        self.assertIn("inet pervius_ks", self.backend.tables)
+        self.service.disarm(0)
+        self.assertNotIn("inet pervius_ks", self.backend.tables)
+
+    def test_failed_rebuild_keeps_the_saved_owner(self):
+        self.backend.tables.add("inet pervius_ks")
+        self.write_state()
+        self.backend.fail_next_nft = True
+        self.service._recover_state()
+        self.assertEqual(self.service._state, "error")
+        with self.assertRaises(daemon.PermissionDenied):
+            self.service.disarm(OTHER)
+        self.service.disarm(OWNER)
+        self.assertNotIn("inet pervius_ks", self.backend.tables)
+
+    def test_negative_owner_uid_is_refused(self):
+        self.write_state(owner_uid=-1)
+        self.assertIsNone(self.service.load_state())
+
     def test_failed_rebuild_keeps_the_old_table(self):
         self.backend.tables.add("inet pervius_ks")
         self.write_state()
@@ -491,7 +552,118 @@ class StaleGuardTests(ServiceTestCase):
     def test_status_reports_the_guard(self):
         self.assertFalse(self.service.status()["guard"].unpack())
         self.backend.tables.add("inet pervius_guard")
+        self.backend.now += daemon.GUARD_STATUS_TTL
         self.assertTrue(self.service.status()["guard"].unpack())
+
+
+class StatusCostTests(ServiceTestCase):
+    """Regression: every unauthenticated GetStatus ran nft as root."""
+
+    def test_polling_get_status_runs_nft_at_most_once_per_ttl(self):
+        for _ in range(500):
+            self.service.handle("GetStatus", (), ":1.99")
+        self.assertEqual(self.backend.table_checks, 1)
+        self.backend.now += daemon.GUARD_STATUS_TTL
+        self.service.handle("GetStatus", (), ":1.99")
+        self.assertEqual(self.backend.table_checks, 2)
+
+    def test_own_guard_changes_refresh_the_cached_state(self):
+        self.assertFalse(self.service.status()["guard"].unpack())
+        self.backend.vpn_active = True
+        self.service._sync_guard()  # applies the guard
+        self.assertTrue(self.service.status()["guard"].unpack())
+
+    def test_a_clock_step_backwards_does_not_freeze_the_cache(self):
+        self.service.status()
+        self.backend.tables.add("inet pervius_guard")
+        self.backend.now -= 100
+        self.assertTrue(self.service.status()["guard"].unpack())
+
+
+class ProvisionalWindowEndpointTests(ServiceTestCase):
+    """Window-resolved endpoints go again unless a tunnel comes up."""
+
+    def window_update(self, replace=False):
+        resolved = self.service.update_endpoints(MANAGED_UUID, replace, OWNER)
+        self.assertEqual(resolved, NEW)
+        return resolved
+
+    def test_window_endpoints_are_removed_if_no_tunnel_comes_up(self):
+        self.armed()
+        self.window_update()
+        self.assertEqual(set(self.service._endpoints), set(OLD + NEW))
+        [(seconds, _callback)] = self.backend.timers.values()
+        self.assertEqual(seconds, daemon.PROVISIONAL_SECONDS)
+        self.backend.nft_calls.clear()
+        self.backend.fire_timers()
+        swap = self.last_script()
+        self.assertIn("192.0.2.10 . udp . 1194", swap)
+        self.assertNotIn("192.0.2.20", swap)
+        self.assertEqual(self.service._endpoints, OLD)
+        self.assertNotIn("provisional", json.loads(self.service.state_file.read_text()))
+
+    def test_replacing_through_the_window_falls_back_to_the_previous_set(self):
+        self.armed()
+        self.window_update(replace=True)
+        self.assertEqual(self.service._endpoints, NEW)
+        self.backend.fire_timers()
+        self.assertEqual(self.service._endpoints, OLD)
+        self.assertIn("192.0.2.10 . udp . 1194", self.last_script())
+
+    def test_a_tunnel_that_came_up_keeps_them(self):
+        self.armed()
+        self.window_update()
+        self.backend.tunnel = True
+        self.backend.nft_calls.clear()
+        self.backend.fire_timers()
+        self.assertEqual(self.backend.nft_calls, [])
+        self.assertEqual(set(self.service._endpoints), set(OLD + NEW))
+        self.assertEqual(self.service._provisional, ())
+
+    def test_an_update_through_the_tunnel_confirms_them(self):
+        self.armed()
+        self.window_update()
+        self.backend.tunnel = True
+        self.backend.system_result = Resolution(NEW, ())
+        self.service.update_endpoints(MANAGED_UUID, False, OWNER)
+        self.assertEqual(self.backend.timers, {})
+        self.assertEqual(self.service._provisional, ())
+
+    def test_known_endpoints_are_never_provisional(self):
+        self.armed()
+        self.backend.direct_result = Resolution(OLD, ())
+        self.service.update_endpoints(MANAGED_UUID, False, OWNER)
+        self.assertEqual(self.backend.timers, {})
+
+    def test_disarm_cancels_the_check(self):
+        self.armed()
+        self.window_update()
+        self.service.disarm(OWNER)
+        self.assertEqual(self.backend.timers, {})
+        self.assertEqual(self.service._provisional, ())
+
+    def test_the_deadline_survives_a_service_restart(self):
+        self.armed()
+        self.window_update()
+        self.backend.now += 30
+        restarted = Service(self.backend, state_file=self.service.state_file)
+        self.backend.timers.clear()
+        restarted._recover_state()
+        [(seconds, _callback)] = self.backend.timers.values()
+        self.assertAlmostEqual(seconds, daemon.PROVISIONAL_SECONDS - 30)
+        self.backend.fire_timers()
+        self.assertEqual(restarted._endpoints, OLD)
+
+    def test_failed_removal_is_retried(self):
+        self.armed()
+        self.window_update()
+        self.backend.fail_next_nft = True
+        self.backend.fire_timers()
+        self.assertEqual(set(self.service._endpoints), set(OLD + NEW))
+        [(seconds, _callback)] = self.backend.timers.values()
+        self.assertLess(seconds, daemon.PROVISIONAL_SECONDS)
+        self.backend.fire_timers()
+        self.assertEqual(self.service._endpoints, OLD)
 
 
 class MergeTests(unittest.TestCase):

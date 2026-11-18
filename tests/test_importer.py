@@ -13,6 +13,7 @@ from gi.repository import NM  # noqa: E402
 from pervius.config import OPENVPN_SERVICE_TYPE  # noqa: E402
 from pervius.catalogue.parser import parse_profile  # noqa: E402
 from pervius.killswitchd.rules import Endpoint  # noqa: E402
+from pervius.nm import importer  # noqa: E402
 from pervius.nm.importer import (  # noqa: E402
     ImportVerificationError,
     verify_imported_profile,
@@ -196,6 +197,24 @@ class ImportVerificationTests(unittest.TestCase):
         s_vpn.add_data_item("cert", "/tmp/client.pem")
         with self.assertRaisesRegex(ImportVerificationError, "sensitive field 'cert'"):
             verify_imported_profile(connection, self.parsed, self.cert_dir)
+
+    def test_unreviewed_vpn_data_keys_are_rejected(self):
+        """Only keys from the reviewed allowlist may reach the stored profile."""
+        for key, value in (("up", "/bin/sh"), ("script-security", "2"), ("tun-ipv6", "yes"), ("dev-type", "tap")):
+            connection = make_connection(self.parsed, self.ca_path)
+            connection.get_setting_vpn().add_data_item(key, value)
+            with self.assertRaises(ImportVerificationError, msg=key):
+                verify_imported_profile(connection, self.parsed, self.cert_dir)
+
+    def test_every_key_of_a_real_imported_profile_is_allowed(self):
+        # The key set NetworkManager's OpenVPN plugin produced for a catalogue
+        # profile on Ubuntu 26.10 (plus proto-tcp for TCP profiles).
+        real = {
+            "auth", "ca", "challenge-response-flags", "connection-type", "data-ciphers",
+            "data-ciphers-fallback", "dev", "dev-type", "password-flags", "remote",
+            "remote-cert-tls", "remote-random", "tls-cipher", "verify-x509-name", "proto-tcp",
+        }
+        self.assertLessEqual(real, importer.ALLOWED_VPN_DATA_KEYS)
 
     def test_wrong_service_is_rejected(self):
         connection = make_connection(self.parsed, self.ca_path)

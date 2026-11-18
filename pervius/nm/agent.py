@@ -7,7 +7,8 @@ GetSecrets() back on that same connection.  libnm defaults to the system bus
 the system bus directly with Gio rather than relying on NM.SecretAgentOld.
 
 The agent is intentionally narrow:
-  * only root (NetworkManager) callers are accepted;
+  * only NetworkManager is accepted: a root connection that currently owns
+    the org.freedesktop.NetworkManager bus name;
   * only the app-owned UUID/ID/service type in the local manifest;
   * only the current user's permission;
   * only the "vpn" setting and the OpenVPN password key.
@@ -44,6 +45,7 @@ from ..ownership import (  # noqa: E402
 
 log = logging.getLogger(__name__)
 
+NM_BUS_NAME = "org.freedesktop.NetworkManager"
 NOT_AUTHORIZED = SECRET_AGENT_INTERFACE + ".NotAuthorized"
 NO_SECRETS = SECRET_AGENT_INTERFACE + ".NoSecrets"
 
@@ -269,6 +271,30 @@ class NetworkManagerSecretAgent:
             return False
         return uid == 0
 
+    def _sender_owns_networkmanager(self, sender: str | None) -> bool:
+        if not sender or self._bus is None:
+            return False
+        try:
+            reply = self._bus.call_sync(
+                "org.freedesktop.DBus",
+                "/org/freedesktop/DBus",
+                "org.freedesktop.DBus",
+                "GetNameOwner",
+                GLib.Variant("(s)", (NM_BUS_NAME,)),
+                GLib.VariantType.new("(s)"),
+                Gio.DBusCallFlags.NONE,
+                2000,
+                None,
+            )
+            owner = reply.unpack()[0]
+        except (GLib.Error, TypeError, IndexError):
+            return False
+        return bool(owner) and owner == sender
+
+    def _sender_is_networkmanager(self, sender: str | None) -> bool:
+        """Root alone is not enough: any root process could ask for secrets."""
+        return self._sender_is_root(sender) and self._sender_owns_networkmanager(sender)
+
     def _manifest_entry(self) -> OwnershipEntry | None:
         try:
             store = self._store_provider()
@@ -318,7 +344,7 @@ class NetworkManagerSecretAgent:
         parameters,
         invocation,
     ):
-        if not self._sender_is_root(sender):
+        if not self._sender_is_networkmanager(sender):
             invocation.return_dbus_error(NOT_AUTHORIZED, "only NetworkManager may request secrets")
             return None
 

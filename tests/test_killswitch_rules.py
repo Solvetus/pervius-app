@@ -75,11 +75,11 @@ class ResolutionTests(unittest.TestCase):
         result = resolve_remotes(
             "vpn.example:1194",
             "udp",
-            resolver=resolver("192.0.2.10", "192.0.2.10", "2001:db8::1"),
+            resolver=resolver("185.15.58.10", "185.15.58.10", "2a00:1450::1"),
         )
         self.assertEqual(
             {(endpoint.address, endpoint.protocol) for endpoint in result.endpoints},
-            {("192.0.2.10", "udp"), ("2001:db8::1", "udp")},
+            {("185.15.58.10", "udp"), ("2a00:1450::1", "udp")},
         )
         self.assertEqual(result.warnings, ())
 
@@ -87,7 +87,7 @@ class ResolutionTests(unittest.TestCase):
         def partial(host, port, family, socktype):
             if host == "bad.example":
                 raise OSError("name not known")
-            return resolver("192.0.2.10")(host, port, family, socktype)
+            return resolver("185.15.58.10")(host, port, family, socktype)
 
         result = resolve_remotes("bad.example:1194, good.example:1194", "udp", resolver=partial)
         self.assertEqual(len(result.endpoints), 1)
@@ -104,9 +104,9 @@ class ResolutionTests(unittest.TestCase):
         result = resolve_remotes(
             "vpn.example:1194",
             "tcp",
-            resolver=resolver("not-an-ip", "192.0.2.10"),
+            resolver=resolver("not-an-ip", "185.15.58.10"),
         )
-        self.assertEqual([endpoint.address for endpoint in result.endpoints], ["192.0.2.10"])
+        self.assertEqual([endpoint.address for endpoint in result.endpoints], ["185.15.58.10"])
         self.assertTrue(result.warnings)
 
 
@@ -149,15 +149,19 @@ class RulesetTests(unittest.TestCase):
         self.assertNotIn("elements", v4)
         self.assertIn("2001:db8::1 . udp . 1194", text)
 
-    def test_tunnel_is_pinned_instead_of_tun_wildcard(self):
+    def test_tunnel_is_pinned_by_name_and_kind_instead_of_tun_wildcard(self):
         text = build_ruleset(self.endpoints)
         self.assertNotIn("tun*", text)
-        self.assertIn('elements = { "pervius0" }', text)
+        self.assertIn('oifname "pervius0" oifkind { "tun", "ovpn", "ovpn-dco" } accept', text)
         self.assertIn("oifname @allowed_ifaces accept", text)
+        allowed = text[text.index("set allowed_ifaces"):text.index("set endpoints_v4")]
+        self.assertNotIn("elements", allowed)  # no extras: the set is empty
 
-    def test_extra_interfaces_join_the_same_set(self):
+    def test_extra_interfaces_join_the_set_but_never_the_tunnel_name(self):
+        # Listing pervius0 as an extra would trust any device of that name.
         text = build_ruleset(self.endpoints, interfaces=["wt0", "pervius0", "wt0"])
-        self.assertIn('elements = { "pervius0", "wt0" }', text)
+        self.assertIn('elements = { "wt0" }', text)
+        self.assertEqual(text.count('"pervius0"'), 1)
 
     def test_invalid_interfaces_are_rejected(self):
         for bad in ("", ".", "..", "-x", "a" * 16, "wt0; flush ruleset", 'wt0"', "wt*", "a b", "é", "eth0\n", None, 5):
@@ -165,13 +169,14 @@ class RulesetTests(unittest.TestCase):
                 build_ruleset(self.endpoints, interfaces=[bad])
 
     def test_lan_rules_are_opt_in(self):
+        lan_v4 = "ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 } accept"
         without = build_ruleset(self.endpoints)
         with_lan = build_ruleset(self.endpoints, allow_lan=True)
-        self.assertNotIn("10.0.0.0/8", without)
-        self.assertIn("ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 } accept", with_lan)
+        self.assertNotIn(lan_v4, without)
+        self.assertIn(lan_v4, with_lan)
         self.assertIn("ip6 daddr { fc00::/7, fe80::/10 } accept", with_lan)
         # LAN rules come before the final drops.
-        self.assertLess(with_lan.index("10.0.0.0/8"), with_lan.index("meta nfproto ipv4 drop"))
+        self.assertLess(with_lan.index(lan_v4), with_lan.index("meta nfproto ipv4 drop"))
 
     def test_empty_allowlist_is_rejected(self):
         with self.assertRaises(RulesError):
@@ -204,14 +209,87 @@ class DnsOutsideTheTunnelTests(unittest.TestCase):
 
     def test_dns_is_dropped_before_lan_access(self):
         text = build_ruleset((Endpoint("192.0.2.10", 1194, "udp"),), allow_lan=True)
-        drop = text.index("meta l4proto { udp, tcp } th dport 53 drop")
+        drop = text.index("meta l4proto { udp, tcp } th dport { 53, 853 } drop")
         self.assertLess(drop, text.index("ip daddr { 10.0.0.0/8"))
         self.assertLess(text.index("oifname @allowed_ifaces accept"), drop)
-        self.assertIn("tcp dport 853 drop", text)
 
     def test_window_rule_comes_before_the_dns_drop(self):
         text = build_ruleset((Endpoint("192.0.2.10", 1194, "udp"),), service_cgroup="init.scope")
-        self.assertLess(text.index("@dns_window_v4"), text.index("th dport 53 drop"))
+        self.assertLess(text.index("@dns_window_v4"), text.index("th dport { 53, 853 } drop"))
+
+
+class EndpointAddressTests(unittest.TestCase):
+    """Regression: ipaddress accepts any scope id, which reached the nft input."""
+
+    def test_scope_ids_and_mapped_addresses_are_rejected(self):
+        for bad in (
+            "fe80::1%x};flush;{",
+            "fe80::1%eth0",
+            "2001:db8::1%a\"b",
+            "::ffff:192.0.2.1",
+            "192.0.2.1%x",
+            " 192.0.2.1",
+            "192.0.2.1\n",
+        ):
+            with self.assertRaises(RulesError, msg=repr(bad)):
+                Endpoint(bad, 1194, "udp")
+            with self.assertRaises(RulesError, msg=repr(bad)):
+                endpoints_from_state([{"address": bad, "port": 1194, "protocol": "udp"}])
+
+    def test_the_canonical_form_is_stored(self):
+        self.assertEqual(Endpoint("2001:0DB8:0000::0001", 443, "TCP").address, "2001:db8::1")
+        self.assertIn("2001:db8::1 . tcp . 443", build_endpoint_swap([Endpoint("2001:0db8::0:1", 443, "tcp")]))
+
+    def test_scoped_literal_remotes_never_become_endpoints(self):
+        for remote in ("fe80::1%x};flush;{", "[fe80::1%eth0]:443"):
+            with self.assertRaises(RulesError, msg=remote):
+                resolve_remotes(remote, "udp", resolver=lambda *a: [])
+
+
+class ResolvedAddressFilterTests(unittest.TestCase):
+    """A hostile resolver may not turn one name into many allowlist holes."""
+
+    def test_at_most_four_addresses_per_name_and_family(self):
+        many_v4 = [f"185.15.58.{i}" for i in range(1, 40)]
+        many_v6 = [f"2a00:1450::{i:x}" for i in range(1, 40)]
+        result = resolve_remotes("vpn.example:1194", "udp", resolver=resolver(*many_v4, *many_v6))
+        addresses = [e.address for e in result.endpoints]
+        self.assertEqual(addresses, many_v4[:4] + many_v6[:4])
+        self.assertTrue(any("at most 4 per family" in w for w in result.warnings))
+
+    def test_each_name_has_its_own_budget(self):
+        def per_host(host, port, family, socktype):
+            base = "185.15.58." if host == "a.example" else "185.15.59."
+            return resolver(*[f"{base}{i}" for i in range(1, 10)])(host, port, family, socktype)
+
+        result = resolve_remotes("a.example:1194, b.example:1194", "udp", resolver=per_host)
+        self.assertEqual(len(result.endpoints), 8)
+
+    def test_non_public_addresses_are_never_allowed(self):
+        private = ("10.0.0.1", "192.168.1.10", "172.16.0.1", "100.64.0.1", "127.0.0.1", "169.254.1.1",
+                   "192.0.2.10", "fd00::1", "fe80::1", "::1", "2001:db8::1")
+        result = resolve_remotes("vpn.example:1194", "udp", resolver=resolver(*private, "185.15.58.10"))
+        self.assertEqual([e.address for e in result.endpoints], ["185.15.58.10"])
+        with self.assertRaises(RulesError):
+            resolve_remotes("vpn.example:1194", "udp", resolver=resolver(*private))
+
+
+class DhcpRuleTests(unittest.TestCase):
+    """Regression: DHCP ports were an open path to any internet host."""
+
+    def test_dhcp_is_limited_to_broadcast_and_the_local_network(self):
+        text = build_ruleset((Endpoint("192.0.2.10", 1194, "udp"),))
+        self.assertIn(
+            "ip daddr { 255.255.255.255, 10.0.0.0/8, 100.64.0.0/10, 172.16.0.0/12, 192.168.0.0/16, "
+            "169.254.0.0/16 } udp sport 68 udp dport 67 accept",
+            text,
+        )
+        self.assertIn("ip6 daddr { ff02::1:2, fe80::/10 } udp sport 546 udp dport 547 accept", text)
+        self.assertNotIn("meta nfproto ipv4 udp sport 68 udp dport 67 accept", text)
+
+    def test_dns_over_tls_and_quic_are_dropped(self):
+        text = build_ruleset((Endpoint("192.0.2.10", 1194, "udp"),))
+        self.assertIn("meta l4proto { udp, tcp } th dport { 53, 853 } drop", text)
 
 
 class InterfaceNameTests(unittest.TestCase):
@@ -223,6 +301,21 @@ class InterfaceNameTests(unittest.TestCase):
         self.assertEqual(validate_interfaces(["wt0", "wt0", "eth1"]), ("wt0", "eth1"))
         with self.assertRaises(RulesError):
             validate_interfaces([f"if{index}" for index in range(17)])
+
+    def test_an_oversized_list_is_refused_before_any_work(self):
+        """Regression: de-duplication was quadratic before the length check."""
+        calls = []
+
+        class Name(str):
+            def __eq__(self, other):
+                calls.append(1)
+                return str.__eq__(self, other)
+
+            __hash__ = str.__hash__
+
+        with self.assertRaises(RulesError):
+            validate_interfaces([Name("wt0")] * 200_000)
+        self.assertEqual(calls, [])
 
 
 class EndpointSwapTests(unittest.TestCase):

@@ -352,6 +352,7 @@ def _validate_directive(directive: _Directive, profile: str) -> None:
             raise ProfileError(f"unsupported verify-x509-name type '{verify_type}'", profile, directive.line)
         if (
             not value
+            or value.startswith("-")  # would be read as an OpenVPN option
             or len(value) > 255
             or any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
             or (verify_type != "subject" and any(char.isspace() for char in value))

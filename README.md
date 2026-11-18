@@ -102,8 +102,8 @@ computer cannot use or change it.
 The package installs a small root service, `pervius-killswitchd`, that is idle
 until you arm the kill switch. Arming asks polkit for permission. While armed,
 a dedicated nftables table (`inet pervius_ks`) allows only loopback, the
-Pervius tunnel (`pervius0`), the interfaces you always allow, DHCP, IPv6
-neighbour discovery and the VPN server addresses, and drops all other IPv4
+Pervius tunnel (`pervius0`, only as a real tunnel device), the interfaces you
+always allow, DHCP to the local network, IPv6 neighbour discovery and the VPN server addresses, and drops all other IPv4
 and IPv6 traffic, including plain DNS. Another VPN's tunnel is blocked unless
 you allow its interface.
 

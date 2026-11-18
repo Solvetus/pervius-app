@@ -26,7 +26,8 @@ While armed, the service installs the nftables table
 .B inet pervius_ks
 that allows only loopback, the Pervius tunnel interface
 .B pervius0
-and any interfaces you always allow, DHCP, IPv6 neighbour discovery and the
+(only as a tun or OpenVPN offload device), any interfaces you always allow,
+DHCP to the local network, IPv6 neighbour discovery and the
 VPN server addresses of the Pervius-managed profile, and drops all other
 traffic.
 .SH COMMANDS

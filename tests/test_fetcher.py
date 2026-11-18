@@ -4,7 +4,7 @@ import types
 import unittest
 from unittest.mock import patch
 
-from gi.repository import GLib
+from gi.repository import Gio, GLib
 
 from pervius.catalogue import fetcher
 from pervius.catalogue.fetcher import FetchError, fetch_bytes
@@ -15,7 +15,7 @@ class FakeProps:
     user_agent = ""
 
 
-class FakeBody:
+class FakeBytes:
     def __init__(self, data: bytes):
         self._data = data
 
@@ -23,14 +23,38 @@ class FakeBody:
         return self._data
 
 
+class FakeStream:
+    """A GInputStream stand-in that serves the body in small chunks."""
+
+    def __init__(self, body: bytes, chunk: int = 4):
+        self._body = body
+        self._chunk = chunk
+        self.read = 0
+        self.closed = False
+
+    def read_bytes(self, count, _cancellable):
+        size = min(count, self._chunk)
+        data, self._body = self._body[:size], self._body[size:]
+        self.read += len(data)
+        return FakeBytes(data)
+
+    def close(self, _cancellable):
+        self.closed = True
+
+
 class FakeSession:
     def __init__(self, body: bytes, status: int = 200):
         self.props = FakeProps()
-        self._body = body
+        self.stream = FakeStream(body)
         self._status = status
+        self.messages = []
+
+    def send(self, message, _cancellable):
+        self.messages.append(message)
+        return self.stream
 
     def send_and_read(self, _message, _cancellable):
-        return FakeBody(self._body)
+        raise AssertionError("the whole body must never be buffered by libsoup")
 
 
 class FakeHeaders:
@@ -52,6 +76,10 @@ class FakeMessage:
     def __init__(self, status: int = 200):
         self._headers = FakeHeaders()
         self._status = status
+        self.flags = 0
+
+    def add_flags(self, flags):
+        self.flags |= flags
 
     def get_request_headers(self):
         return self._headers
@@ -69,7 +97,11 @@ def fake_soup(status: int = 200):
         def new(_method, _url):
             return FakeMessage(status)
 
-    return types.SimpleNamespace(Message=Message, Status=types.SimpleNamespace(OK=200))
+    return types.SimpleNamespace(
+        Message=Message,
+        Status=types.SimpleNamespace(OK=200),
+        MessageFlags=types.SimpleNamespace(NO_REDIRECT=fetcher.Soup.MessageFlags.NO_REDIRECT),
+    )
 
 
 class FetcherTests(unittest.TestCase):
@@ -80,6 +112,30 @@ class FetcherTests(unittest.TestCase):
         headers = message.get_request_headers()
         self.assertIsNotNone(headers)
         headers.append("Accept", "application/zip")
+
+    def test_real_libsoup_streaming_and_redirect_api(self):
+        message = fetcher.Soup.Message.new("GET", "https://example.com/catalogue.zip")
+        message.add_flags(fetcher.Soup.MessageFlags.NO_REDIRECT)
+        self.assertTrue(message.get_flags() & fetcher.Soup.MessageFlags.NO_REDIRECT)
+        self.assertTrue(hasattr(fetcher.Soup.Session, "send"))
+        self.assertTrue(hasattr(Gio.InputStream, "read_bytes"))
+
+    def test_redirects_are_not_followed(self):
+        session = FakeSession(b"elsewhere", status=302)
+        with patch.object(fetcher, "Soup", fake_soup(status=302)):
+            with self.assertRaisesRegex(FetchError, "HTTP 302"):
+                fetch_bytes("https://example.com/catalogue.zip", session_factory=lambda: session)
+        self.assertTrue(session.messages[0].flags & fetcher.Soup.MessageFlags.NO_REDIRECT)
+        self.assertEqual(session.stream.read, 0)  # the redirect body is never read
+        self.assertTrue(session.stream.closed)
+
+    def test_oversized_body_stops_reading_at_the_cap(self):
+        session = FakeSession(b"x" * 10_000)
+        with patch.object(fetcher, "Soup", fake_soup()):
+            with self.assertRaisesRegex(FetchError, "exceeds"):
+                fetch_bytes("https://example.com/catalogue.zip", session_factory=lambda: session, max_bytes=10)
+        self.assertLessEqual(session.stream.read, 11)
+        self.assertTrue(session.stream.closed)
 
     def test_non_https_rejected(self):
         with self.assertRaisesRegex(FetchError, "non-HTTPS"):
@@ -125,7 +181,7 @@ class FetcherTests(unittest.TestCase):
         class BrokenSession:
             props = FakeProps()
 
-            def send_and_read(self, _message, _cancellable):
+            def send(self, _message, _cancellable):
                 raise GLib.Error("connection refused")
 
         with patch.object(fetcher, "Soup", fake_soup()):

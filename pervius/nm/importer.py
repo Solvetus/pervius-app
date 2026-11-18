@@ -56,6 +56,31 @@ class ImportVerificationError(ImportError):
     pass
 
 
+# Every vpn.data key the OpenVPN plugin produces for an accepted catalogue
+# profile, plus the keys Pervius itself sets (dev, dev-type).  Anything else
+# is a setting nobody reviewed and fails verification.
+ALLOWED_VPN_DATA_KEYS = frozenset(
+    {
+        "auth",
+        "ca",
+        "challenge-response-flags",
+        "connection-type",
+        "data-ciphers",
+        "data-ciphers-fallback",
+        "dev",
+        "dev-type",
+        "password-flags",
+        "proto-tcp",
+        "remote",
+        "remote-cert-tls",
+        "remote-random",
+        "tls-cipher",
+        "username",
+        "verify-x509-name",
+    }
+)
+
+
 @dataclass(frozen=True)
 class ImportedProfile:
     """Temporary profile plus the preserved non-secret values."""
@@ -227,6 +252,11 @@ def _verify_vpn_fields(
     ):
         if data.get(forbidden):
             raise ImportVerificationError(f"unexpected sensitive field '{forbidden}' in profile")
+    unexpected = sorted(set(data.keys()) - ALLOWED_VPN_DATA_KEYS)
+    if unexpected:
+        raise ImportVerificationError(f"unexpected setting(s) in profile: {', '.join(unexpected)}")
+    if data.get("dev-type") not in (None, "tun"):
+        raise ImportVerificationError(f"unexpected device type {data.get('dev-type')!r}")
 
     ca_path = _check_ca_path(data.get("ca"), cert_dir, parsed.ca_sha256)
     warnings = low_risk_warnings(parsed, connection)

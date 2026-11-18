@@ -8,10 +8,14 @@
 # It runs for every activation path (the app, nmcli, the desktop's VPN menu)
 # and needs no Pervius process.
 #
-# DNS (UDP/TCP 53, DNS over TLS 853) may only use loopback, the tunnel and
-# the interfaces the user always allows; queries to the physical link's
-# resolver are dropped, whatever systemd-resolved or another tool (for
-# example NetBird's search domain) would route there.
+# DNS (UDP/TCP 53, DNS over TLS/QUIC on TCP/UDP 853) may only use loopback,
+# the tunnel and the interfaces the user always allows; queries to the
+# physical link's resolver are dropped, whatever systemd-resolved or another
+# tool (for example NetBird's search domain) would route there.  The same
+# applies to forwarded DNS (containers and VMs that route through this host).
+# The tunnel is matched by name and by device kind (tun, or OpenVPN's
+# in-kernel data channel offload), so another device named like it is not
+# trusted.
 #
 # IPv6 (unless turned off): allowed outside the tunnel are loopback,
 # link-local (fe80::/10, ff02::/16), ICMPv6 neighbour discovery, unique local
@@ -77,7 +81,7 @@ fi
 
 tunnel=${VPN_IP_IFACE:-$TUNNEL}
 valid_ifname "$tunnel" || tunnel=$TUNNEL
-interfaces="\"$tunnel\""
+extra=
 count=0
 saved_ifs=$IFS
 IFS=,
@@ -86,24 +90,27 @@ for name in $allowed; do
     [ "$name" = "$tunnel" ] && continue
     count=$((count + 1))
     [ "$count" -le "$MAX_INTERFACES" ] || break
-    interfaces="$interfaces, \"$name\""
+    extra="${extra:+$extra, }\"$name\""
 done
 IFS=$saved_ifs
 
+tunnel_rule="    oifname \"$tunnel\" oifkind { \"tun\", \"ovpn\", \"ovpn-dco\" } accept"
+if [ -n "$extra" ]; then
+    extra_rule="    oifname { $extra } accept"
+else
+    extra_rule=
+fi
+dns_rule='    meta l4proto { udp, tcp } th dport { 53, 853 } drop'
+
 if [ "$block" = yes ]; then
+    ipv6_rules='    ip6 daddr { fe80::/10, ff02::/16, fc00::/7 } accept
+    meta nfproto ipv6 drop'
     ipv6_output='    ip6 daddr { fe80::/10, ff02::/16, fc00::/7 } accept
     icmpv6 type { 133, 134, 135, 136 } accept
     meta nfproto ipv6 drop'
-    ipv6_forward='    chain forward {
-    type filter hook forward priority -10; policy accept;
-    meta nfproto ipv4 accept
-    oifname { '"$interfaces"' } accept
-    ip6 daddr { fe80::/10, ff02::/16, fc00::/7 } accept
-    meta nfproto ipv6 drop
-  }'
 else
+    ipv6_rules=
     ipv6_output=
-    ipv6_forward=
 fi
 
 # One transaction: create if missing, delete, define again.
@@ -114,12 +121,19 @@ table inet pervius_guard {
   chain output {
     type filter hook output priority -10; policy accept;
     oifname "lo" accept
-    oifname { $interfaces } accept
-    meta l4proto { udp, tcp } th dport 53 drop
-    tcp dport 853 drop
+$tunnel_rule
+$extra_rule
+$dns_rule
     meta nfproto ipv4 accept
 $ipv6_output
   }
-$ipv6_forward
+  chain forward {
+    type filter hook forward priority -10; policy accept;
+$tunnel_rule
+$extra_rule
+$dns_rule
+    meta nfproto ipv4 accept
+$ipv6_rules
+  }
 }
 RULES

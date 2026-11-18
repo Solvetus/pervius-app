@@ -87,8 +87,8 @@ def addresses_for(query):
     qname = str(query.question[0].name)
     rdtype = query.question[0].rdtype
     if rdtype == dns.rdatatype.A:
-        return [(qname, "A", ["198.51.100.10"])]
-    return [(qname, "AAAA", ["2001:db8::10"])]
+        return [(qname, "A", ["185.15.58.10"])]
+    return [(qname, "AAAA", ["2a00:1450::10"])]
 
 
 @unittest.skipIf(dns is None, "python3-dnspython is not installed")
@@ -110,7 +110,7 @@ class DirectLookupTests(unittest.TestCase):
         result = self.resolve(self.good)
         self.assertEqual(
             sorted((e.address, e.port, e.protocol) for e in result.endpoints),
-            [("198.51.100.10", 1194, "udp"), ("2001:db8::10", 1194, "udp")],
+            [("185.15.58.10", 1194, "udp"), ("2a00:1450::10", 1194, "udp")],
         )
 
     def test_only_a_and_aaaa_are_asked_with_random_ids_and_ephemeral_ports(self):
@@ -137,14 +137,14 @@ class DirectLookupTests(unittest.TestCase):
                     answer(
                         query,
                         (qname, "CNAME", ["edge.example.net."]),
-                        ("edge.example.net.", "A", ["198.51.100.20"]),
+                        ("edge.example.net.", "A", ["185.15.58.20"]),
                     ),
                     (SERVER, 53),
                 )
             ]
 
         result = self.resolve(responder)
-        self.assertEqual([e.address for e in result.endpoints], ["198.51.100.20"])
+        self.assertEqual([e.address for e in result.endpoints], ["185.15.58.20"])
 
     def assertRejected(self, responder):
         with self.assertRaises(RulesError):
@@ -206,7 +206,7 @@ class DirectLookupTests(unittest.TestCase):
     def test_non_address_records_are_ignored(self):
         def responder(query, _address):
             name = str(query.question[0].name)
-            return [(answer(query, (name, "TXT", ['"198.51.100.10"'])), (SERVER, 53))]
+            return [(answer(query, (name, "TXT", ['"185.15.58.10"'])), (SERVER, 53))]
 
         self.assertRejected(responder)
 
@@ -214,12 +214,41 @@ class DirectLookupTests(unittest.TestCase):
         def responder(query, _address):
             name = str(query.question[0].name)
             if query.question[0].rdtype == dns.rdatatype.A:
-                return [(answer(query, (name, "A", ["0.0.0.0", "224.0.0.1", "198.51.100.30"])), (SERVER, 53))]
+                return [(answer(query, (name, "A", ["0.0.0.0", "224.0.0.1", "185.15.58.30"])), (SERVER, 53))]
             return [(answer(query), (SERVER, 53))]
 
         result = self.resolve(responder)
-        self.assertEqual([e.address for e in result.endpoints], ["198.51.100.30"])
+        self.assertEqual([e.address for e in result.endpoints], ["185.15.58.30"])
         self.assertTrue(result.warnings)
+
+    def test_answers_are_capped_per_name_and_family(self):
+        """Regression: every A/AAAA record became an allowlist entry."""
+
+        def responder(query, _address):
+            name = str(query.question[0].name)
+            if query.question[0].rdtype == dns.rdatatype.A:
+                return [(answer(query, (name, "A", [f"185.15.58.{i}" for i in range(1, 30)])), (SERVER, 53))]
+            return [(answer(query, (name, "AAAA", [f"2a00:1450::{i:x}" for i in range(1, 30)])), (SERVER, 53))]
+
+        result = self.resolve(responder)
+        self.assertEqual(len([e for e in result.endpoints if ":" not in e.address]), 4)
+        self.assertEqual(len([e for e in result.endpoints if ":" in e.address]), 4)
+        self.assertTrue(any("at most 4 per family" in w for w in result.warnings))
+
+    def test_non_public_answers_are_dropped(self):
+        def responder(query, _address):
+            name = str(query.question[0].name)
+            if query.question[0].rdtype == dns.rdatatype.A:
+                values = ["10.0.0.1", "192.168.1.1", "100.64.0.1", "192.0.2.10", "127.0.0.1"]
+                return [(answer(query, (name, "A", values)), (SERVER, 53))]
+            return [(answer(query, (name, "AAAA", ["fd00::1", "fe80::1", "::1"])), (SERVER, 53))]
+
+        with self.assertRaises(RulesError):
+            self.resolve(responder)
+
+    def test_scoped_literal_remote_is_rejected(self):
+        with self.assertRaises(RulesError):
+            self.resolve(lambda q, a: [], remotes=(("fe80::1%x};flush;{", 443),))
 
     def test_next_server_is_tried_after_a_timeout(self):
         def responder(query, address):
@@ -238,8 +267,8 @@ class DirectLookupTests(unittest.TestCase):
             self.assertLessEqual(sock.timeouts[0], dnsquery.PER_SERVER_TIMEOUT)
 
     def test_ip_literal_remotes_need_no_query(self):
-        result = self.resolve(lambda q, a: [], remotes=(("198.51.100.40", 443),))
-        self.assertEqual([e.address for e in result.endpoints], ["198.51.100.40"])
+        result = self.resolve(lambda q, a: [], remotes=(("185.15.58.40", 443),))
+        self.assertEqual([e.address for e in result.endpoints], ["185.15.58.40"])
         self.assertEqual(FakeSocket.instances, [])
 
     def test_no_resolver_is_an_error(self):

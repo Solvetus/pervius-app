@@ -94,6 +94,10 @@ class ParserTests(unittest.TestCase):
             "verify-x509-name example name extra",
             "verify-x509-name",
             'verify-x509-name "has space" name',
+            # Read by OpenVPN as an option instead of a name.
+            "verify-x509-name --up name-prefix",
+            "verify-x509-name -x",
+            'verify-x509-name "-C=US, O=Example"',
         ):
             text = profile_text().replace("verify-x509-name example name-prefix", replacement)
             with self.assertRaises(ProfileError, msg=replacement):

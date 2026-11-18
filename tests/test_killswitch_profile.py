@@ -32,16 +32,16 @@ VALID = {
 class ProfileValidationTests(unittest.TestCase):
     def test_valid_profile(self):
         result = endpoints_from_profile_data(
-            VALID, ["user:tester:"], "tester", resolver=resolver("192.0.2.10")
+            VALID, ["user:tester:"], "tester", resolver=resolver("185.15.58.10")
         )
-        self.assertEqual(result.endpoints[0].address, "192.0.2.10")
+        self.assertEqual(result.endpoints[0].address, "185.15.58.10")
 
     def test_tcp_profile_and_default_port(self):
         result = endpoints_from_profile_data(
             {"remote": "vpn.example", "proto-tcp": "yes"},
             ["user:tester"],
             "tester",
-            resolver=resolver("192.0.2.10"),
+            resolver=resolver("185.15.58.10"),
         )
         self.assertEqual(result.endpoints[0].protocol, "tcp")
         self.assertEqual(result.endpoints[0].port, 1194)
@@ -57,7 +57,7 @@ class ProfileValidationTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(ProfileError, "restricted"):
                 endpoints_from_profile_data(
-                    VALID, permissions, "tester", resolver=resolver("192.0.2.10")
+                    VALID, permissions, "tester", resolver=resolver("185.15.58.10")
                 )
 
     def test_password_in_data_is_rejected(self):
@@ -65,7 +65,7 @@ class ProfileValidationTests(unittest.TestCase):
         data["password"] = "secret"
         with self.assertRaisesRegex(ProfileError, "password"):
             endpoints_from_profile_data(
-                data, ["user:tester:"], "tester", resolver=resolver("192.0.2.10")
+                data, ["user:tester:"], "tester", resolver=resolver("185.15.58.10")
             )
 
     def test_bad_port_is_rejected(self):
@@ -73,13 +73,13 @@ class ProfileValidationTests(unittest.TestCase):
         data["port"] = "99999"
         with self.assertRaisesRegex(ProfileError, "port"):
             endpoints_from_profile_data(
-                data, ["user:tester:"], "tester", resolver=resolver("192.0.2.10")
+                data, ["user:tester:"], "tester", resolver=resolver("185.15.58.10")
             )
 
     def test_missing_remote_is_rejected(self):
         with self.assertRaisesRegex(ProfileError, "remote"):
             endpoints_from_profile_data(
-                {}, ["user:tester:"], "tester", resolver=resolver("192.0.2.10")
+                {}, ["user:tester:"], "tester", resolver=resolver("185.15.58.10")
             )
 
 

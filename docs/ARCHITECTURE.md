@@ -56,8 +56,9 @@ dbus-broker as the system bus. Fedora support is planned; see
   helpers, and the profile-preparation worker.
 - `pervius/nm/importer.py` — runs `nmcli connection import --temporary` with
   `NM_CERT_PATH` pointing at an app-owned directory, verifies the imported
-  settings against the parsed profile field by field, builds the managed
-  profile, deletes the temporary profile and keeps the CA file (mode 0600).
+  settings against the parsed profile field by field (and rejects any
+  `vpn.data` key outside a reviewed allowlist), builds the managed profile,
+  deletes the temporary profile and keeps the CA file (mode 0600).
 - `pervius/nm/profile.py` — builds the reserved managed profile. The **local
   profile owner and the VPN account name are separate**: the local login (for
   example `alice`) goes into `connection.permissions`; the VPN account (for
@@ -68,7 +69,8 @@ dbus-broker as the system bus. Fedora support is planned; see
   Every change starts from NetworkManager's current settings (`GetSettings`),
   never from libnm's cached copy, which can lag behind our own last write.
 - `pervius/nm/agent.py` — system-bus NetworkManager SecretAgent. Only
-  NetworkManager (uid 0) may call it. It checks the UUID, connection ID,
+  NetworkManager may call it: a uid-0 connection that currently owns the
+  `org.freedesktop.NetworkManager` bus name (uid 0 alone is not enough). It checks the UUID, connection ID,
   OpenVPN service type and an exact single-user permission before returning a
   password. It is the only reader of a stored password, by VPN account name.
 - `pervius/ownership.py` — ownership manifest and reserved UUID/ID
@@ -156,10 +158,18 @@ dbus-broker as the system bus. Fedora support is planned; see
 - A root systemd service (`pervius-killswitchd.service`) is D-Bus activated
   as `com.solvetus.Pervius.KillSwitch1` at `/com/solvetus/Pervius/KillSwitch1`. It is not
   enabled at boot.
-- Unit hardening: `Type=dbus`, `CapabilityBoundingSet=CAP_NET_ADMIN`,
-  `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ProtectHome=yes`,
-  `PrivateTmp=yes`, `RuntimeDirectory=pervius` (0700),
-  `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK`.
+- Unit hardening: `Type=dbus`, `python3 -I` (isolated: no `PYTHON*`
+  variables, user site or working directory on the path),
+  `CapabilityBoundingSet=CAP_NET_ADMIN`, `NoNewPrivileges=yes`,
+  `ProtectSystem=strict`, `ProtectHome=yes`, `PrivateTmp=yes`,
+  `PrivateDevices=yes`, `ProtectKernelTunables/Modules/Logs=yes`,
+  `ProtectControlGroups=yes`, `ProtectClock=yes`, `ProtectHostname=yes`,
+  `ProtectProc=invisible`, `ProcSubset=pid`, `RestrictNamespaces=yes`,
+  `RestrictRealtime=yes`, `RestrictSUIDSGID=yes`, `LockPersonality=yes`,
+  `SystemCallArchitectures=native`, `SystemCallFilter=@system-service`,
+  `UMask=0077`, `RuntimeDirectory=pervius` (0700),
+  `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK`
+  (`systemd-analyze security`: 2.1, "OK").
 - The service never runs a shell and never accepts rule text, paths or
   firewall expressions from callers.
 
@@ -199,8 +209,11 @@ messages.
   validate that the caller owns it through exactly one `user:<local-user>:`
   permission.
 - `Configure`, `UpdateEndpoints` and `Disarm` are restricted to the UID that
-  armed the switch, or root.
-- `GetStatus` is readable by local users.
+  armed the switch, or root. The owner is saved with the state and kept
+  through a failed recovery; when it is unknown (a table without saved
+  state), only root may change or disarm the switch.
+- `GetStatus` is readable by local users. It never starts a process per
+  call: the leak-guard check is cached for two seconds.
 - Callers never pass rule text, paths or addresses. Interface names are
   validated strictly (1–15 characters from `[A-Za-z0-9_.-]`, starting with a
   letter or digit, never `.` or `..`, at most 16).
@@ -216,14 +229,19 @@ messages.
 - Named sets: `allowed_ifaces` (`ifname`), `endpoints_v4` / `endpoints_v6`
   (`addr . inet_proto . inet_service`), `dns_window_v4` / `dns_window_v6`
   (addresses with `flags timeout`).
-- Output base chain at priority `-10`: accept loopback; `oifname
-  @allowed_ifaces` (the tunnel, pinned to `pervius0`, plus the interfaces the
-  user always allows, for example NetBird's `wt0`); DHCPv4/v6; IPv6 neighbour
-  discovery (ICMPv6 133–136); the endpoint sets on their exact protocol and
-  port; while a DNS window is open, plain DNS (port 53) **from the service's
-  own cgroup** (`socket cgroupv2 level 2
-  "system.slice/pervius-killswitchd.service"`) to the window's resolvers;
-  optionally RFC 1918/ULA LAN ranges; drop all remaining IPv4 and IPv6.
+- Output base chain at priority `-10`: accept loopback; the tunnel, matched
+  by name **and** device kind (`oifname "pervius0" oifkind { "tun", "ovpn",
+  "ovpn-dco" }`: OpenVPN's tun device or its in-kernel data channel offload
+  device, so a VLAN, macvlan or dummy that takes the name is not trusted);
+  `oifname @allowed_ifaces` (the interfaces the user always allows, for
+  example NetBird's `wt0`); DHCPv4 only to broadcast or local addresses
+  (RFC 1918, `100.64.0.0/10`, link-local) and DHCPv6 only to `ff02::1:2` or
+  `fe80::/10`; IPv6 neighbour discovery (ICMPv6 133–136); the endpoint sets
+  on their exact protocol and port; while a DNS window is open, plain DNS
+  (port 53) **from the service's own cgroup** (`socket cgroupv2 level 2
+  "system.slice/pervius-killswitchd.service"`) to the window's resolvers; then
+  DNS (53) and DNS over TLS/QUIC (853), TCP and UDP, are dropped; optionally
+  RFC 1918/ULA LAN ranges; drop all remaining IPv4 and IPv6.
 - Forward chain policy drop.
 - There is no `tun*` wildcard: another VPN's tunnel is blocked unless you
   allow it.
@@ -267,8 +285,13 @@ and the tunnel is down, DNS is blocked. Pervius therefore:
    and resolves the names itself with dnspython: A and AAAA only, a random
    query ID and source port, a 2-second per-server and 5-second overall
    timeout, a 1232-byte reply cap, and truncated, malformed or mismatched
-   replies rejected. Only packets from the service's cgroup match the window
-   rule; other processes' DNS stays blocked. The window closes in the same
+   replies rejected. At most four **public** addresses per name and address
+   family are taken (private, shared, loopback, link-local and documentation
+   space is refused), and every new address learned through the window is
+   **provisional**: unless the tunnel is up 90 seconds later, the service
+   removes it again (the deadline survives a service restart). Only packets
+   from the service's cgroup match the window rule; other processes' DNS
+   stays blocked. The window closes in the same
    transaction that swaps the endpoints, or expires in the kernel even if the
    service dies. If the cgroup cannot be determined, no window rule is built
    and such a lookup fails closed. A failed resolution never changes the
@@ -281,8 +304,8 @@ and the tunnel is down, DNS is blocked. Pervius therefore:
 - On service start: valid state → rebuild the table atomically from the saved
   endpoints and interfaces, whether or not the table survived (the DNS window
   rule names the service's cgroup, which a restart replaces); table without valid state → report
-  `error` and require Disarm (fail closed). A rebuild failure keeps the old
-  table.
+  `error` and require Disarm by root (`sudo pervius-killswitch disarm`;
+  fail closed). A rebuild failure keeps the old table and the saved owner.
 - Reboot clears `/run` and the nftables ruleset: protection fails open, with
   no automatic re-arming.
 - Quitting the GUI can keep protection armed or disarm it; the rules survive
@@ -344,9 +367,12 @@ service because:
   root-owned options file (below); every value is validated.
 - `vpn-pre-up` / `vpn-up`: atomically (re)install the table
   `inet pervius_guard` (output and forward chains at priority -10):
-  - **DNS** (UDP/TCP 53, TCP 853) may use only loopback, the tunnel and the
-    always-allowed interfaces; queries to any other interface, such as the
-    router's resolver, are dropped. NetBird's own domain keeps working
+  - **DNS** (UDP/TCP 53, and DNS over TLS/QUIC on TCP/UDP 853) may use only
+    loopback, the tunnel and the always-allowed interfaces; queries to any
+    other interface, such as the router's resolver, are dropped. The same
+    applies in the forward chain, so containers and VMs that route through
+    this host cannot query the router either. The tunnel is matched by name
+    and device kind, as in the kill switch. NetBird's own domain keeps working
     through NetBird's local resolver or its interface (if allowed); public
     names never reach the physical resolver.
   - **IPv6** (unless turned off): outside the tunnel only loopback,
@@ -392,8 +418,10 @@ service because:
   exception is the DNS window: while the tunnel is down, only the
   kill-switch service's own lookups of the VPN server names may reach the
   link's resolvers, for at most 5 seconds. These lookups skip DNSSEC and the
-  local cache; a spoofed answer could at most add one address to the
-  allowlist on the VPN's port and protocol, and server identity is still
+  local cache. A hostile or spoofing resolver can add at most four public
+  addresses per server name and address family to the allowlist, only on
+  the VPN's port and protocol, and only provisionally: they are removed
+  again unless the tunnel is up within 90 seconds. Server identity is still
   enforced by the CA and `verify-x509-name`.
 - Stale firewall state left by a crashed GUI process (fail closed).
 
@@ -451,7 +479,16 @@ service because:
 15. **The leak guard and the kill switch protect this machine's traffic**;
     the guard also drops forwarded IPv6, but containers or VMs in their own
     network namespaces are outside both.
-17. **The DNS window needs cgroup v2** (standard on current distributions).
+16. **Forwarded DNS is guarded too.** While the VPN is connected, DNS that
+    containers or VMs route through this host may leave only through the
+    tunnel or an always-allowed interface. A DNS server running in a
+    container on a local bridge (for example a Pi-hole container serving
+    other containers) needs that bridge (`docker0`, `br-…`) in the
+    always-allowed interfaces.
+17. **DHCP renewals to a public DHCP server are blocked while armed.** DHCP
+    is allowed only to broadcast and local addresses; a client whose DHCP
+    server has a public address renews by broadcast (rebinding) instead.
+18. **The DNS window needs cgroup v2** (standard on current distributions).
     Without it, resolving new server names while armed and disconnected fails
     closed.
 
@@ -479,6 +516,23 @@ Install paths are listed once in `packaging/layout.tsv`; see
 [`PACKAGING.md`](PACKAGING.md).
 
 ## 10. Future work
+
+### Roadmap (security)
+
+- **CA change warning.** The catalogue supplies both the server names and
+  the CA, so trust in a new CA rests on HTTPS to the catalogue host alone.
+  Pervius should remember the CA hash it last accepted and ask before using
+  a profile whose CA differs.
+- **Re-authentication for weakening operations.** The polkit action allows
+  every kill-switch operation in an active session without a prompt. Disarm,
+  allowing the LAN and adding always-allowed interfaces weaken protection and
+  should use a separate action with `auth_self_keep`.
+- **Always-on VPN.** An opt-in boot-time ruleset (a systemd unit ordered
+  before the network comes up) that blocks traffic outside the tunnel from
+  boot until the user connects or disarms, closing the fail-open window
+  after a reboot.
+
+### Other
 
 - **Auto-protect** needs a background component that is not tied to the
   window, a trusted-network model, an auto-connect and credential policy,
@@ -514,12 +568,15 @@ Install paths are listed once in `packaging/layout.tsv`; see
   building, import verification, agent authorization, the password-never-in-UI
   guarantees, fetcher, country search, reconnect policy, tray properties,
   public-IP parsing, kill-switch rules and service (authorization, atomic
-  updates, DNS window, recovery), the dnspython lookups against malformed and
-  spoofed replies, the leak-guard hook, translation completeness and coverage,
+  updates, DNS window, provisional endpoints, owner recovery, status cost),
+  the dnspython lookups against malformed, spoofed and oversized answers, the leak-guard hook, translation completeness and coverage,
   the language override, start at login, the distribution checks, and
   version consistency.
 - Integration tests (`tests/integration/`) enforce the kill-switch and IPv6
-  guard rules in a network namespace; CI runs them with `sudo unshare --net`.
+  guard rules in a network namespace with a real tun device; CI runs them
+  with `sudo unshare --net`. They include an impostor device named like the
+  tunnel, DHCP destinations, DNS over QUIC and DNS forwarded from a client
+  namespace.
 - UI harnesses in [`tests/manual/`](../tests/manual/README.md) exercise the
   window on a private Broadway display.
 - Verified live: first VPN import/activation and browsing; keyring store,

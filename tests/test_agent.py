@@ -125,11 +125,11 @@ class AsyncSecretTests(unittest.TestCase):
 
     def make_agent(self, store):
         agent = NetworkManagerSecretAgent(store, lambda: "vpnuser@example", username=USER)
-        agent._sender_is_root = lambda sender: True
+        agent._sender_is_networkmanager = lambda sender: True
         agent._manifest_entry = lambda: OwnershipEntry()
         return agent
 
-    def call(self, agent):
+    def call(self, agent, sender=":1.1"):
         class Invocation:
             def __init__(self):
                 self.value = None
@@ -146,7 +146,7 @@ class AsyncSecretTests(unittest.TestCase):
             "(a{sa{sv}}osasu)",
             (connection_hash(), "/org/freedesktop/NetworkManager/Settings/1", "vpn", [], 0),
         )
-        agent._on_method_call(None, ":1.1", "/", "", "GetSecrets", params, invocation)
+        agent._on_method_call(None, sender, "/", "", "GetSecrets", params, invocation)
         return invocation
 
     def test_reply_is_deferred_until_the_keyring_answers(self):
@@ -175,6 +175,64 @@ class AsyncSecretTests(unittest.TestCase):
 
         invocation = self.call(self.make_agent(Store()))
         self.assertEqual(invocation.error[0], "org.freedesktop.NetworkManager.SecretAgent.NoSecrets")
+
+
+class FakeBus:
+    """Answers GetConnectionUnixUser and GetNameOwner like the system bus."""
+
+    def __init__(self, uids, nm_owner):
+        self.uids = uids
+        self.nm_owner = nm_owner
+
+    def call_sync(self, _dest, _path, _iface, method, params, _rtype, _flags, _timeout, _cancel):
+        (arg,) = params.unpack()
+        if method == "GetConnectionUnixUser":
+            if arg not in self.uids:
+                raise GLib.Error("unknown name")
+            return GLib.Variant("(u)", (self.uids[arg],))
+        if method == "GetNameOwner":
+            if arg != "org.freedesktop.NetworkManager" or self.nm_owner is None:
+                raise GLib.Error("name has no owner")
+            return GLib.Variant("(s)", (self.nm_owner,))
+        raise AssertionError(method)
+
+
+class SenderIsNetworkManagerTests(unittest.TestCase):
+    """Regression: any root process on the system bus could ask for the password."""
+
+    def agent(self, bus):
+        agent = NetworkManagerSecretAgent(_EmptyStore(), lambda: "vpnuser@example", username=USER)
+        agent._bus = bus
+        return agent
+
+    def test_networkmanager_is_accepted(self):
+        agent = self.agent(FakeBus({":1.5": 0}, ":1.5"))
+        self.assertTrue(agent._sender_is_networkmanager(":1.5"))
+
+    def test_other_root_processes_are_refused(self):
+        agent = self.agent(FakeBus({":1.5": 0, ":1.9": 0}, ":1.5"))
+        self.assertFalse(agent._sender_is_networkmanager(":1.9"))
+
+    def test_the_name_owner_must_also_be_root(self):
+        agent = self.agent(FakeBus({":1.5": 1000}, ":1.5"))
+        self.assertFalse(agent._sender_is_networkmanager(":1.5"))
+
+    def test_no_networkmanager_means_nobody(self):
+        agent = self.agent(FakeBus({":1.5": 0}, None))
+        self.assertFalse(agent._sender_is_networkmanager(":1.5"))
+        self.assertFalse(agent._sender_is_networkmanager(None))
+
+    def test_refused_sender_gets_no_secret(self):
+        agent = self.agent(FakeBus({":1.5": 0, ":1.9": 0}, ":1.5"))
+        agent._manifest_entry = lambda: OwnershipEntry()
+
+        class Store:
+            def lookup_async(self, _username, _callback):
+                raise AssertionError("the keyring must not be asked")
+
+        agent._credentials = Store()
+        invocation = AsyncSecretTests.call(None, agent, sender=":1.9")
+        self.assertEqual(invocation.error[0], NOT_AUTHORIZED)
 
 
 class AsyncLookupTimeoutTests(unittest.TestCase):

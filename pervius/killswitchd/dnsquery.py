@@ -10,9 +10,12 @@ itself, here.
 The lookups are deliberately narrow: A and AAAA only, a random query ID
 (dnspython) and a random ephemeral source port (bind to port 0), a strict
 per-server and overall timeout, a reply size cap, and rejection of truncated,
-malformed or mismatched replies.  No parsing is hand-written.  The addresses
-only become kill-switch allowlist entries and pinned OpenVPN remotes; the
-server's identity is still enforced by the CA and verify-x509-name checks.
+malformed or mismatched replies.  No parsing is hand-written.  At most
+``MAX_ADDRESSES_PER_NAME`` public addresses per name and family are taken, so
+a hostile resolver cannot turn one lookup into many allowlist holes.  The
+addresses only become kill-switch allowlist entries (provisional, see the
+daemon) and pinned OpenVPN remotes; the server's identity is still enforced
+by the CA and verify-x509-name checks.
 """
 
 from __future__ import annotations
@@ -29,7 +32,7 @@ import dns.name
 import dns.rcode
 import dns.rdatatype
 
-from .rules import Endpoint, Resolution, RulesError
+from .rules import AddressCap, Endpoint, Resolution, RulesError
 
 DNS_PORT = 53
 MAX_REPLY_BYTES = 1232
@@ -161,6 +164,7 @@ def resolve_remotes_direct(
     endpoints: list[Endpoint] = []
     warnings: list[str] = []
     seen: set[tuple[str, int, str]] = set()
+    cap = AddressCap()
 
     def add(address: str, port: int, host: str) -> None:
         try:
@@ -169,7 +173,7 @@ def resolve_remotes_direct(
             warnings.append(f"ignored resolved address for {host}: {exc}")
             return
         key = (endpoint.address, endpoint.port, endpoint.protocol)
-        if key not in seen:
+        if key not in seen and cap.admit(host, endpoint.address, warnings):
             seen.add(key)
             endpoints.append(endpoint)
 
@@ -197,6 +201,7 @@ def resolve_remotes_direct(
                 break
             except (DnsLookupError, dns.exception.DNSException) as exc:
                 warnings.append(f"could not resolve {host} ({dns.rdatatype.to_text(rdtype)}): {exc}")
+    warnings.extend(cap.warnings())
     if not endpoints:
         raise RulesError("could not resolve any VPN server endpoint")
     return Resolution(tuple(endpoints), tuple(warnings))

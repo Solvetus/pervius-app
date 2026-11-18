@@ -29,10 +29,13 @@ code Pervius runs as root is the kill-switch service and the IPv6-guard
 dispatcher hook:
 
 - **`pervius-killswitchd.service`** — started on demand by D-Bus activation
-  (`com.solvetus.Pervius.KillSwitch1`), not at boot. It runs with
-  `CapabilityBoundingSet=CAP_NET_ADMIN`, `NoNewPrivileges`,
-  `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp` and a 0700 runtime
-  directory `/run/pervius`.
+  (`com.solvetus.Pervius.KillSwitch1`), not at boot. It runs as
+  `python3 -I` with `CapabilityBoundingSet=CAP_NET_ADMIN`, `NoNewPrivileges`,
+  `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `PrivateDevices`, the
+  `ProtectKernel*`/`ProtectControlGroups`/`ProtectProc` family,
+  `RestrictNamespaces`, `SystemCallFilter=@system-service`, `UMask=0077` and
+  a 0700 runtime directory `/run/pervius` (full list in
+  [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)).
 - **API:** `Arm(uuid, allow_lan, interfaces)`, `Configure(allow_lan,
   interfaces)`, `UpdateEndpoints(uuid, replace)`, `SetGuardOptions(block_ipv6,
   interfaces)`, `Disarm()`, `GetStatus()`.
@@ -40,7 +43,8 @@ dispatcher hook:
   `com.solvetus.pervius.killswitch.control` (active local sessions only).
   `Arm` and `UpdateEndpoints` accept only the reserved profile UUID and only
   if the caller owns that profile; `Configure`, `UpdateEndpoints` and `Disarm`
-  are limited to the user who armed it, or root. Interface names are
+  are limited to the user who armed it, or root (root only if that user is
+  unknown). Interface names are
   validated strictly. `GetStatus` reveals state and an endpoint count, not
   addresses.
 - **Effect:** it adds, atomically replaces or deletes exactly one nftables

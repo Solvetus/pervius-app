@@ -4,7 +4,8 @@ These tests apply the generated rulesets with nft inside a fresh network
 namespace that contains only dummy interfaces:
 
     eth9      the "physical" link (default routes, IPv4 + IPv6)
-    pervius0  the pinned VPN tunnel
+    pervius0  the pinned VPN tunnel: a real tun device, created with the
+              TUNSETIFF ioctl exactly as OpenVPN does (kind "tun")
     wt0       an always-allowed interface (e.g. NetBird)
     tun0      some other tunnel, which must NOT be allowed
 
@@ -20,7 +21,9 @@ firewall is never touched.  CI runs them with:
 
 from __future__ import annotations
 
+import fcntl
 import os
+import re
 import shutil
 import tempfile
 import socket
@@ -62,6 +65,35 @@ elif not NFT or not IP:
     REASON = "needs nft and ip"
 
 
+TUNSETIFF = 0x400454CA
+IFF_TUN = 0x0001
+IFF_NO_PI = 0x1000
+_TUN_FD: int | None = None
+
+
+def make_tun():
+    """Create pervius0 as a tun device held open by this process (like OpenVPN)."""
+    global _TUN_FD
+    if _TUN_FD is not None:
+        return
+    fd = os.open("/dev/net/tun", os.O_RDWR | os.O_NONBLOCK)
+    fcntl.ioctl(fd, TUNSETIFF, struct.pack("16sH", b"pervius0", IFF_TUN | IFF_NO_PI))
+    _TUN_FD = fd
+    run(IP, "link", "set", "pervius0", "up")
+    run(IP, "addr", "add", "10.8.0.2/24", "dev", "pervius0", check=False)
+
+
+def drop_tun():
+    global _TUN_FD
+    if _TUN_FD is not None:
+        os.close(_TUN_FD)
+        _TUN_FD = None
+    for _ in range(50):
+        if not Path("/sys/class/net/pervius0").exists():
+            return
+        time.sleep(0.05)
+
+
 def run(*args, input_text=None, check=True):
     return subprocess.run(args, input=input_text, text=True, capture_output=True, check=check)
 
@@ -82,7 +114,7 @@ def tcp_syn(port: int) -> bytes:
     return struct.pack("!HHIIBBHHH", 40000, port, 0, 0, 5 << 4, 0x02, 64240, 0, 0)
 
 
-def send(dest: str, port: int, *, proto: str = "udp", device: str | None = None) -> bool:
+def send(dest: str, port: int, *, proto: str = "udp", device: str | None = None, sport: int | None = None) -> bool:
     """True if the output hook let the first packet out, False on EPERM.
 
     UDP uses sendto() on a datagram socket.  TCP uses a raw socket carrying a
@@ -104,6 +136,11 @@ def send(dest: str, port: int, *, proto: str = "udp", device: str | None = None)
     with socket.socket(family, kind, number) as sock:
         if device:
             sock.setsockopt(socket.SOL_SOCKET, SO_BINDTODEVICE, device.encode())
+        if sport is not None:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(("::" if family == socket.AF_INET6 else "0.0.0.0", sport))
+        if address == "255.255.255.255":
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         try:
             sock.sendto(payload, sockaddr)
         except PermissionError:
@@ -116,13 +153,13 @@ class NamespaceTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         run(IP, "link", "set", "lo", "up")
-        for name in ("eth9", "pervius0", "wt0", "tun0"):
+        make_tun()
+        for name in ("eth9", "wt0", "tun0"):
             run(IP, "link", "add", name, "type", "dummy", check=False)
             run(IP, "link", "set", name, "up")
         run(IP, "addr", "add", "10.99.0.2/24", "dev", "eth9", check=False)
         run(IP, "-6", "addr", "add", "2001:db8:99::2/64", "dev", "eth9", "nodad", check=False)
         run(IP, "-6", "addr", "add", "fd99::2/64", "dev", "eth9", "nodad", check=False)
-        run(IP, "addr", "add", "10.8.0.2/24", "dev", "pervius0", check=False)
         run(IP, "addr", "add", "100.64.0.2/16", "dev", "wt0", check=False)
         run(IP, "-6", "addr", "add", "2001:db8:64::2/64", "dev", "wt0", "nodad", check=False)
         run(IP, "addr", "add", "10.7.0.2/24", "dev", "tun0", check=False)
@@ -139,6 +176,36 @@ class NamespaceTestCase(unittest.TestCase):
 
     def assertBlocked(self, *args, **kwargs):
         self.assertFalse(send(*args, **kwargs), f"expected blocked: {args} {kwargs}")
+
+    def hook(self, action, options: str | None = None, **env):
+        work = Path(tempfile.mkdtemp())
+        conf = work / "guard.conf"
+        if options is not None:
+            conf.write_text(options)
+            conf.chmod(0o644)
+        script = work / "hook"
+        script.write_text(
+            HOOK.read_text().replace("OPTIONS=/var/lib/pervius/guard.conf\n", f"OPTIONS={conf}\n")
+        )
+        environment = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "CONNECTION_UUID": MANAGED_UUID}
+        environment.update(env)
+        result = subprocess.run(
+            ["sh", str(script), "pervius0", action], env=environment, capture_output=True, text=True
+        )
+        shutil.rmtree(work)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def with_impostor_tunnel(self, check):
+        """Replace the real tun pervius0 by a dummy of the same name, run check()."""
+        drop_tun()
+        run(IP, "link", "add", "pervius0", "type", "dummy")
+        try:
+            run(IP, "link", "set", "pervius0", "up")
+            run(IP, "addr", "add", "10.8.0.2/24", "dev", "pervius0")
+            check()
+        finally:
+            run(IP, "link", "del", "pervius0", check=False)
+            make_tun()
 
 
 class KillSwitchTests(NamespaceTestCase):
@@ -192,10 +259,38 @@ class KillSwitchTests(NamespaceTestCase):
         self.assertBlocked("192.0.2.10", 1194)
         self.assertBlocked("2001:db8::10", 443, proto="tcp")
 
+    def test_another_device_named_like_the_tunnel_is_blocked(self):
+        """Regression: any device named pervius0 (VLAN, macvlan, dummy) was trusted."""
+        self.arm(interfaces=["pervius0"])  # listing the name as an extra changes nothing
+
+        def check():
+            self.assertBlocked("198.51.100.1", 53, device="pervius0")
+            self.assertBlocked("198.51.100.1", 443, proto="tcp", device="pervius0")
+
+        self.with_impostor_tunnel(check)
+        self.assertAllowed("198.51.100.1", 443, proto="tcp", device="pervius0")  # the real tun again
+
+    def test_dhcp_only_to_broadcast_or_the_local_network(self):
+        """Regression: the DHCP ports were an open path to any host."""
+        self.arm()
+        self.assertAllowed("255.255.255.255", 67, sport=68, device="eth9")
+        self.assertAllowed("10.99.0.1", 67, sport=68)
+        self.assertBlocked("198.51.100.1", 67, sport=68)
+        self.assertBlocked("198.51.100.1", 443, sport=68)
+        self.assertAllowed("ff02::1:2%eth9", 547, sport=546)
+        self.assertAllowed("fe80::1%eth9", 547, sport=546)
+        self.assertBlocked("2001:db8:5::1", 547, sport=546)
+
+    def test_dns_over_quic_and_tls_are_blocked_even_to_the_lan(self):
+        self.arm(allow_lan=True)
+        self.assertBlocked("10.99.0.1", 853)
+        self.assertBlocked("10.99.0.1", 853, proto="tcp")
+        self.assertAllowed("10.99.0.1", 854)
+
     def test_allowed_interface_set_exists_while_armed(self):
         self.arm(interfaces=["wt0"])
         listing = run(NFT, "list", "set", "inet", "pervius_ks", "allowed_ifaces").stdout
-        self.assertIn('"pervius0"', listing)
+        self.assertNotIn('"pervius0"', listing)  # the tunnel has its own name-and-kind rule
         self.assertIn('"wt0"', listing)
         run(NFT, "delete", "table", "inet", "pervius_ks")
         missing = run(NFT, "list", "set", "inet", "pervius_ks", "allowed_ifaces", check=False)
@@ -273,29 +368,12 @@ class KillSwitchTests(NamespaceTestCase):
 
 
 class GuardTests(NamespaceTestCase):
-    def hook(self, action, options: str | None = None, **env):
-        work = Path(tempfile.mkdtemp())
-        conf = work / "guard.conf"
-        if options is not None:
-            conf.write_text(options)
-            conf.chmod(0o644)
-        script = work / "hook"
-        script.write_text(
-            HOOK.read_text().replace("OPTIONS=/var/lib/pervius/guard.conf\n", f"OPTIONS={conf}\n")
-        )
-        environment = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "CONNECTION_UUID": MANAGED_UUID}
-        environment.update(env)
-        result = subprocess.run(
-            ["sh", str(script), "pervius0", action], env=environment, capture_output=True, text=True
-        )
-        shutil.rmtree(work)
-        self.assertEqual(result.returncode, 0, result.stderr)
-
     def test_dns_leaves_only_through_the_tunnel(self):
         self.hook("vpn-up", VPN_IP_IFACE="pervius0")
         self.assertBlocked("10.99.0.1", 53)  # the router's resolver
         self.assertBlocked("10.99.0.1", 53, proto="tcp")
         self.assertBlocked("198.51.100.1", 853, proto="tcp")
+        self.assertBlocked("198.51.100.1", 853)  # DNS over QUIC
         self.assertAllowed("10.8.0.1", 53, device="pervius0")
         self.assertAllowed("127.0.0.53", 53)
         self.assertAllowed("198.51.100.1", 443, proto="tcp")  # other IPv4 untouched
@@ -337,6 +415,10 @@ class GuardTests(NamespaceTestCase):
         self.assertAllowed("2001:db8:5::1", 53)
         self.assertAllowed("10.99.0.1", 53)
 
+    def test_guard_does_not_trust_another_device_named_like_the_tunnel(self):
+        self.hook("vpn-up", VPN_IP_IFACE="pervius0")
+        self.with_impostor_tunnel(lambda: self.assertBlocked("10.8.0.1", 53, device="pervius0"))
+
     def test_guard_and_kill_switch_together(self):
         nft(build_ruleset((Endpoint("192.0.2.10", 1194, "udp"),)))
         self.hook("vpn-up", VPN_IP_IFACE="pervius0")
@@ -344,6 +426,98 @@ class GuardTests(NamespaceTestCase):
         self.assertBlocked("2001:db8:5::1", 53)
         self.assertBlocked("198.51.100.1", 53)
         self.assertAllowed("198.51.100.1", 53, device="pervius0")
+
+
+
+class ForwardedDnsTests(NamespaceTestCase):
+    """Containers and VMs routing through this host: their DNS stays in the tunnel.
+
+    A client namespace behind a veth pair sends through this namespace (which
+    forwards).  The oracle is a counter in a postrouting chain: a packet the
+    guard drops in the forward hook never reaches it.
+    """
+
+    CLIENT = f"pvclient{os.getpid()}"
+    PROBE = (
+        "table inet pvprobe {}\n"
+        "delete table inet pvprobe\n"
+        "table inet pvprobe {\n"
+        "  chain post {\n"
+        "    type filter hook postrouting priority 300; policy accept;\n"
+        "    ip daddr 10.99.0.1 udp dport 53 counter\n"
+        "    ip daddr 10.99.0.1 udp dport 853 counter\n"
+        "    ip daddr 10.99.0.1 udp dport 54 counter\n"
+        '    oifname "pervius0" udp dport 53 counter\n'
+        "  }\n"
+        "}\n"
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        if run(IP, "netns", "add", cls.CLIENT, check=False).returncode != 0:
+            raise unittest.SkipTest("ip netns add is unavailable")
+        client = ("-n", cls.CLIENT)
+        run(IP, "link", "add", "vh0", "type", "veth", "peer", "name", "vc0", "netns", cls.CLIENT)
+        run(IP, "addr", "add", "10.50.0.1/24", "dev", "vh0")
+        run(IP, "link", "set", "vh0", "up")
+        run(IP, *client, "link", "set", "lo", "up")
+        run(IP, *client, "addr", "add", "10.50.0.2/24", "dev", "vc0")
+        run(IP, *client, "link", "set", "vc0", "up")
+        run(IP, *client, "route", "add", "default", "via", "10.50.0.1")
+        Path("/proc/sys/net/ipv4/ip_forward").write_text("1\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        run(IP, "netns", "del", cls.CLIENT, check=False)
+        run(IP, "link", "del", "vh0", check=False)
+        run(IP, "route", "del", "198.51.100.53/32", check=False)
+
+    def setUp(self):
+        run(IP, "route", "replace", "198.51.100.53/32", "dev", "pervius0")
+        nft(self.PROBE)
+
+    def tearDown(self):
+        super().tearDown()
+        run(NFT, "delete", "table", "inet", "pvprobe", check=False)
+
+    def forwarded(self) -> dict[str, int]:
+        code = (
+            "import socket\n"
+            "s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n"
+            "for dest in (('10.99.0.1', 53), ('10.99.0.1', 853), ('10.99.0.1', 54), ('198.51.100.53', 53)):\n"
+            "    s.sendto(b'q', dest)\n"
+        )
+        run(IP, "netns", "exec", self.CLIENT, "/usr/bin/python3", "-I", "-c", code)
+        time.sleep(1.0)  # the client's first packets wait for ARP
+        listing = run(NFT, "list", "chain", "inet", "pvprobe", "post").stdout
+        counts = {}
+        for key, pattern in (
+            ("lan53", r"udp dport 53 counter packets (\d+)"),
+            ("lan853", r"udp dport 853 counter packets (\d+)"),
+            ("lan54", r"udp dport 54 counter packets (\d+)"),
+            ("tunnel53", r'oifname "pervius0" udp dport 53 counter packets (\d+)'),
+        ):
+            match = re.search(pattern, listing)
+            self.assertIsNotNone(match, listing)
+            counts[key] = int(match.group(1))
+        return counts
+
+    def test_forwarding_works_without_the_guard(self):
+        counts = self.forwarded()
+        self.assertGreater(counts["lan53"], 0)
+        self.assertGreater(counts["lan54"], 0)
+
+    def test_forwarded_dns_is_dropped_outside_the_tunnel(self):
+        """Regression: the guard's forward chain accepted all IPv4, DNS included."""
+        for options in (None, "block-ipv6=no\n"):
+            nft(self.PROBE)  # fresh counters
+            self.hook("vpn-up", options=options, VPN_IP_IFACE="pervius0")
+            counts = self.forwarded()
+            self.assertEqual(counts["lan53"], 0, options)
+            self.assertEqual(counts["lan853"], 0, options)
+            self.assertGreater(counts["lan54"], 0, options)  # other IPv4 still forwarded
+            self.assertGreater(counts["tunnel53"], 0, options)  # DNS into the tunnel is fine
 
 
 if __name__ == "__main__":

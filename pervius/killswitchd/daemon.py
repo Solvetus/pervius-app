@@ -42,6 +42,7 @@ from .rules import (  # noqa: E402
     Endpoint,
     Resolution,
     RulesError,
+    parse_address,
     build_dns_window,
     build_dns_window_close,
     build_endpoint_swap,
@@ -66,6 +67,13 @@ STATE_VERSION = 2
 NFT_TIMEOUT = 20
 # At most one DNS window per this many seconds.
 DNS_WINDOW_INTERVAL = 30.0
+# Endpoints learned through the DNS window are provisional: unless the tunnel
+# is up this many seconds later, they are removed again.  A hostile resolver
+# on the local network can therefore not keep holes open.
+PROVISIONAL_SECONDS = 90
+# GetStatus is open to every local user; the guard table check (an nft
+# process) is cached so that polling cannot keep the service busy.
+GUARD_STATUS_TTL = 2.0
 CGROUP_ROOT = Path("/sys/fs/cgroup")
 GUARD_HOOK = "/usr/lib/NetworkManager/dispatcher.d/90-pervius-guard"
 
@@ -282,21 +290,30 @@ class SystemBackend:
         return False
 
     def active_vpn_gateways(self) -> list[str]:
-        """Addresses of the server the managed VPN is connected to right now.
+        """Candidate addresses of the server the managed VPN uses right now.
 
-        NetworkManager routes the VPN server through the physical link with a
-        host route (/32 or /128 with a next hop) while the VPN is up.  These
-        are added to the allowlist when arming, so arming never cuts the
-        tunnel that is already running, whatever the server names resolve to
-        at that moment.
+        NetworkManager routes the VPN server through the VPN's parent device
+        with a host route (/32 or /128 with a next hop).  Only host routes on
+        the parent device(s) of the *active managed VPN connection* count;
+        the daemon further keeps only addresses the profile or the current
+        allowlist already names (``KillSwitchService._live_endpoints``).
         """
-        if not self.managed_vpn_active():
-            return []
-        addresses: list[str] = []
         try:
-            devices = self._client().get_devices()
+            client = self._client()
         except ServiceError:
             return []
+        devices = []
+        for active in client.get_active_connections():
+            try:
+                if active.get_uuid() != MANAGED_UUID or active.get_state() not in (
+                    NM.ActiveConnectionState.ACTIVATING,
+                    NM.ActiveConnectionState.ACTIVATED,
+                ):
+                    continue
+                devices.extend(active.get_devices() or [])
+            except Exception:
+                continue
+        addresses: list[str] = []
         for device in devices:
             try:
                 if device.get_iface() == TUNNEL_INTERFACE:
@@ -360,7 +377,22 @@ class SystemBackend:
             raise ServiceError(f"the leak guard hook failed: {(result.stderr or '').strip()[:300]}")
 
     def clock(self) -> float:
+        # CLOCK_MONOTONIC is system-wide, so deadlines saved in /run survive a
+        # service restart (and /run itself does not survive a reboot).
         return time.monotonic()
+
+    def schedule(self, seconds: float, callback) -> int:
+        def fire():
+            callback()
+            return False
+
+        return GLib.timeout_add(max(0, int(seconds * 1000)), fire)
+
+    def cancel(self, handle) -> None:
+        try:
+            GLib.source_remove(handle)
+        except Exception:
+            pass
 
 
 class KillSwitchService:
@@ -381,6 +413,13 @@ class KillSwitchService:
         self._endpoints: tuple[Endpoint, ...] = ()
         self._window_rule = False
         self._last_window: float | None = None
+        # Window-resolved endpoints awaiting a tunnel, the set to fall back to
+        # if they are removed, the monotonic deadline and its timer.
+        self._provisional: tuple[Endpoint, ...] = ()
+        self._provisional_fallback: tuple[Endpoint, ...] = ()
+        self._provisional_until: float | None = None
+        self._provisional_timer = None
+        self._guard_cache: tuple[float, bool] | None = None
 
     # ------------------------------------------------------------- lifecycle
 
@@ -433,11 +472,19 @@ class KillSwitchService:
             "interfaces": GLib.Variant("as", list(self._interfaces)),
             "endpoints": GLib.Variant("u", len(self._endpoints)),
             "resolved_at": GLib.Variant("s", self._resolved_at),
-            "guard": GLib.Variant("b", self.backend.table_exists(GUARD_TABLE_SPEC)),
+            "guard": GLib.Variant("b", self._guard_present()),
             "backend": GLib.Variant("s", "nftables"),
             "table": GLib.Variant("s", TABLE_SPEC),
             "since": GLib.Variant("s", self._since),
         }
+
+    def _guard_present(self) -> bool:
+        now = self.backend.clock()
+        cache = self._guard_cache
+        if cache is None or not (0 <= now - cache[0] < GUARD_STATUS_TTL):
+            cache = (now, self.backend.table_exists(GUARD_TABLE_SPEC))
+            self._guard_cache = cache
+        return cache[1]
 
     def _reply(self, resolved: tuple[Endpoint, ...] | None = None) -> GLib.Variant:
         status = self.status()
@@ -580,8 +627,12 @@ class KillSwitchService:
             raise PermissionDenied("caller has no local account") from exc
 
     def _require_owner(self, uid: int):
-        """The Disarm restriction: only the arming user, or root."""
-        if self._owner_uid is not None and uid not in {0, self._owner_uid}:
+        """Only the arming user, or root.  An unknown owner means root only."""
+        if uid == 0:
+            return
+        if self._owner_uid is None:
+            raise PermissionDenied("the owner of the kill switch is unknown; only root may change it")
+        if uid != self._owner_uid:
             raise PermissionDenied("only the user who armed the kill switch may change it")
 
     def _require_armed(self):
@@ -650,6 +701,7 @@ class KillSwitchService:
         self._log_warnings(resolution)
         endpoints = merge_endpoints(resolution.endpoints, live)
         self._apply_rules(endpoints, allow_lan, validated)
+        self._clear_provisional()
         self._armed = True
         self._state = "armed"
         self._detail = "Rules installed; VPN may still be connecting"
@@ -681,9 +733,11 @@ class KillSwitchService:
         if uuid != self._uuid:
             raise PermissionDenied("the kill switch protects a different profile")
         remotes, protocol = self._profile_remotes(uuid, uid)
+        tunnel = self.backend.tunnel_up()
+        through_window = False
         try:
             resolution = None
-            if self.backend.tunnel_up():
+            if tunnel:
                 try:
                     resolution = self.backend.resolve_system(remotes, protocol)
                 except RulesError as exc:
@@ -692,6 +746,7 @@ class KillSwitchService:
                     log.warning("resolving through the tunnel failed: %s", exc)
             if resolution is None:
                 resolution = self._resolve_through_window(remotes, protocol)
+                through_window = True
         except ResolveFailed as exc:
             log.warning("could not update the VPN server addresses: %s", exc)
             raise
@@ -707,7 +762,13 @@ class KillSwitchService:
             endpoints = merge_endpoints(resolution.endpoints, (*self._endpoints, *live))
         # One transaction: new endpoint sets in, DNS window closed.
         self.backend.run_nft(["-f", "-"], input_text=build_endpoint_swap(endpoints))
+        previous = self._endpoints
         self._endpoints = endpoints
+        if through_window:
+            fresh = tuple(e for e in endpoints if e not in previous and e not in live)
+            self._mark_provisional(fresh, previous)
+        elif tunnel:
+            self._confirm_provisional("the tunnel is up")
         self._resolved_at = utc_now()
         self._detail = "VPN server addresses updated"
         self._save_state()
@@ -716,8 +777,18 @@ class KillSwitchService:
         return resolution.endpoints
 
     def _live_endpoints(self, remotes, protocol: str) -> tuple[Endpoint, ...]:
-        """The live VPN server, on the profile's ports and protocol."""
+        """The live VPN server, on the profile's ports and protocol.
+
+        A host route alone is not proof: only an address the profile pins or
+        the allowlist already holds can be the server the tunnel uses.
+        """
         ports = sorted({port for _host, port in remotes})
+        known = {e.address for e in self._endpoints}
+        for host, _port in remotes:
+            try:
+                known.add(parse_address(host).compressed)
+            except RulesError:
+                continue
         endpoints = []
         try:
             gateways = self.backend.active_vpn_gateways()
@@ -725,6 +796,13 @@ class KillSwitchService:
             log.warning("could not read the live VPN server: %s", exc)
             gateways = []
         for address in gateways:
+            try:
+                address = parse_address(address).compressed
+            except RulesError:
+                continue
+            if address not in known:
+                log.info("ignoring a host route that is not a known VPN server address")
+                continue
             for port in ports:
                 try:
                     endpoints.append(Endpoint(address, port, protocol))
@@ -776,6 +854,69 @@ class KillSwitchService:
                 log.warning("could not close the DNS window early; it expires on its own")
             raise ResolveFailed(f"could not resolve the VPN servers: {exc}") from exc
 
+    # ------------------------------------------------------- provisional
+
+    def _mark_provisional(self, fresh: tuple[Endpoint, ...], previous: tuple[Endpoint, ...]):
+        if not fresh:
+            return
+        if not self._provisional:
+            self._provisional_fallback = previous
+        self._provisional = merge_endpoints(self._provisional, fresh)
+        self._provisional_until = self.backend.clock() + PROVISIONAL_SECONDS
+        self._schedule_provisional_check(PROVISIONAL_SECONDS)
+        log.info(
+            "%d endpoint(s) from the DNS window are provisional for %d s", len(self._provisional), PROVISIONAL_SECONDS
+        )
+
+    def _schedule_provisional_check(self, seconds: float):
+        if self._provisional_timer is not None:
+            self.backend.cancel(self._provisional_timer)
+        self._provisional_timer = self.backend.schedule(max(0.0, seconds), self._check_provisional)
+
+    def _clear_provisional(self):
+        if self._provisional_timer is not None:
+            self.backend.cancel(self._provisional_timer)
+        self._provisional_timer = None
+        self._provisional = ()
+        self._provisional_fallback = ()
+        self._provisional_until = None
+
+    def _confirm_provisional(self, reason: str):
+        if self._provisional:
+            log.info("provisional endpoints confirmed: %s", reason)
+        self._clear_provisional()
+
+    def _check_provisional(self):
+        """Deadline reached: keep the provisional endpoints only if the tunnel is up."""
+        self._provisional_timer = None
+        if not self._provisional or not self._armed or self._state != "armed":
+            self._clear_provisional()
+            return
+        if self.backend.tunnel_up():
+            self._confirm_provisional("the tunnel came up")
+            self._save_state()
+            return
+        dropped = set(self._provisional)
+        remaining = tuple(e for e in self._endpoints if e not in dropped) or self._provisional_fallback
+        if not remaining:
+            # Nothing to fall back to: keeping the set is the only way not to
+            # empty the allowlist (which build_endpoint_swap refuses anyway).
+            log.warning("no confirmed endpoints to fall back to; keeping the provisional ones")
+            self._clear_provisional()
+            return
+        try:
+            self.backend.run_nft(["-f", "-"], input_text=build_endpoint_swap(remaining))
+        except Exception as exc:
+            log.warning("could not remove the provisional endpoints, retrying: %s", exc)
+            self._schedule_provisional_check(5)
+            return
+        self._endpoints = tuple(remaining)
+        self._clear_provisional()
+        self._detail = "No tunnel came up; addresses from the DNS window removed"
+        log.info("removed %d provisional endpoint(s): no tunnel came up", len(dropped))
+        self._save_state()
+        self._emit_status()
+
     @staticmethod
     def _log_warnings(resolution: Resolution):
         for warning in resolution.warnings:
@@ -796,6 +937,7 @@ class KillSwitchService:
         self._resolved_at = ""
         self._endpoints = ()
         self._window_rule = False
+        self._clear_provisional()
         self._delete_state()
         self._emit_status()
 
@@ -821,6 +963,14 @@ class KillSwitchService:
                 for e in self._endpoints
             ],
         }
+        if self._provisional and self._provisional_until is not None:
+            payload["provisional"] = [
+                {"address": e.address, "port": e.port, "protocol": e.protocol} for e in self._provisional
+            ]
+            payload["provisional_fallback"] = [
+                {"address": e.address, "port": e.port, "protocol": e.protocol} for e in self._provisional_fallback
+            ]
+            payload["provisional_until"] = self._provisional_until
         data = json.dumps(payload, sort_keys=True).encode("utf-8")
         fd, temporary = tempfile.mkstemp(prefix=".killswitch-", dir=directory)
         try:
@@ -853,8 +1003,19 @@ class KillSwitchService:
         except (RulesError, TypeError, ValueError):
             return None
         owner = value.get("owner_uid")
-        if not isinstance(owner, int) or isinstance(owner, bool):
+        if not isinstance(owner, int) or isinstance(owner, bool) or owner < 0:
             return None
+        provisional: tuple[Endpoint, ...] = ()
+        fallback: tuple[Endpoint, ...] = ()
+        until = None
+        if value.get("provisional"):
+            try:
+                provisional = endpoints_from_state(value["provisional"])
+                if value.get("provisional_fallback"):
+                    fallback = endpoints_from_state(value["provisional_fallback"])
+                until = float(value["provisional_until"])
+            except (RulesError, TypeError, ValueError, KeyError):
+                return None
         return {
             "uuid": MANAGED_UUID,
             "allow_lan": value["allow_lan"],
@@ -864,6 +1025,9 @@ class KillSwitchService:
             "resolved_at": str(value.get("resolved_at") or value.get("since") or ""),
             "endpoints": endpoints,
             "version": value["version"],
+            "provisional": provisional,
+            "provisional_fallback": fallback,
+            "provisional_until": until,
         }
 
     def _delete_state(self):
@@ -885,16 +1049,24 @@ class KillSwitchService:
         self._since = state["since"]
         self._resolved_at = state["resolved_at"]
         self._endpoints = state["endpoints"]
+        self._clear_provisional()
+        if state.get("provisional"):
+            self._provisional = state["provisional"]
+            self._provisional_fallback = state["provisional_fallback"]
+            self._provisional_until = state["provisional_until"]
+            self._schedule_provisional_check(self._provisional_until - self.backend.clock())
 
     def _recover_state(self):
         table = self.backend.table_exists(TABLE_SPEC)
         state = self.load_state()
         if table and state is None:
+            # The owner is unknown, so only root may disarm (_require_owner).
             self._armed = True
             self._state = "error"
+            self._owner_uid = None
             self._detail = (
                 "Pervius firewall table exists without recoverable state; "
-                "Disarm before arming again"
+                "disarm it as root (sudo pervius-killswitch disarm)"
             )
             log.error(self._detail)
             return
@@ -911,6 +1083,8 @@ class KillSwitchService:
         except Exception as exc:
             self._armed = table
             self._state = "error"
+            # The saved owner keeps the right to disarm, and nobody else.
+            self._owner_uid = state["owner_uid"]
             self._detail = f"Could not restore protection: {exc}"
             log.error(self._detail)
             return
@@ -945,6 +1119,8 @@ class KillSwitchService:
                 log.info("removed a stale leak guard (the managed VPN is not active)")
         except Exception as exc:
             log.warning("could not synchronise the leak guard: %s", exc)
+        finally:
+            self._guard_cache = None
 
     # Kept for callers and tests from before the guard was synchronised.
     _clear_stale_guard = _sync_guard
