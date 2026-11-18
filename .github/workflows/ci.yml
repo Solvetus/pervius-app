@@ -18,6 +18,7 @@ env:
   APT_TEST_DEPS: >-
     python3-gi gir1.2-glib-2.0 gir1.2-gtk-4.0 gir1.2-adw-1
     gir1.2-nm-1.0 gir1.2-secret-1 gir1.2-soup-3.0 python3-dnspython iso-codes
+    gettext appstream desktop-file-utils
 
 # Each distribution gets its own packaging job. Add a Fedora job ("rpm",
 # running in a fedora container and building packaging/rpm/) next to "deb".
@@ -32,18 +33,28 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends shellcheck appstream desktop-file-utils
+          sudo apt-get install -y --no-install-recommends shellcheck appstream desktop-file-utils gettext
       - name: ruff
         run: pipx run "ruff==${RUFF_VERSION}" check .
       - name: shellcheck
         run: |
-          shellcheck packaging/stage.sh packaging/debian/build.sh packaging/debian/preinst \
+          shellcheck packaging/stage.sh packaging/build-i18n.sh scripts/update-pot.sh \
+            packaging/debian/build.sh packaging/debian/preinst \
             packaging/debian/postinst packaging/debian/prerm packaging/debian/postrm \
             tests/manual/run.sh data/networkmanager/90-pervius-ipv6-guard
+      - name: Translations (complete, no fuzzy entries)
+        run: |
+          for po in po/*.po; do
+            stats=$(LC_ALL=C msgfmt --check --statistics -o /dev/null "$po" 2>&1)
+            echo "$po: $stats"
+            echo "$stats" | grep -Eq '^[0-9]+ translated messages?\.$'
+          done
+      - name: Build translated desktop and AppStream files
+        run: packaging/build-i18n.sh build/i18n
       - name: AppStream metadata
-        run: appstreamcli validate --no-net data/com.solvetus.Pervius.metainfo.xml
+        run: appstreamcli validate --no-net build/i18n/com.solvetus.Pervius.metainfo.xml
       - name: Desktop file
-        run: desktop-file-validate data/com.solvetus.Pervius.desktop
+        run: desktop-file-validate build/i18n/com.solvetus.Pervius.desktop
 
   test:
     name: Unit tests
@@ -86,7 +97,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends lintian
+          sudo apt-get install -y --no-install-recommends lintian gettext appstream
       - name: Build
         run: packaging/debian/build.sh
       - name: lintian (errors fail, warnings are reported)

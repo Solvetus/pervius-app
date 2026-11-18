@@ -17,6 +17,9 @@ PYTHONDIR=$2
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 TAB=$(printf '\t')
 
+# Generated sources (translations, translated desktop and AppStream files).
+"$ROOT/packaging/build-i18n.sh" "$ROOT/build/i18n"
+
 grep -v -e '^#' -e '^[[:space:]]*$' "$ROOT/packaging/layout.tsv" |
 while IFS=$TAB read -r mode source destination; do
     destination=$(printf '%s\n' "$destination" | sed "s|{pythondir}|$PYTHONDIR|")

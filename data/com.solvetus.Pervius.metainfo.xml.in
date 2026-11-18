@@ -3,7 +3,7 @@
   <id>com.solvetus.Pervius</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>Apache-2.0</project_license>
-  <name>Pervius</name>
+  <name translate="no">Pervius</name>
   <summary>Unofficial Linux client for FastVPN</summary>
   <description>
     <p>
@@ -16,13 +16,16 @@
       The application runs as an ordinary user. NetworkManager performs the
       privileged network operations, and passwords are supplied by a
       NetworkManager secret agent instead of being written into the VPN profile.
-      An optional kill switch, backed by a small system service and polkit,
-      blocks traffic outside the tunnel while it is armed.
+      While connected, all DNS goes through the tunnel and IPv6 outside the
+      tunnel is blocked. An optional kill switch, backed by a small system
+      service and polkit, blocks all other traffic outside the tunnel while it
+      is armed.
     </p>
     <p>
       It offers country search with flags, favorites, bounded automatic
-      reconnection, a tray icon, desktop notifications, and connection details
-      such as the VPN exit IP and traffic totals. It manages one NetworkManager
+      reconnection, a tray icon, desktop notifications, connection details
+      such as the VPN exit IP and traffic totals, and English, Portuguese,
+      French, Spanish and Italian translations. It manages one NetworkManager
       profile and does not provide auto-protect or DNS filtering.
     </p>
     <p>
@@ -33,7 +36,7 @@
   </description>
   <launchable type="desktop-id">com.solvetus.Pervius.desktop</launchable>
   <developer id="com.solvetus">
-    <name>Solvetus Labs</name>
+    <name translate="no">Solvetus Labs</name>
   </developer>
   <url type="homepage">https://github.com/Solvetus/pervius-app</url>
   <url type="bugtracker">https://github.com/Solvetus/pervius-app/issues</url>
@@ -44,13 +47,15 @@
     <color type="primary" scheme_preference="light">#BEE63B</color>
     <color type="primary" scheme_preference="dark">#1B2127</color>
   </branding>
+  <translation type="gettext">pervius</translation>
   <categories>
     <category>Network</category>
   </categories>
   <keywords>
-    <keyword>VPN</keyword>
-    <keyword>OpenVPN</keyword>
-    <keyword>NetworkManager</keyword>
+    <keyword translate="no">VPN</keyword>
+    <keyword translate="no">OpenVPN</keyword>
+    <keyword translate="no">NetworkManager</keyword>
+    <keyword>kill switch</keyword>
   </keywords>
   <provides>
     <binary>pervius</binary>
@@ -76,106 +81,6 @@
           managed NetworkManager profile from earlier test builds are adopted
           automatically on first start.
         </p>
-      </description>
-    </release>
-    <release version="0.1.19" date="2026-11-17">
-      <description>
-        <p>Align the local-network row and remove the test-build notice group.</p>
-      </description>
-    </release>
-    <release version="0.1.18" date="2026-11-17">
-      <description>
-        <p>Remove the Switch IP banner.</p>
-      </description>
-    </release>
-    <release version="0.1.17" date="2026-11-17">
-      <description>
-        <p>Show ISP IP and protocol while disconnected, with — for the rest.</p>
-      </description>
-    </release>
-    <release version="0.1.16" date="2026-11-17">
-      <description>
-        <p>Show ISP/VPN exit IPs, Switch IP, traffic totals, and protocol.</p>
-      </description>
-    </release>
-    <release version="0.1.15" date="2026-11-17">
-      <description>
-        <p>Replace the protocol dropdown with a compact UDP/TCP switch.</p>
-      </description>
-    </release>
-    <release version="0.1.14" date="2026-11-17">
-      <description>
-        <p>Improve status-card spacing and update the security notice.</p>
-      </description>
-    </release>
-    <release version="0.1.13" date="2026-11-17">
-      <description>
-        <p>Add the service-backed kill-switch control to the GUI and tray.</p>
-      </description>
-    </release>
-    <release version="0.1.12" date="2026-11-17">
-      <description>
-        <p>Fix the polkit authorization reply type in the kill-switch service.</p>
-      </description>
-    </release>
-    <release version="0.1.11" date="2026-11-17">
-      <description>
-        <p>Ship the app and kill-switch service in one package.</p>
-      </description>
-    </release>
-    <release version="0.1.10" date="2026-11-17">
-      <description>
-        <p>Fix the kill-switch service polkit authorization signature.</p>
-      </description>
-    </release>
-    <release version="0.1.9" date="2026-11-17">
-      <description>
-        <p>Add the optional kill-switch service groundwork and diagnostic CLI.</p>
-      </description>
-    </release>
-    <release version="0.1.8" date="2026-11-17">
-      <description>
-        <p>Add favorite locations and a tray Favorites menu for quick switching.</p>
-      </description>
-    </release>
-    <release version="0.1.7" date="2026-11-17">
-      <description>
-        <p>Add red/green tray status icons for disconnected and connected states.</p>
-      </description>
-    </release>
-    <release version="0.1.6" date="2026-11-17">
-      <description>
-        <p>Add a native tray icon with connection, location, settings, and quit actions.</p>
-      </description>
-    </release>
-    <release version="0.1.5" date="2026-11-17">
-      <description>
-        <p>Add background notifications, bring-back behavior, and password removal.</p>
-      </description>
-    </release>
-    <release version="0.1.4" date="2026-11-17">
-      <description>
-        <p>Add bounded automatic reconnection after an unexpected VPN drop.</p>
-      </description>
-    </release>
-    <release version="0.1.3" date="2026-11-17">
-      <description>
-        <p>Add country flags, country-name search, a stale-location fix, and a TCP/UDP guide.</p>
-      </description>
-    </release>
-    <release version="0.1.2" date="2026-11-17">
-      <description>
-        <p>Separate the VPN account name from the local profile owner.</p>
-      </description>
-    </release>
-    <release version="0.1.1" date="2026-11-17">
-      <description>
-        <p>Fix the location list download on the installed libsoup runtime.</p>
-      </description>
-    </release>
-    <release version="0.1.0" date="2026-11-17">
-      <description>
-        <p>First test build.</p>
       </description>
     </release>
   </releases>

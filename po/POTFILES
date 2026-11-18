@@ -1,0 +1,7 @@
+# Source files with translatable strings, relative to the repository root.
+pervius/config.py
+pervius/i18n.py
+pervius/ui/account.py
+pervius/ui/window.py
+data/com.solvetus.Pervius.desktop.in
+data/com.solvetus.Pervius.metainfo.xml.in

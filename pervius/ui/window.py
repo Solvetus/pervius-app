@@ -544,7 +544,8 @@ class MainWindow(Adw.ApplicationWindow):
         )
         self.upload_column = stat_column("go-up-symbolic", C_("traffic", "Upload"), self.upload_value)
         self.duration_column = stat_column(
-            "preferences-system-time-symbolic", _("Connected"), self.duration_value
+            # Translators: caption under the time since the VPN connected.
+            "preferences-system-time-symbolic", C_("duration", "Connected"), self.duration_value
         )
         stats.append(self.download_column)
         stats.append(self.upload_column)

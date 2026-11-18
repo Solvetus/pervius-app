@@ -7,6 +7,7 @@ Icon=com.solvetus.Pervius
 Terminal=false
 Type=Application
 Categories=Network;
-Keywords=VPN;OpenVPN;NetworkManager;
+# Translators: search terms, separated by semicolons; keep the trailing semicolon.
+Keywords=VPN;OpenVPN;NetworkManager;kill switch;
 StartupNotify=true
 StartupWMClass=com.solvetus.Pervius
