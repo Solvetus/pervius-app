@@ -19,18 +19,28 @@ from ..settings import SettingsStore  # noqa: E402
 from .window import MainWindow  # noqa: E402
 
 
+HIDDEN_OPTION = "--hidden"
+
+
 class PerviusApplication(Adw.Application):
-    def __init__(self):
+    def __init__(self, *, start_hidden: bool = False):
         super().__init__(application_id=APP_ID, flags=0)
         self.window: MainWindow | None = None
+        # Start at login runs "pervius --hidden": stay in the tray.  Without a
+        # tray to come back to, show the window anyway.
+        self.start_hidden = start_hidden
 
         present = Gio.SimpleAction.new("present", None)
         present.connect("activate", lambda *_args: self.do_activate())
         self.add_action(present)
 
     def do_activate(self):
-        if self.window is None:
+        first = self.window is None
+        if first:
             self.window = MainWindow(application=self)
+        hidden, self.start_hidden = self.start_hidden, False
+        if first and hidden and self.window.tray is not None and self.window.tray.registered:
+            return
         self.withdraw_notification(NOTIFICATION_ID)
         self.window.present()
 
@@ -49,6 +59,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
     argv = list(sys.argv if argv is None else argv)
+    start_hidden = HIDDEN_OPTION in argv[1:]
+    argv = [argv[0], *[arg for arg in argv[1:] if arg != HIDDEN_OPTION]] if argv else argv
     logging.basicConfig(level=logging.INFO, format="%(name)s: %(levelname)s %(message)s")
     # Adopt settings and saved passwords from a 0.1.x installation before the
     # window loads anything.  A no-op on fresh installs.
@@ -57,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     i18n.setup(SettingsStore().load().language)
     Gtk.init()
     Adw.init()
-    app = PerviusApplication()
+    app = PerviusApplication(start_hidden=start_hidden)
     return app.run(argv)
 
 
