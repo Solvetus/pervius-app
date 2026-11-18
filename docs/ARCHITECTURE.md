@@ -1,13 +1,13 @@
 # Architecture
 
-This document describes how Solvetus VPN Manager is built, how the kill switch
+This document describes how Pervius is built, how the kill switch
 works, what it does and does not protect against, and the known limitations.
 The user-facing overview is in [`README.md`](../README.md).
 
 ## 1. Goals and constraints
 
-An independent Linux desktop front end for an **existing FastVPN / OpenVPN
-subscription**, using only system packages and NetworkManager:
+Pervius is an independent Linux desktop client for an **existing FastVPN /
+OpenVPN subscription**, using only system packages and NetworkManager:
 
 - Python 3, GTK 4, libadwaita, PyGObject and libnm.
 - No custom VPN protocol, daemon or bundled VPN engine. NetworkManager and its
@@ -25,8 +25,9 @@ subscription**, using only system packages and NetworkManager:
 
 Ubuntu 26.10 on aarch64 is the only tested environment, with NetworkManager
 1.58, NetworkManager-openvpn 1.12, OpenVPN 2.7, Python 3.14, GTK 4.24,
-libadwaita 1.10, libsoup 3.6, libsecret 0.21, nftables 1.1, polkitd, dbus-broker
-as the system bus, and UFW active on the nftables backend.
+libadwaita 1.10, libsoup 3.6, libsecret 0.21, nftables 1.1, polkitd and
+dbus-broker as the system bus. Fedora support is planned; see
+[`PACKAGING.md`](PACKAGING.md).
 
 ## 3. Components
 
@@ -86,6 +87,9 @@ as the system bus, and UFW active on the nftables backend.
   service.
 - `pervius/killswitchd/` — root service and pure policy helpers.
 - `pervius/tools/` — catalogue inspector, live proof CLI and kill-switch CLI.
+- `pervius/migration.py` — one-time upgrade from 0.1.x (section 9).
+- `pervius/distro.py` — documented, report-only distribution checks
+  (section 8).
 
 ## 4. Connection model
 
@@ -109,19 +113,19 @@ as the system bus, and UFW active on the nftables backend.
 ### Privilege model
 
 - The GUI and CLI are ordinary-user processes.
-- A root systemd service (`solvetus-killswitchd.service`) is D-Bus activated
-  as `org.solvetus.KillSwitch1` at `/org/solvetus/KillSwitch1`. It is not
+- A root systemd service (`pervius-killswitchd.service`) is D-Bus activated
+  as `com.solvetus.Pervius.KillSwitch1` at `/com/solvetus/Pervius/KillSwitch1`. It is not
   enabled at boot.
 - Unit hardening: `Type=dbus`, `CapabilityBoundingSet=CAP_NET_ADMIN`,
   `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ProtectHome=yes`,
-  `PrivateTmp=yes`, `RuntimeDirectory=solvetus` (0700),
+  `PrivateTmp=yes`, `RuntimeDirectory=pervius` (0700),
   `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK`.
 - The service never runs a shell and never accepts rule text, paths or
   firewall expressions from callers.
 
 ### D-Bus API
 
-Interface `org.solvetus.KillSwitch1`:
+Interface `com.solvetus.Pervius.KillSwitch1`:
 
 - `Arm(s uuid, b allow_lan) -> a{sv}`
 - `Disarm() -> a{sv}`
@@ -133,7 +137,7 @@ Status keys: `armed`, `state` (`off`/`armed`/`error`), `detail`, `uuid`,
 
 ### Authorization
 
-- polkit action `org.solvetus.killswitch.control`: `allow_active=yes`,
+- polkit action `com.solvetus.pervius.killswitch.control`: `allow_active=yes`,
   `allow_inactive=no`, `allow_any=no`. The service calls `CheckAuthorization`
   with a `system-bus-name` subject; root bypasses polkit.
 - `Arm` only accepts the reserved profile UUID and validates that the caller
@@ -143,8 +147,9 @@ Status keys: `armed`, `state` (`off`/`armed`/`error`), `detail`, `uuid`,
 
 ### nftables policy
 
-- A dedicated table `inet solvetus_ks`. The service only adds and deletes this
-  table; it never flushes the global ruleset and coexists with UFW.
+- A dedicated table `inet pervius_ks`. The service only adds and deletes this
+  table; it never flushes the global ruleset and leaves firewall front ends
+  such as ufw or firewalld untouched.
 - Output base chain at priority `-10`: accept loopback, `tun*`, DHCPv4/v6,
   IPv6 neighbour discovery (ICMPv6 133–136), the resolved VPN server addresses
   on their exact protocol/port, and optionally RFC 1918/ULA LAN ranges; drop
@@ -163,7 +168,7 @@ Status keys: `armed`, `state` (`off`/`armed`/`error`), `detail`, `uuid`,
 - Reboot clears `/run` and the nftables ruleset: protection fails open, with
   no automatic re-arming.
 - Quitting the GUI can keep protection armed or disarm it. The CLI
-  `solvetus-killswitch disarm` is the recovery path.
+  `pervius-killswitch disarm` is the recovery path.
 - The GUI polls the service status every 5 seconds and never assumes local
   state.
 
@@ -172,8 +177,7 @@ Status keys: `armed`, `state` (`off`/`armed`/`error`), `detail`, `uuid`,
 A live test with the VPN down armed the switch with 14 resolved endpoints.
 DNS resolution, traffic bound to the physical interface and a direct TCP
 connection to a public address all timed out; status stayed armed; disarm
-restored IPv4 connectivity; UFW stayed active and only the dedicated table was
-touched.
+restored IPv4 connectivity; only the dedicated table was touched.
 
 Not yet tested live: an IPv6-literal leak (the test machine had no global IPv6
 route), the GUI switch against the live service, behaviour across a real
@@ -229,14 +233,86 @@ provider IP rotation while armed.
 12. **GNOME's VPN indicator cannot be hidden**; a shell extension would be
     fragile and is deliberately not attempted.
 13. **No multiple simultaneous VPNs or accounts; no split tunnelling.**
-14. **No signed packages or reproducible builds.**
+14. **No signed packages or reproducible builds.** Releases publish a
+    `SHA256SUMS` file next to the `.deb`.
+15. **Upgrades from 0.1.x with `apt` bypass the armed-kill-switch guard**,
+    because apt removes the old package (whose removal script deletes its
+    table) before unpacking Pervius. `dpkg -i` is guarded. See section 9.
 
-## 8. Test status
+## 8. Platform differences
+
+Application code under `pervius/` is distribution-neutral. The only module
+that knows about distribution differences is `pervius/distro.py`, and it only
+*reports* them (`pervius-killswitch diagnose`):
+
+- **System bus:** dbus-broker or dbus-daemon. D-Bus activation goes through
+  systemd and the packages reload the bus policy with `busctl ... ReloadConfig`;
+  both implementations support this.
+- **Firewall front ends:** ufw or firewalld. The kill switch uses its own table
+  and never modifies them; its early-priority drop wins over their accepts.
+- **nftables.service:** when enabled, restarting it reloads a ruleset file that
+  normally begins with `flush ruleset`, which also removes an armed kill-switch
+  table (fail-open until armed again). `diagnose` warns about it.
+- **polkit:** Pervius ships only an action file in
+  `/usr/share/polkit-1/actions`; local rules can narrow it.
+
+Install paths are listed once in `packaging/layout.tsv`; see
+[`PACKAGING.md`](PACKAGING.md).
+
+## 9. Upgrade migration from 0.1.x
+
+Releases up to 0.1.19 used different identifiers. `pervius/migration.py` is
+the only module that knows them. Each step runs once, is recorded in
+`~/.local/share/pervius/migration.json`, and runs only if the old data
+directory exists:
+
+1. **Files** (before settings load): settings and favorites, the ownership
+   manifest, the cached catalogue and the CA file are copied into the new data
+   directory (directories 0700, files 0600, regular files only, never
+   overwriting). The old directory is left in place.
+2. **Keyring:** saved passwords are copied from the old Secret Service schema
+   to `com.solvetus.Pervius`, read back to verify, then the old entries are
+   deleted. A locked or unavailable keyring postpones the step to the next
+   start. Secrets and account names are never logged.
+3. **Profile** (before the secret agent registers): the profile with the
+   reserved UUID must pass the usual ownership checks, using its old
+   connection ID, and the copied CA must match the manifest hash. It is then
+   renamed to **Pervius (managed)**, pointed at the copied CA, and the manifest
+   is updated. Anything that does not validate is left untouched, and the
+   strict ownership check then blocks with an explanation. If the VPN is up
+   during the upgrade, the stored profile is still renamed; a
+   reauthentication during that one session may fail, after which automatic
+   reconnect uses the renamed profile.
+
+The Debian `preinst` refuses to install while the old kill-switch table
+exists, and never deletes it. apt removes the conflicting old package first,
+and the old package's removal script deletes its own table, so the guard
+protects `dpkg -i` upgrades only.
+
+## 10. Future work
+
+- **Auto-protect** needs a background component that is not tied to the
+  window, a trusted-network model, an auto-connect and credential policy,
+  captive-portal handling, and a documented escape hatch. It must not be a
+  toggle that arms without being able to reconnect.
+- **DNS filtering** needs a local filtering resolver with maintained
+  blocklists, integration with systemd-resolved, and an explicit DoH/DoT
+  policy. It filters names, not IP-literal traffic, and must not be labelled
+  "DNS leak protection" unless the fallback paths are addressed.
+- **Kill-switch test plan** still to automate in a disposable VM or network
+  namespace: arm with the VPN down (no internet, DNS or IPv6), drop the tunnel
+  during reconnect, restart the service (rules rebuilt or error reported),
+  reboot (fail-open), uninstall (table and service removed), and bypass
+  attempts (bound sockets, IPv6 literals, plain DNS, DoH), with the host
+  firewall front end active throughout.
+
+## 11. Test status
 
 - Unit tests cover the parser, validator, store, settings, ownership, profile
   building, import verification, agent authorization, fetcher, country search,
   reconnect policy, tray properties, public-IP parsing, kill-switch rules and
-  profile validation.
+  profile validation, every upgrade-migration path, the Debian preinst guard,
+  the distribution checks, and version and identifier consistency.
 - UI harnesses in [`tests/manual/`](../tests/manual/README.md) exercise the
   window on a private Broadway display.
 - Verified live: first VPN import/activation and browsing; keyring store,
