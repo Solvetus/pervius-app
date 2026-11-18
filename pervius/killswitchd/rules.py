@@ -395,6 +395,21 @@ def build_dns_window(resolvers: Iterable[str], seconds: int = DNS_WINDOW_SECONDS
     return "\n".join(lines) + "\n"
 
 
+def merge_endpoints(fresh, current) -> tuple[Endpoint, ...]:
+    """Fresh endpoints first, then the current ones (kept for the live tunnel)."""
+    merged: list[Endpoint] = []
+    seen = set()
+    for endpoint in (*fresh, *current):
+        key = (endpoint.address, endpoint.port, endpoint.protocol)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(endpoint)
+        if len(merged) >= MAX_ENDPOINTS:
+            break
+    return tuple(merged)
+
+
 def endpoints_from_state(items: Iterable[dict]) -> tuple[Endpoint, ...]:
     endpoints = []
     for item in items:

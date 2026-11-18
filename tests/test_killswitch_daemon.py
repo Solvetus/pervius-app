@@ -9,6 +9,7 @@ from pathlib import Path
 
 from pervius.config import MANAGED_UUID
 from pervius.killswitchd import daemon
+from pervius.killswitchd import rules
 from pervius.killswitchd.rules import Endpoint, Resolution, RulesError
 
 OWNER = 1000
@@ -498,7 +499,7 @@ class MergeTests(unittest.TestCase):
         fresh = tuple(Endpoint(f"198.51.100.{i}", 1194, "udp") for i in range(1, 200))
         current = tuple(Endpoint(f"203.0.113.{i}", 1194, "udp") for i in range(1, 200))
         merged = daemon.merge_endpoints(fresh, current + fresh[:5])
-        self.assertEqual(len(merged), daemon.MAX_ENDPOINTS)
+        self.assertEqual(len(merged), rules.MAX_ENDPOINTS)
         self.assertEqual(merged[:199], fresh)
 
 

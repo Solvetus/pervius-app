@@ -39,7 +39,6 @@ from .profile import ProfileError, remotes_from_profile_data  # noqa: E402
 from .rules import (  # noqa: E402
     GUARD_TABLE_SPEC,
     LEGACY_GUARD_TABLE_SPEC,
-    MAX_ENDPOINTS,
     TABLE_SPEC,
     Endpoint,
     Resolution,
@@ -50,6 +49,7 @@ from .rules import (  # noqa: E402
     build_ruleset,
     cgroup_match,
     endpoints_from_state,
+    merge_endpoints,
     resolve_remotes,
     resolver_addresses,
     validate_interfaces,
@@ -136,21 +136,6 @@ class ResolveFailed(ServiceError):
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-
-
-def merge_endpoints(fresh, current) -> tuple[Endpoint, ...]:
-    """Fresh endpoints first, then the current ones (kept for the live tunnel)."""
-    merged: list[Endpoint] = []
-    seen = set()
-    for endpoint in (*fresh, *current):
-        key = (endpoint.address, endpoint.port, endpoint.protocol)
-        if key in seen:
-            continue
-        seen.add(key)
-        merged.append(endpoint)
-        if len(merged) >= MAX_ENDPOINTS:
-            break
-    return tuple(merged)
 
 
 class SystemBackend:

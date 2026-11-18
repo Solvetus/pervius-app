@@ -36,6 +36,7 @@ from pervius.killswitchd.rules import (
     build_dns_window,
     build_endpoint_swap,
     build_ruleset,
+    merge_endpoints,
 )
 
 REPO = Path(__file__).resolve().parents[2]
@@ -212,8 +213,6 @@ class KillSwitchTests(NamespaceTestCase):
         """Regression: replacing the endpoints before disconnecting cut the old
         tunnel's packets ("write UDPv4: Operation not permitted"); the old
         OpenVPN then held pervius0 and the new one could not open it."""
-        from pervius.killswitchd.daemon import merge_endpoints
-
         old = (Endpoint("192.0.2.10", 1194, "udp"),)
         new = (Endpoint("192.0.2.20", 1194, "udp"),)
         nft(build_ruleset(old))
