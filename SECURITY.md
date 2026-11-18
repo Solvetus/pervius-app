@@ -19,9 +19,7 @@ Only the latest release receives security fixes.
 
 | Version | Supported |
 | --- | --- |
-| 0.3.x | Yes |
-| 0.2.x | No |
-| < 0.2 | No (private test builds) |
+| 1.0.x | Yes |
 
 ## Privileged component and scope
 
@@ -62,7 +60,7 @@ dispatcher hook:
 
 Also in scope: the NetworkManager secret agent (it must release the password
 only to NetworkManager, for the owned profile), profile and catalogue
-validation, keyring handling and the upgrade migration.
+validation and keyring handling.
 
 Out of scope: vulnerabilities in NetworkManager, OpenVPN, the VPN provider's
 service or servers, and the limitations documented in

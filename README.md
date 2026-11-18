@@ -69,30 +69,22 @@ nftables, polkit, systemd and the GTK 4/libadwaita GObject bindings.
 ## Install
 
 The latest release is
-[v0.3.2](https://github.com/Solvetus/pervius-app/releases/tag/v0.3.2). Download
+[v1.0.0](https://github.com/Solvetus/pervius-app/releases/tag/v1.0.0). Download
 the `.deb` and `SHA256SUMS` from the same release, verify the checksum, then
 install. With the GitHub CLI:
 
 ```sh
-gh release download v0.3.2 --repo Solvetus/pervius-app
+gh release download v1.0.0 --repo Solvetus/pervius-app
 sha256sum --check SHA256SUMS
-sudo apt install ./pervius_0.3.2_all.deb
+sudo apt install ./pervius_1.0.0_all.deb
 ```
 
 Without it, download both files from the release page and run the last two
-commands. `sha256sum` must print `pervius_0.3.2_all.deb: OK`; do not install a
+commands. `sha256sum` must print `pervius_1.0.0_all.deb: OK`; do not install a
 package whose checksum does not match. The packages are not signed yet.
 
 Start **Pervius** from the application menu or run `pervius`. Do not run it
 with `sudo`.
-
-### Upgrading from 0.2.0
-
-Disarm the kill switch, disconnect and quit Pervius before upgrading. 0.3.0
-pins the tunnel to the interface `pervius0`; an armed 0.2.0 kill switch that
-is restored by the new service blocks the old tunnel until you reconnect. The
-managed profile is re-imported automatically on the next connection (new
-tunnel name, DNS through the tunnel).
 
 ## First use
 

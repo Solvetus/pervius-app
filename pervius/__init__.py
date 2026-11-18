@@ -6,4 +6,4 @@ existing FastVPN (OpenVPN) subscription through NetworkManager.
 ``__version__`` is the single version source; packaging reads it from here.
 """
 
-__version__ = "0.3.2"
+__version__ = "1.0.0"

@@ -72,48 +72,13 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
-    <release version="0.3.2" date="2026-11-18" type="stable">
-      <url type="details">https://github.com/Solvetus/pervius-app/releases/tag/v0.3.2</url>
-      <description>
-        <p>The header shows only the app name, centred, and the footer is two short lines.</p>
-      </description>
-    </release>
-    <release version="0.3.1" date="2026-11-18" type="stable">
-      <url type="details">https://github.com/Solvetus/pervius-app/releases/tag/v0.3.1</url>
+    <release version="1.0.0" date="2026-11-19" type="stable">
+      <url type="details">https://github.com/Solvetus/pervius-app/releases/tag/v1.0.0</url>
       <description>
         <p>
-          A calmer window: short confirmations appear as toasts that disappear
-          by themselves, warnings stay in a banner you can dismiss, and the
-          window and status card keep the same size in every state.
-        </p>
-      </description>
-    </release>
-    <release version="0.3.0" date="2026-11-18" type="stable">
-      <url type="details">https://github.com/Solvetus/pervius-app/releases/tag/v0.3.0</url>
-      <description>
-        <p>
-          A new logo, Portuguese, French, Spanish and Italian translations, and
-          leak protection that works even with the kill switch off: while the
-          VPN is connected, all DNS goes through the tunnel and IPv6 outside the
-          tunnel is blocked.
-        </p>
-        <p>
-          The kill switch now allows only the Pervius tunnel and interfaces you
-          choose, and lets you change location or protocol while it stays
-          armed. A saved password is never shown again; the Account dialog only
-          says that one is saved and offers to replace or forget it. Pervius
-          can also start at login, hidden in the tray.
-        </p>
-      </description>
-    </release>
-    <release version="0.2.0" date="2026-11-18">
-      <url type="details">https://github.com/Solvetus/pervius-app/releases/tag/v0.2.0</url>
-      <description>
-        <p>
-          First public release under the name Pervius, licensed under the
-          Apache License 2.0. Settings, favorites, a saved password and the
-          managed NetworkManager profile from earlier test builds are adopted
-          automatically on first start.
+          First public release: a desktop client for an existing FastVPN
+          subscription with leak protection while connected, an optional kill
+          switch, a tray icon, automatic reconnect and five languages.
         </p>
       </description>
     </release>
