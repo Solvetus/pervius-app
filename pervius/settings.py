@@ -31,6 +31,10 @@ class Settings:
     block_ipv6: bool = True
     # Interfaces the kill switch and the IPv6 guard always allow (e.g. wt0).
     killswitch_interfaces: list[str] = field(default_factory=list)
+    # Last window size (0 = never saved, use the default) and maximised state.
+    window_width: int = 0
+    window_height: int = 0
+    window_maximized: bool = False
 
     @classmethod
     def from_dict(cls, value: dict) -> "Settings":
@@ -80,6 +84,15 @@ class Settings:
                     interfaces.append(name)
                 if len(interfaces) >= MAX_INTERFACES:
                     break
+        def dimension(name: str) -> int:
+            item = value.get(name, 0)
+            if isinstance(item, bool) or not isinstance(item, int):
+                return 0
+            return item if 200 <= item <= 10000 else 0
+
+        window_width, window_height = dimension("window_width"), dimension("window_height")
+        if not (window_width and window_height):
+            window_width = window_height = 0
         language = value.get("language", "")
         if language not in SUPPORTED_LANGUAGES:
             language = ""
@@ -97,6 +110,9 @@ class Settings:
             show_ip_addresses=flag("show_ip_addresses", False),
             block_ipv6=flag("block_ipv6", True),
             killswitch_interfaces=interfaces,
+            window_width=window_width,
+            window_height=window_height,
+            window_maximized=flag("window_maximized", False),
         )
 
 

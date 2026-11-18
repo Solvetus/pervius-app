@@ -328,6 +328,10 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.settings_store = SettingsStore()
         self.settings: Settings = self.settings_store.load()
+        if self.settings.window_width:
+            self.set_default_size(self.settings.window_width, self.settings.window_height)
+        if self.settings.window_maximized:
+            self.maximize()
         self.local_username = local_username()
         self.catalogue_store = CatalogueStore()
         self.catalogue: Catalogue | None = None
@@ -558,7 +562,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.connection_details.append(Gtk.Separator())
 
-        stats = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=18)
+        stats = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         stats.set_homogeneous(True)
         stats.set_halign(Gtk.Align.CENTER)
 
@@ -571,14 +575,10 @@ class MainWindow(Adw.ApplicationWindow):
             column.append(icon)
             value_label.set_xalign(0.5)
             value_label.add_css_class("body")
-            # Long values shorten instead of widening the window.
-            value_label.set_ellipsize(Pango.EllipsizeMode.END)
-            value_label.set_max_width_chars(14)
             column.append(value_label)
             caption_label = Gtk.Label(label=caption)
             caption_label.add_css_class("caption")
             caption_label.add_css_class("dim-label")
-            caption_label.set_ellipsize(Pango.EllipsizeMode.END)
             column.append(caption_label)
             return column
 
@@ -586,7 +586,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.download_value.set_tooltip_text(_("Traffic received since this connection"))
         self.upload_value = Gtk.Label(label="—")
         self.upload_value.set_tooltip_text(_("Traffic sent since this connection"))
-        self.protocol_value = Gtk.Label(label="OpenVPN")
+        self.protocol_value = Gtk.Label(label="UDP")
         self.duration_value = Gtk.Label(label="—")
         self.duration_value.set_tooltip_text(_("Time since the VPN connected"))
         self.download_column = stat_column(
@@ -599,7 +599,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         stats.append(self.download_column)
         stats.append(self.upload_column)
-        stats.append(stat_column("network-vpn-symbolic", _("Protocol"), self.protocol_value))
+        stats.append(stat_column("network-vpn-symbolic", "OpenVPN", self.protocol_value))
         stats.append(self.duration_column)
         self.connection_details.append(stats)
         status_card.append(self.connection_details)
@@ -1267,7 +1267,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _refresh_connection_details(self):
         connected = self._state == "connected"
-        self.protocol_value.set_label(f"OpenVPN · {self.settings.protocol.upper()}")
+        self.protocol_value.set_label(self.settings.protocol.upper())
         # Every detail always keeps its place (so the card never changes size);
         # while disconnected the values show "—" and Switch IP is insensitive.
         if not connected:
@@ -2017,7 +2017,7 @@ class MainWindow(Adw.ApplicationWindow):
             protocol = "udp" if "udp" in location.profiles else "tcp"
         self._set_protocol(protocol)
         self.settings.protocol = protocol
-        self.protocol_value.set_label(f"OpenVPN · {protocol.upper()}")
+        self.protocol_value.set_label(protocol.upper())
         self._update_location_row()
         if self._state not in _ACTIVE_STATES:
             self.settings_store.save(self.settings)
@@ -3255,7 +3255,20 @@ class MainWindow(Adw.ApplicationWindow):
         dialog.connect("response", lambda _dialog, response_id: on_response(response_id))
         dialog.present(self)
 
+    def _save_window_size(self):
+        """Remember the size like GNOME apps do; the default applies until then."""
+        maximized = self.is_maximized()
+        width, height = self.get_default_size()
+        if not maximized and width > 0 and height > 0:
+            self.settings.window_width, self.settings.window_height = width, height
+        self.settings.window_maximized = maximized
+        try:
+            self.settings_store.save(self.settings)
+        except OSError:
+            pass
+
     def _on_close_request(self, *_args):
+        self._save_window_size()
         if self._quitting or self._allow_close:
             return False
         if self._state == "reconnecting" or (
@@ -3498,6 +3511,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._quit_now()
 
     def _quit_now(self):
+        self._save_window_size()
         self._quitting = True
         self._intent_connected = False
         self._reset_reconnect_state()

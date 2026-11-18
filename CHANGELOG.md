@@ -25,6 +25,10 @@ Releases up to 0.1.19 were private test builds named "Solvetus VPN Manager".
   default window keeps the 0.3.0 height and is as narrow as the English
   "Allow local network" description allows on one line; its content scrolls
   when it does not fit. The footer wraps centred.
+- The window remembers its size and maximised state between runs; the default
+  size applies only until one is saved.
+- The Protocol column of the connection details reads "OpenVPN" over "UDP" or
+  "TCP", so it is never truncated.
 - A taller header with a little space between the title and the subtitle.
 ## [0.3.0] - 2026-11-18
 

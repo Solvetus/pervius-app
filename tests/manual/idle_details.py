@@ -13,7 +13,7 @@ def scenario(window, checks, done):
     checks.equal("VPN exit IP placeholder", (window.vpn_ip_value.get_visible(), window.vpn_ip_value.get_text()), (True, "—"))
     checks.equal("counters placeholders", (window.download_value.get_text(), window.upload_value.get_text()), ("—", "—"))
     checks.equal("timer placeholder", (window.duration_column.get_visible(), window.duration_value.get_text()), (True, "—"))
-    checks.equal("protocol", window.protocol_value.get_text(), "OpenVPN · UDP")
+    checks.equal("protocol", window.protocol_value.get_text(), "UDP")
     checks.equal("Switch IP shown but insensitive", (window.switch_ip_button.get_visible(), window.switch_ip_button.get_sensitive()), (True, False))
     done()
 

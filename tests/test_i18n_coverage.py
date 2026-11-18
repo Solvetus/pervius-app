@@ -44,7 +44,6 @@ TECHNICAL = {
 # Literals that are shown but must not be translated.
 ALLOWED = {
     "OpenVPN",
-    "OpenVPN ·",
     "UDP",
     "TCP",
     "VPN",

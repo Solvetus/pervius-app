@@ -23,7 +23,7 @@ def scenario(window, checks, done):
         checks.equal("preference saved", window.settings_store.load().show_ip_addresses, True)
         window.ip_toggle.set_active(False)
         checks.equal("hidden again", window.vpn_ip_value.get_text(), "•••.•••.•••.•••")
-        checks.equal("protocol", window.protocol_value.get_text(), "OpenVPN · UDP")
+        checks.equal("protocol", window.protocol_value.get_text(), "UDP")
         checks.equal("timer shown", window.duration_column.get_visible(), True)
         checks.equal("counters shown", window.download_column.get_visible(), True)
         checks.equal("Switch IP shown", window.switch_ip_button.get_visible(), True)

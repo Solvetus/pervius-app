@@ -47,6 +47,7 @@ def scenario(window, checks, done):
         ("idle", ""),
     ]
     sizes = []
+    state_checks = []
 
     def measure(index=0):
         if index == len(states):
@@ -78,6 +79,28 @@ def scenario(window, checks, done):
             if isinstance(w, Gtk.Label) and (w.get_label() or "").startswith("Permit RFC")
         )
         checks.equal("local-network subtitle is one line at the default size", lan.get_layout().get_line_count(), 1)
+        window._set_state("connected")
+        window._refresh_connection_details()
+        window.download_value.set_label("1023.9 MB")
+        window.upload_value.set_label("1023.9 MB")
+        window.duration_value.set_label("00:12:34")
+        window.vpn_ip_value.set_label("255.255.255.255")
+
+        def check_details():
+            cut = [
+                w.get_label() for w in walk(window.connection_details)
+                if isinstance(w, Gtk.Label) and w.get_mapped() and w.get_layout().is_ellipsized()
+            ]
+            cut += [
+                w.get_label() for w in walk(window.connection_details)
+                if isinstance(w, Gtk.Label) and w.get_mapped()
+                and w.get_width() < w.measure(Gtk.Orientation.HORIZONTAL, -1)[1]
+            ]
+            checks.equal("no truncated labels in the details row", cut, [])
+            checks.equal("protocol column reads OpenVPN / UDP", window.protocol_value.get_label(), "UDP")
+            return False
+
+        state_checks.append(check_details)
         footer = window.footer
         checks.equal("footer is centred", (footer.get_xalign(), footer.get_justify()), (0.5, Gtk.Justification.CENTER))
         checks.true("footer wraps inside the column", footer.get_width() <= window.get_width())
@@ -128,7 +151,24 @@ def scenario(window, checks, done):
         checks.true("room above the title", top >= 6)
         checks.true("room between title and subtitle", gap >= 2)
         checks.true("room below the subtitle", bottom >= 6)
-        done()
+        window.queue_resize()
+
+        waited = {"n": 0, "last": None}
+
+        def finish_checks():
+            # Wait for the layout to settle after the long values were set.
+            now = (window.download_column.get_width(), window.upload_column.get_width())
+            waited["n"] += 1
+            if now != waited["last"] and waited["n"] < 25:
+                waited["last"] = now
+                window.queue_resize()
+                return True
+            for later in state_checks:
+                later()
+            done()
+            return False
+
+        GLib.timeout_add(250, finish_checks)
         return False
 
     GLib.timeout_add(600, lambda: measure() and False)
