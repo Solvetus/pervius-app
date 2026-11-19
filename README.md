@@ -68,23 +68,17 @@ nftables, polkit, systemd and the GTK 4/libadwaita GObject bindings.
 
 ## Install
 
-The latest release is
-[v1.0.0](https://github.com/Solvetus/pervius-app/releases/tag/v1.0.0). Download
-the `.deb` and `SHA256SUMS` from the same release, verify the checksum, then
-install. With the GitHub CLI:
+The latest release is on the [Releases page](https://github.com/Solvetus/pervius-app/releases/latest). Download the `.deb` and `SHA256SUMS` from the same release, verify the checksum, then install. With the GitHub CLI:
 
 ```sh
-gh release download v1.0.0 --repo Solvetus/pervius-app
+gh release download --repo Solvetus/pervius-app --pattern '*.deb' --pattern SHA256SUMS
 sha256sum --check SHA256SUMS
-sudo apt install ./pervius_1.0.0_all.deb
+sudo apt install ./pervius_*_all.deb
 ```
 
-Without it, download both files from the release page and run the last two
-commands. `sha256sum` must print `pervius_1.0.0_all.deb: OK`; do not install a
-package whose checksum does not match. The packages are not signed yet.
+Without it, download both files from the release page and run the last two commands. `sha256sum` must print `OK` for the `.deb`; do not install a package whose checksum does not match. The packages are not signed yet.
 
-Start **Pervius** from the application menu or run `pervius`. Do not run it
-with `sudo`.
+Start **Pervius** from the application menu or run `pervius`. Do not run it with `sudo`.
 
 ## First use
 
